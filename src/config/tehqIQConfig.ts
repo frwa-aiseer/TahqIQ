@@ -1,0 +1,30 @@
+export const tehqIQConfig = {
+  appName: "TehqIQ",
+  tagline: "Research with Evidence. Write with Integrity.",
+  productDescription: "From research idea to verified submission.",
+  defaultLanguage: "en",
+  defaultEnglishVariant: "UK",
+  enableOrganizations: true,
+  enableCollaboration: true,
+  enableJournalFinder: true,
+  enableConferenceFinder: true,
+  enableSystematicReviews: true,
+  enableStatisticalAnalysis: true,
+  enableQualitativeResearch: true,
+  enableMachineLearningResearch: true,
+  enableJatsExport: true,
+  enableLatexExport: true,
+  enableDocxExport: true,
+  enablePdfExport: true,
+  enableAiUsageLedger: true,
+  requireHumanApproval: true,
+  blockUnverifiedCitations: true,
+  blockFabricatedData: true,
+  blockFalseAiDisclosure: true,
+  allowAiDetectorEvasion: false,
+  requireOutletRequirementTimestamp: true,
+  requireAnalysisProvenance: true,
+  requireFinalAuthorApproval: true
+};
+
+export const INTEGRITY_NOTICE = `TehqIQ assists researchers but does not replace subject expertise, ethical approval, statistical review, scholarly judgment or author responsibility. Human authors remain fully responsible for the validity, accuracy, originality, interpretation and disclosure of all submitted work.`;

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "entities": [
+    {
+      "name": "User",
+      "collectionName": "users",
+      "fields": [
+        { "name": "uid", "type": "string", "required": true },
+        { "name": "email", "type": "string", "required": true },
+        { "name": "displayName", "type": "string", "required": false },
+        { "name": "photoURL", "type": "string", "required": false },
+        { "name": "emailVerified", "type": "boolean", "required": true },
+        { "name": "organizationId", "type": "string", "required": true },
+        { "name": "createdAt", "type": "string", "required": true }
+      ]
+    },
+    {
+      "name": "Project",
+      "collectionName": "projects",
+      "fields": [
+        { "name": "id", "type": "string", "required": true },
+        { "name": "title", "type": "string", "required": true },
+        { "name": "discipline", "type": "string", "required": true },
+        { "name": "subdiscipline", "type": "string", "required": false },
+        { "name": "projectType", "type": "string", "required": true },
+        { "name": "isDemoProject", "type": "boolean", "required": true },
+        { "name": "isArchived", "type": "boolean", "required": true },
+        { "name": "isDeleted", "type": "boolean", "required": true },
+        { "name": "ownerUid", "type": "string", "required": true },
+        { "name": "organizationId", "type": "string", "required": true },
+        { "name": "members", "type": "map", "required": true },
+        { "name": "createdAt", "type": "string", "required": true },
+        { "name": "updatedAt", "type": "string", "required": true }
+      ]
+    }
+  ]
+}

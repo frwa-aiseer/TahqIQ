@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(projectData) {
+      return isSignedIn() && (
+        projectData.ownerUid == request.auth.uid ||
+        (projectData.members != null && projectData.members[request.auth.uid] == 'Owner')
+      );
+    }
+    
+    function isMember(projectData) {
+      return isSignedIn() && (
+        projectData.ownerUid == request.auth.uid ||
+        (projectData.members != null && projectData.members[request.auth.uid] != null)
+      );
+    }
+    
+    function getRole(projectData) {
+      return projectData.members != null && projectData.members[request.auth.uid] != null
+        ? projectData.members[request.auth.uid]
+        : (projectData.ownerUid == request.auth.uid ? 'Owner' : 'Viewer');
+    }
+    
+    function canWriteProject(projectData) {
+      return isMember(projectData) && (
+        getRole(projectData) in ['Owner', 'Corresponding Author', 'Co-author', 'Supervisor', 'Statistician']
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /projects/{projectId} {
+      allow read: if isSignedIn() && (
+        resource.data.isDemoProject == true ||
+        resource.data.ownerUid == request.auth.uid ||
+        (resource.data.members != null && resource.data.members[request.auth.uid] != null)
+      );
+      
+      allow create: if isSignedIn() && request.resource.data.ownerUid == request.auth.uid;
+      
+      allow update: if isSignedIn() && canWriteProject(resource.data) && (
+        (getRole(resource.data) == 'Owner') || (
+          request.resource.data.ownerUid == resource.data.ownerUid &&
+          request.resource.data.members == resource.data.members
+        )
+      );
+      
+      allow delete: if isSignedIn() && isOwner(resource.data);
+
+      match /versions/{versionId} {
+        allow read: if isSignedIn() && isMember(get(/databases/$(database)/documents/projects/$(projectId)).data);
+        allow create: if isSignedIn() && canWriteProject(get(/databases/$(database)/documents/projects/$(projectId)).data);
+        allow update, delete: if false;
+      }
+
+      match /auditEvents/{eventId} {
+        allow read: if isSignedIn() && isMember(get(/databases/$(database)/documents/projects/$(projectId)).data);
+        allow create: if isSignedIn() && isMember(get(/databases/$(database)/documents/projects/$(projectId)).data);
+        allow update, delete: if false;
+      }
+      
+      match /files/{fileId} {
+        allow read: if isSignedIn() && isMember(get(/databases/$(database)/documents/projects/$(projectId)).data);
+        allow create, update: if isSignedIn() && canWriteProject(get(/databases/$(database)/documents/projects/$(projectId)).data);
+        allow delete: if isSignedIn() && isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data);
+      }
+    }
+  }
+}

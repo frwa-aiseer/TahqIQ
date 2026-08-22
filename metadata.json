@@ -1,0 +1,8 @@
+{
+  "name": "TehqIQ v2.11",
+  "description": "An Intelligent Research and Scholarly Publication Platform — Research with Evidence. Write with Integrity.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
