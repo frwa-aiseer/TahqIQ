@@ -59,9 +59,8 @@ describe('Phase 0 Verification Tests', () => {
     expect(() => createMissingSourceRecord("Smith", 2024)).toThrow(/prohibited/i);
   });
 
-  it('6. Manuscript engine does not output fake Results or Boyer citations for real projects', () => {
+  it('6. Demo manuscript engine rejects real projects without generating substitute Results', () => {
     const realProject = createEmptyProject();
-    const disabledMsg = "Unavailable in the prototype: this function requires verified data, evidence or a configured backend.";
     const sectionToExpand: ManuscriptSection = {
       id: "sec-3",
       title: "3. Results",
@@ -75,8 +74,8 @@ describe('Phase 0 Verification Tests', () => {
       lastEditedTimestamp: new Date().toISOString()
     };
 
-    const expandedResults = expandSectionToQ1Length(sectionToExpand, realProject);
-    expect(expandedResults.content).toContain(disabledMsg);
-    expect(expandedResults.content).not.toContain("Boyer et al.");
+    expect(() => expandSectionToQ1Length(sectionToExpand, realProject)).toThrow(/demo-only/i);
+    expect(sectionToExpand.content).toBe("");
+    expect(sectionToExpand.content).not.toContain("Boyer et al.");
   });
 });

@@ -319,7 +319,11 @@ function MainAppContent() {
 
             {activeStep === 5 && (
               <div className="space-y-6">
-                <ProtocolBuilderView project={project} />
+                <ProtocolBuilderView
+                  project={project}
+                  onUpdateProject={(updatedProject) => setProject(updatedProject)}
+                  currentUserUid={user?.uid}
+                />
                 <DataLabView
                   datasets={project.datasets || []}
                   plans={project.analysisPlans || []}

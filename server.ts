@@ -225,6 +225,80 @@ Strict rules: Output structured JSON matching the responseSchema. Never make gen
     }
   });
 
+  // Domain-neutral methodology proposal. Output remains AI Suggested until a researcher approves it.
+  app.post("/api/gemini/methodology-proposal", async (req, res) => {
+    try {
+      const { projectId, projectContext } = req.body || {};
+      if (!projectId || !projectContext || typeof projectContext !== "object") {
+        return res.status(400).json({
+          status: "failed",
+          error: "projectId and projectContext are required for a methodology proposal.",
+        });
+      }
+
+      const ai = getGeminiClient();
+      const methodologyProperties = {
+        design: { type: Type.STRING },
+        populationOrDataSource: { type: Type.STRING },
+        sampling: { type: Type.STRING },
+        eligibility: { type: Type.STRING },
+        interventionExposureComparator: { type: Type.STRING },
+        variablesOrOutcomes: { type: Type.STRING },
+        instruments: { type: Type.STRING },
+        dataCollection: { type: Type.STRING },
+        analysisPlan: { type: Type.STRING },
+        ethics: { type: Type.STRING },
+        limitations: { type: Type.STRING },
+      };
+      const methodologyKeys = Object.keys(methodologyProperties);
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: `Create a domain-neutral methodology proposal using only this researcher-provided project context:\n${JSON.stringify(projectContext)}`,
+        config: {
+          systemInstruction: `You are a methodology proposal assistant. Return a reviewable proposal, never an approved protocol.
+Use only facts explicitly present in the supplied project context.
+Do not invent participants, sample sizes, power assumptions, instruments, timings, ethics approvals, statistical values, interventions, exposures, comparators, or data sources.
+For every unsupported field, return exactly "Researcher input required".
+Intervention, exposure, and comparator are optional and must remain "Researcher input required" when not supplied.`,
+          temperature: 0.1,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: methodologyProperties,
+            required: methodologyKeys,
+          },
+        },
+      });
+
+      const parsed = JSON.parse(response.text || "{}");
+      const proposal = Object.fromEntries(
+        methodologyKeys.map((key) => [
+          key,
+          typeof parsed[key] === "string" && parsed[key].trim()
+            ? parsed[key].trim()
+            : "Researcher input required",
+        ])
+      );
+
+      res.json({
+        status: "completed",
+        projectId,
+        reviewState: "AI Suggested",
+        proposal,
+        model: "gemini-3.6-flash",
+        promptVersion: "tq-vsc-003-v1",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error("Gemini Methodology Proposal Error:", error);
+      res.status(500).json({
+        status: "failed",
+        error: error.message || "AI methodology proposal failed. No fallback content was generated.",
+      });
+    }
+  });
+
   // 4. DOI Lookup Proxy Endpoint (Authoritative Registries)
   app.post("/api/sources/doi", async (req, res) => {
     try {

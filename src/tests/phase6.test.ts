@@ -135,13 +135,10 @@ describe("Phase 6 Acceptance Tests: Structured, Reviewable & Evidence-Grounded A
       lastEditedTimestamp: new Date().toISOString(),
     };
 
-    const expanded = expandSectionToQ1Length(section, mockProjectWithoutData, 1200);
-
-    // Initial generated status MUST be "AI Suggested", never "Approved"
-    expect(expanded.status).toBe("Drafting");
-    expect(expanded.state).toBe("AI Suggested");
-    expect(expanded.status).not.toBe("Approved");
-    expect(expanded.state).not.toBe("Approved");
+    // The legacy generator is demo-only and cannot create or approve real-project content.
+    expect(() => expandSectionToQ1Length(section, mockProjectWithoutData, 1200)).toThrow(/demo-only/i);
+    expect(section.status).toBe("Drafting");
+    expect(section.state).toBe("Empty");
   });
 
   // Test 4: Accepted and rejected proposals are logged to ledger

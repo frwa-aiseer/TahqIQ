@@ -12,6 +12,7 @@ import {
 import { performStateTransition, DATASET_TRANSITIONS } from "../../lib/stateMachines";
 import { parseAndProfileDataset, updateDatasetVariableDictionary } from "../../lib/datasetIngestion";
 import { executePairedCrossoverAnalysis, generateAnalysisFiguresAndTables } from "../../lib/statsEngine";
+import { createNumericEvidenceFromAnalysis } from "../../lib/numericEvidence";
 import { ApprovalModal } from "../ApprovalModal";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -362,6 +363,11 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
         );
 
         const updatedOutputs = [runOutput, ...(project.analysisOutputs || []).filter((o) => o.id !== runOutput.id)];
+        const runNumericEvidence = createNumericEvidenceFromAnalysis(runOutput);
+        const updatedNumericEvidence = [
+          ...runNumericEvidence,
+          ...(project.numericEvidenceRecords || []).filter((record) => record.analysisRunId !== runOutput.id),
+        ];
         const updatedFigures = [...runFigures, ...(project.figures || []).filter((f) => !runFigures.some((rf) => rf.id === f.id))];
         const updatedTables = [...runTables, ...(project.tables || []).filter((t) => !runTables.some((rt) => rt.id === t.id))];
 
@@ -369,6 +375,7 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
           ...project,
           analysisPlans: updatedPlans,
           analysisOutputs: updatedOutputs,
+          numericEvidenceRecords: updatedNumericEvidence,
           figures: updatedFigures,
           tables: updatedTables,
           updatedAt: new Date().toISOString(),

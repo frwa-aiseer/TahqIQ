@@ -1,4 +1,4 @@
-import { ProjectState, SourceRecord, AnalysisOutput, NumericEvidence } from "../types";
+import { ProjectState, AnalysisOutput, NumericEvidence } from "../types";
 
 export interface AIValidationResult {
   valid: boolean;
@@ -9,6 +9,98 @@ export interface AIValidationResult {
   ungroundedNumbers: number[];
   nonEmpiricalNumbers: number[];
   missingPlaceholders: string[];
+}
+
+export interface NumericValidationTarget {
+  location: "abstract" | "introduction" | "literature-review" | "methods" | "results" | "discussion" | "conclusion" | "table" | "caption" | "supplement";
+  content: string;
+  label?: string;
+}
+
+const CITATION_PATTERN = /\(([A-Z][a-zA-Z\s\-]+(?:et al\.)?,\s*\d{4})\)|\[(DOI:[^\]]+)\]|\[(\d+(?:\s*[-,]\s*\d+)*)\]/g;
+const NUMBER_PATTERN = /(?<![\w.])-?\d+(?:\.\d+)?(?!\w|\.\d)/g;
+
+function numbersEqual(left: number, right: number): boolean {
+  return Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) <= 1e-12;
+}
+
+function hasTraceableProvenance(evidence: NumericEvidence, project: ProjectState): boolean {
+  if (evidence.verificationState !== "Verified" || !evidence.id?.trim() || !evidence.sourceId?.trim()) return false;
+  if (!Number.isFinite(evidence.value) || !Number.isFinite(evidence.normalizedValue) || !evidence.createdAt?.trim()) return false;
+
+  switch (evidence.sourceType) {
+    case "DATASET": {
+      const dataset = (project.datasets || []).find((item) => item.id === evidence.sourceId);
+      return Boolean(dataset && evidence.datasetHash && dataset.fileHash === evidence.datasetHash);
+    }
+    case "ANALYSIS_OUTPUT": {
+      const output = (project.analysisOutputs || []).find((item) => item.id === evidence.sourceId);
+      return Boolean(
+        output &&
+        evidence.analysisRunId === output.id &&
+        (!output.datasetHash || evidence.datasetHash === output.datasetHash)
+      );
+    }
+    case "VERIFIED_SOURCE": {
+      const source = (project.sources || []).find((item) => item.id === evidence.sourceId && item.verificationState === "Verified");
+      return Boolean(
+        source && evidence.evidencePassageId &&
+        source.extractedPassages?.some((passage) => passage.id === evidence.evidencePassageId && passage.isVerifiedByHuman)
+      );
+    }
+    case "RESEARCHER_PROTOCOL":
+      return Boolean(project.methodologyWorkspace && evidence.sourceId === project.id);
+    case "USER_CONFIRMED":
+      return evidence.sourceId === project.id;
+    default:
+      return false;
+  }
+}
+
+function isStructuralNumber(text: string, start: number, end: number): boolean {
+  const before = text.slice(Math.max(0, start - 24), start);
+  const after = text.slice(end, Math.min(text.length, end + 12));
+  return /(?:section|chapter|figure|fig\.?|table|appendix|supplement(?:ary)?(?:\s+(?:figure|table))?)\s*(?:no\.?\s*)?$/i.test(before) ||
+    /^\s*of\s+\d+\b/i.test(after);
+}
+
+function extractNumbers(content: string): { empirical: number[]; nonEmpirical: number[] } {
+  const nonEmpirical: number[] = [];
+  const scrubbed = content.replace(CITATION_PATTERN, (citation) => {
+    for (const match of citation.matchAll(/\b(?:19|20)\d{2}\b/g)) nonEmpirical.push(Number(match[0]));
+    for (const match of citation.matchAll(/\d+/g)) {
+      const value = Number(match[0]);
+      if (!nonEmpirical.includes(value)) nonEmpirical.push(value);
+    }
+    return " ".repeat(citation.length);
+  });
+
+  const empirical: number[] = [];
+  for (const match of scrubbed.matchAll(NUMBER_PATTERN)) {
+    const value = Number(match[0]);
+    const start = match.index || 0;
+    if (isStructuralNumber(scrubbed, start, start + match[0].length)) nonEmpirical.push(value);
+    else empirical.push(value);
+  }
+  return {
+    empirical: Array.from(new Set(empirical)),
+    nonEmpirical: Array.from(new Set(nonEmpirical)),
+  };
+}
+
+export function validateManuscriptNumericContent(
+  targets: readonly NumericValidationTarget[],
+  project: ProjectState
+): { valid: boolean; failures: Array<{ location: string; label?: string; numbers: number[] }> } {
+  const evidence = (project.numericEvidenceRecords || []).filter((record) => hasTraceableProvenance(record, project));
+  const failures = targets.flatMap((target) => {
+    const { empirical } = extractNumbers(target.content);
+    const numbers = empirical.filter((value) => !evidence.some((record) =>
+      numbersEqual(record.value, value) || numbersEqual(record.normalizedValue, value)
+    ));
+    return numbers.length ? [{ location: target.location, label: target.label, numbers }] : [];
+  });
+  return { valid: failures.length === 0, failures };
 }
 
 /**
@@ -73,7 +165,7 @@ export function validateAiGeneratedProse(
   const sources = project.sources || [];
 
   // Extract citations from text, e.g., (Boyer et al., 2021), (Smith, 2024), [1], DOI:10...
-  const citationMatches = prose.match(/\(([A-Z][a-zA-Z\s\-]+(?:et al\.)?,\s*\d{4})\)|\[(DOI:[^\]]+)\]|\[(\d+)\]/g) || [];
+  const citationMatches = prose.match(CITATION_PATTERN) || [];
   
   const groundedCitations: string[] = [];
   const ungroundedCitations: string[] = [];
@@ -96,8 +188,9 @@ export function validateAiGeneratedProse(
       const titleMatch = src.title && cleanCit.toLowerCase().includes(src.title.toLowerCase());
       return (authorMatch && yearMatch) || doiMatch || titleMatch;
     });
+    const numericCitation = /^\d+$/.test(cleanCit) && Number(cleanCit) >= 1 && Number(cleanCit) <= sources.length;
 
-    if (isMatched || project.isDemoProject) {
+    if (isMatched || numericCitation || project.isDemoProject) {
       groundedCitations.push(cleanCit);
     } else {
       ungroundedCitations.push(cleanCit);
@@ -105,42 +198,23 @@ export function validateAiGeneratedProse(
   });
 
   // Temporarily remove citations from prose to avoid parsing citation numbers as empirical numbers
-  const proseWithoutCitations = prose.replace(/\(([A-Z][a-zA-Z\s\-]+(?:et al\.)?,\s*\d{4})\)|\[(DOI:[^\]]+)\]|\[(\d+)\]/g, " ");
-
-  // Extract numeric stats from prose, e.g. p = 0.05, t(10) = 2.1, d = 0.5
-  const numberMatches = proseWithoutCitations.match(/\b\d+(?:\.\d+)?\b/g) || [];
-  const allNumbers = Array.from(new Set(numberMatches.map(Number))).filter((n) => !isNaN(n));
+  const extractedNumbers = extractNumbers(prose);
 
   const groundedNumbers: number[] = [];
   const ungroundedNumbers: number[] = [];
   const nonEmpiricalNumbers: number[] = [];
 
   // Get provenance-based numerical evidence records
-  const numericEvidenceRecords = project.numericEvidenceRecords || [];
+  const numericEvidenceRecords = (project.numericEvidenceRecords || []).filter((record) => hasTraceableProvenance(record, project));
 
-  allNumbers.forEach((num) => {
-    // Classify non-empirical numbers
-    // E.g., standalone years (1900-2100) not covered by citations, section numbers (e.g., 1, 2, 3), etc.
-    // To be safe, we allow small integers (0, 1, 2) often used as section numbers or formatting,
-    // and valid citation years as non-empirical if they still slipped through.
-    if (
-      num === 0 || 
-      num === 1 || 
-      num === 2 || 
-      (num >= 1900 && num <= 2100 && Number.isInteger(num))
-    ) {
-      nonEmpiricalNumbers.push(num);
-      return;
-    }
-
+  extractedNumbers.empirical.forEach((num) => {
     // Must be traceable to a NumericEvidence record
     const isGrounded = numericEvidenceRecords.some(
       (evidence) =>
-        Math.abs(evidence.value - num) < 0.01 ||
-        Math.abs(evidence.normalizedValue - num) < 0.01
+        numbersEqual(evidence.value, num) || numbersEqual(evidence.normalizedValue, num)
     );
 
-    if (isGrounded || project.isDemoProject) {
+    if (isGrounded) {
       groundedNumbers.push(num);
     } else {
       ungroundedNumbers.push(num);
@@ -150,7 +224,7 @@ export function validateAiGeneratedProse(
   // Extract missing placeholders
   const placeholderMatches = prose.match(/\[(MISSING SOURCE|DATA REQUIRED|ETHICS REQUIRED|REASONING REQUIRED):[^\]]+\]/g) || [];
 
-  nonEmpiricalNumbers.push(...citationYears);
+  nonEmpiricalNumbers.push(...extractedNumbers.nonEmpirical, ...citationYears);
 
   // Check for strict ungrounded errors
   if (!project.isDemoProject) {
@@ -167,22 +241,21 @@ export function validateAiGeneratedProse(
       };
     }
 
-    // ANY ungrounded empirical number produces a blocking warning, in ALL sections.
-    if (ungroundedNumbers.length > 0) {
-      return {
-        valid: false,
-        error: `Validation Failed: Ungrounded numerical findings detected (${ungroundedNumbers.join(", ")}). All empirical numbers must be traceable to a verified NumericEvidence record.`,
-        groundedCitations,
-        ungroundedCitations,
-        groundedNumbers,
-        ungroundedNumbers,
-        nonEmpiricalNumbers,
-        missingPlaceholders: placeholderMatches,
-      };
-    }
   }
 
-  nonEmpiricalNumbers.push(...citationYears);
+  // Demo status controls isolation and labeling; it is never numeric provenance.
+  if (ungroundedNumbers.length > 0) {
+    return {
+      valid: false,
+      error: `Validation Failed: Ungrounded numerical findings detected (${ungroundedNumbers.join(", ")}). All empirical numbers must be traceable to a verified NumericEvidence record.`,
+      groundedCitations,
+      ungroundedCitations,
+      groundedNumbers,
+      ungroundedNumbers,
+      nonEmpiricalNumbers,
+      missingPlaceholders: placeholderMatches,
+    };
+  }
 
   return {
     valid: true,

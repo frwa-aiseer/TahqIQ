@@ -1,11 +1,14 @@
 import { isAnalysisOutputApproved } from "./aiValidationService";
 import { ProjectState, ManuscriptSection, ResearchCanvas } from "../types";
 import { formatInTextCitation } from "./cslStyles";
+import { applyToneAndComplexity } from "./manuscriptTone";
+
+export { applyToneAndComplexity } from "./manuscriptTone";
 
 /**
- * Evidence-Grounded Manuscript Assistant Engine
+ * DEMO-ONLY legacy manuscript fixture engine.
  * Generates neutral, structurally rigorous scholarly manuscript scaffolding strictly grounded in
- * verified canvas metadata, verified source records, and verified analysis outputs.
+ * the explicitly selected demo fixture. Real-project access is rejected before any content is built.
  *
  * ZERO FABRICATION POLICY:
  * - Never injects domain-specific assumptions (e.g., biomechanics, crossover trials, 18 participants, EMG findings) into arbitrary real projects.
@@ -27,43 +30,19 @@ export interface ManuscriptAssistantOptions {
 // Backward-compatible alias for existing imports
 export type Q1ExpansionOptions = ManuscriptAssistantOptions;
 
-export function applyToneAndComplexity(
-  content: string,
-  toneStyle: "Concise Technical" | "Narrative Descriptive" | "Formal Academic"
-): string {
-  if (!content) return content;
-  const tone = toneStyle || "Formal Academic";
-
-  if (tone === "Concise Technical") {
-    // Transform content into concise, metric-dense, direct technical prose
-    const concise = content
-      .replace(/accumulating empirical evidence indicates that/gi, "Empirical data show")
-      .replace(/it is important to note that/gi, "Notably,")
-      .replace(/despite extensive previous investigation,/gi, "Despite prior work,")
-      .replace(/in order to establish whether/gi, "To evaluate whether")
-      .replace(/a major methodological limitation in existing literature is/gi, "Key methodological limitation:")
-      .replace(/furthermore, many previous studies failed to report/gi, "Prior work omitted")
-      .replace(/the central finding of this investigation is that/gi, "Primary result:")
-      .replace(/statistical analysis was conducted using/gi, "Analyzed via");
-
-    return `<!-- Tone & Complexity Mode: Concise Technical -->\n${concise}`;
+export class DemoManuscriptEngineAccessError extends Error {
+  constructor(projectId: string) {
+    super(
+      `q1ManuscriptEngine is demo-only. Real project "${projectId || "Missing"}" was not modified and no substitute scientific content was generated.`
+    );
+    this.name = "DemoManuscriptEngineAccessError";
   }
+}
 
-  if (tone === "Narrative Descriptive") {
-    // Transform content into narrative descriptive flow with contextual transitions
-    const narrative = content
-      .replace(/## 1. Introduction/g, "## 1. Introduction & Contextual Narrative")
-      .replace(/## 2. Materials and Methods/g, "## 2. Materials and Experimental Methods")
-      .replace(/## 3. Results/g, "## 3. Findings & Observational Results")
-      .replace(/## 4. Discussion/g, "## 4. Discussion & Mechanistic Interpretation")
-      .replace(/key methodological limitation:/gi, "When evaluating the broader experimental landscape, a central methodological challenge emerges:")
-      .replace(/primary result:/gi, "Upon examining the primary outcomes across verified observations, the data indicate:");
-
-    return `<!-- Tone & Complexity Mode: Narrative Descriptive -->\n${narrative}`;
+function requireExplicitDemoProject(project: ProjectState): void {
+  if (project.isDemoProject !== true) {
+    throw new DemoManuscriptEngineAccessError(project.id);
   }
-
-  // Formal Academic (default)
-  return content.replace(/<!-- Tone & Complexity Mode: [^>]+ -->\n?/g, "");
 }
 
 export function expandSectionToQ1Length(
@@ -72,6 +51,8 @@ export function expandSectionToQ1Length(
   targetWordCount: number = 1200,
   options: ManuscriptAssistantOptions = {}
 ): ManuscriptSection {
+  requireExplicitDemoProject(project);
+
   const canvas: Partial<ResearchCanvas> = project.canvas || {};
   const topic = project.title || "Scholarly Investigation";
   const discipline = project.discipline || "Academic Discipline [Unspecified]";
@@ -265,7 +246,9 @@ ${hasValidAnalysis ? `The empirical results provide evidence regarding ${canvas.
     targetWordLimit: Math.max(targetWordCount, words),
     status: "Drafting",
     state: "AI Suggested",
-    lastEditedTimestamp: new Date().toISOString()
+    lastEditedTimestamp: new Date().toISOString(),
+    isDemo: true,
+    isSynthetic: true,
   };
 }
 
@@ -274,6 +257,8 @@ export function expandFullPaperToQ1Length(
   targetTotalWords: number = 4500,
   options: ManuscriptAssistantOptions = {}
 ): ProjectState {
+  requireExplicitDemoProject(project);
+
   const currentSections = project.sections || [];
   if (currentSections.length === 0) return project;
 

@@ -6,7 +6,15 @@ import { AiProposalModal } from "../AiProposalModal";
 import { validateAiGeneratedProse, AIValidationResult, isAnalysisOutputApproved } from "../../lib/aiValidationService";
 import { useAuth } from "../../context/AuthContext";
 import { formatInTextCitation, formatBibliographyEntry, CSL_STYLES } from "../../lib/cslStyles";
-import { ManuscriptAssistantOptions, applyToneAndComplexity } from "../../lib/q1ManuscriptEngine";
+import { applyToneAndComplexity } from "../../lib/manuscriptTone";
+import {
+  buildApprovedAnalysisInsertion,
+  buildLiteratureEvidenceInsertion,
+  getApprovedManuscriptAnalysisOutputs,
+  getInsertableLiteratureEvidence,
+  InsertableLiteratureEvidence,
+  StatisticalInsertionMode,
+} from "../../lib/writingEvidence";
 import { verifyManuscriptCitations, CitationOccurrence, CitationVerificationReport } from "../../lib/citationVerifier";
 import {
   JournalStyleVariation,
@@ -232,15 +240,6 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
       handleContentChange(updatedContent);
     }
   };
-
-  const getExpansionOptions = (): ManuscriptAssistantOptions => ({
-    focusStyle,
-    toneStyle: currentSectionTone,
-    cslStyle: activeCslStyle,
-    useCanvasContext,
-    useSourceContext,
-    useAnalysisContext,
-  });
 
   // Phase 6 AI Proposal Modal State
   const [aiProposalState, setAiProposalState] = useState<{
@@ -482,212 +481,43 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
   const [showStatisticalFindingsModal, setShowStatisticalFindingsModal] = useState<boolean>(false);
   const [evidenceSearchTerm, setEvidenceSearchTerm] = useState<string>("");
 
-  interface VerifiedLiteratureEvidenceItem {
-    id: string;
-    sourceId: string;
-    sourceTitle: string;
-    sourceAuthors: string[];
-    sourceYear: number;
-    passageText: string;
-    location?: string;
-    category?: string;
-    verificationBadge: string;
-  }
-
-  // 1. Gather all strictly verified project literature evidence records
-  const verifiedLiteratureEvidenceList: VerifiedLiteratureEvidenceItem[] = React.useMemo(() => {
-    const list: VerifiedLiteratureEvidenceItem[] = [];
-    const seen = new Set<string>();
-
-    // Passages from project source records
-    sources.forEach((src) => {
-      const isSrcVerified =
-        src.verificationState === "Verified" ||
-        src.state === "Metadata Verified" ||
-        src.state === "Full Text Reviewed" ||
-        src.doiVerified ||
-        src.crossrefVerified;
-
-      if (src.extractedPassages && src.extractedPassages.length > 0) {
-        src.extractedPassages.forEach((p, idx) => {
-          if (p.text && p.text.trim().length > 0) {
-            const key = `${src.id}-${p.text.trim().toLowerCase()}`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              list.push({
-                id: p.id || `pass-${src.id}-${idx}`,
-                sourceId: src.id,
-                sourceTitle: src.title || "Untitled Verified Source",
-                sourceAuthors: src.authors || [],
-                sourceYear: src.year || 0,
-                passageText: p.text.trim(),
-                location: p.section
-                  ? `${p.section}${p.pageNumber ? ` (p. ${p.pageNumber})` : ""}`
-                  : p.pageNumber
-                  ? `Page ${p.pageNumber}`
-                  : undefined,
-                category: p.category || "Extracted Evidence",
-                verificationBadge: p.isVerifiedByHuman
-                  ? "Researcher Verified Passage"
-                  : isSrcVerified
-                  ? "Verified Source Evidence"
-                  : "Source Passage",
-              });
-            }
-          }
-        });
-      }
-
-      // If source is verified and has an abstract/key finding passage, include it
-      if (isSrcVerified && src.abstract && src.abstract.trim().length > 0) {
-        const key = `${src.id}-${src.abstract.trim().toLowerCase()}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          list.push({
-            id: `src-abs-${src.id}`,
-            sourceId: src.id,
-            sourceTitle: src.title || "Untitled Verified Source",
-            sourceAuthors: src.authors || [],
-            sourceYear: src.year || 0,
-            passageText: src.abstract.trim(),
-            location: "Verified Abstract",
-            category: "Abstract Finding",
-            verificationBadge: "Verified Source Abstract",
-          });
-        }
-      }
-    });
-
-    // Evidence from verified claims
-    (project.claims || []).forEach((cl, clIdx) => {
-      if (cl.linkedEvidence && cl.linkedEvidence.length > 0) {
-        cl.linkedEvidence.forEach((le, leIdx) => {
-          if (le.passageQuote && le.passageQuote.trim().length > 0) {
-            const key = `${le.sourceId}-${le.passageQuote.trim().toLowerCase()}`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              const matchedSrc = sources.find((s) => s.id === le.sourceId);
-              list.push({
-                id: le.id || `claim-ev-${cl.id || clIdx}-${leIdx}`,
-                sourceId: le.sourceId,
-                sourceTitle: le.sourceTitle || matchedSrc?.title || "Project Verified Source",
-                sourceAuthors: matchedSrc?.authors || [],
-                sourceYear: matchedSrc?.year || 0,
-                passageText: le.passageQuote.trim(),
-                location: le.sectionName || (le.pageNumber ? `Page ${le.pageNumber}` : undefined),
-                category: `Claim: ${cl.claimStatement.substring(0, 45)}...`,
-                verificationBadge: cl.isResearcherApproved
-                  ? "Researcher Approved Claim Evidence"
-                  : "Linked Source Evidence",
-              });
-            }
-          }
-        });
-      }
-    });
-
-    return list;
-  }, [sources, project.claims]);
+  const verifiedLiteratureEvidenceList = React.useMemo(
+    () => getInsertableLiteratureEvidence(project),
+    [project]
+  );
 
   // 2. Gather strictly Researcher-Approved analysis outputs
-  const approvedAnalysisOutputs = React.useMemo(() => {
-    return (project.analysisOutputs || []).filter((out) => {
-      const isApproved = isAnalysisOutputApproved(out);
-
-      const hasRealData = !!(
-        out.summaryText?.trim() ||
-        (out.numericResults && Object.keys(out.numericResults).length > 0) ||
-        (out.pValues && out.pValues.length > 0) ||
-        (out.effectSizes && out.effectSizes.length > 0) ||
-        (out.tablesCreated && out.tablesCreated.length > 0)
-      );
-
-      return isApproved && hasRealData;
-    });
-  }, [project.analysisOutputs]);
+  const approvedAnalysisOutputs = React.useMemo(
+    () => getApprovedManuscriptAnalysisOutputs(project),
+    [project]
+  );
 
   const handleSelectAndInsertLiteratureEvidence = (
-    item: VerifiedLiteratureEvidenceItem,
+    item: InsertableLiteratureEvidence,
     formatMode: "blockquote" | "inline"
   ) => {
     if (!currentSection) return;
-    const matchedSrc = sources.find((s) => s.id === item.sourceId);
-    const citation = matchedSrc
-      ? formatInTextCitation([matchedSrc], activeCslStyle, sources)
-      : `[${item.sourceTitle}]`;
-
-    let textToInsert = "";
-    if (formatMode === "blockquote") {
-      textToInsert = `\n\n> "${item.passageText}"\n— ${citation} [Source ID: ${item.sourceId}]\n`;
-    } else {
-      textToInsert = `\n\n"${item.passageText}" (${citation}, Source ID: ${item.sourceId})\n`;
+    try {
+      const textToInsert = buildLiteratureEvidenceInsertion(item, project, formatMode);
+      handleContentChange(currentSection.content + textToInsert);
+      setShowLiteratureEvidenceModal(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Literature insertion blocked.");
     }
-
-    handleContentChange(currentSection.content + textToInsert);
-    setShowLiteratureEvidenceModal(false);
   };
 
   const handleSelectAndInsertStatisticalFinding = (
     output: (typeof approvedAnalysisOutputs)[0],
-    insertMode: "full" | "summary_only" | "metrics_only"
+    insertMode: StatisticalInsertionMode
   ) => {
     if (!currentSection) return;
-    const matchingPlan = project.analysisPlans?.find((p) => p.id === output.analysisPlanId);
-    const planTitle = matchingPlan?.title || output.softwareEnvironment || "Empirical Statistical Analysis";
-
-    let textToInsert = `\n\n### Statistical Findings: ${planTitle} [Output ID: ${output.id}]\n`;
-
-    if (insertMode !== "metrics_only" && output.summaryText?.trim()) {
-      textToInsert += `${output.summaryText.trim()}\n\n`;
+    try {
+      const textToInsert = buildApprovedAnalysisInsertion(output, project, insertMode);
+      handleContentChange(currentSection.content + textToInsert);
+      setShowStatisticalFindingsModal(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Statistical insertion blocked.");
     }
-
-    if (insertMode !== "summary_only") {
-      const metricLines: string[] = [];
-
-      if (output.numericResults) {
-        for (const [key, value] of Object.entries(output.numericResults)) {
-          if (value !== undefined && value !== null && value !== "") {
-            const formattedKey = key.replace(/_/g, " ");
-            const formattedVal = typeof value === "number" ? Number(value.toFixed(4)) : value;
-            metricLines.push(`- **${formattedKey}:** ${formattedVal}`);
-          }
-        }
-      }
-
-      if (output.pValues && output.pValues.length > 0) {
-        for (const pv of output.pValues) {
-          const sigTag = pv.significant ? " *(Statistically Significant)*" : "";
-          metricLines.push(`- **${pv.test}:** ${pv.formatted || `p = ${pv.pValue}`}${sigTag}`);
-        }
-      }
-
-      if (output.effectSizes && output.effectSizes.length > 0) {
-        for (const es of output.effectSizes) {
-          const ci =
-            es.ciLower !== undefined && es.ciUpper !== undefined
-              ? ` [95% CI: ${es.ciLower}, ${es.ciUpper}]`
-              : "";
-          metricLines.push(`- **${es.metric}:** ${es.value}${ci}`);
-        }
-      }
-
-      if (output.assumptionChecks && output.assumptionChecks.length > 0) {
-        for (const ac of output.assumptionChecks) {
-          metricLines.push(
-            `- **Assumption Check (${ac.assumption}):** ${ac.met ? "Met" : "Unmet"} (${ac.testUsed}${
-              ac.pValue !== undefined ? `, p = ${ac.pValue}` : ""
-            })`
-          );
-        }
-      }
-
-      if (metricLines.length > 0) {
-        textToInsert += `**Researcher-Approved Quantitative Results:**\n${metricLines.join("\n")}\n`;
-      }
-    }
-
-    handleContentChange(currentSection.content + textToInsert);
-    setShowStatisticalFindingsModal(false);
   };
 
   const handleInsertCitation = (src: SourceRecord) => {
@@ -833,7 +663,7 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
               onClick={() => {
                 if (approvedAnalysisOutputs.length === 0) {
                   alert(
-                    "No researcher-approved analysis outputs available. Upload a dataset and execute an approved analysis in the Data Lab first."
+                    "No analysis outputs Approved for Manuscript are available. Complete analysis review and explicit manuscript approval in the Data Lab first."
                   );
                   return;
                 }
@@ -842,8 +672,8 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
               disabled={approvedAnalysisOutputs.length === 0}
               title={
                 approvedAnalysisOutputs.length === 0
-                  ? "No researcher-approved analysis outputs available. Upload a dataset and execute an analysis in Data Lab first."
-                  : `Select from ${approvedAnalysisOutputs.length} researcher-approved analysis output(s)`
+                  ? "No analysis outputs Approved for Manuscript are available."
+                  : `Select from ${approvedAnalysisOutputs.length} output(s) Approved for Manuscript`
               }
               className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition flex items-center space-x-1.5 ${
                 approvedAnalysisOutputs.length === 0
@@ -2001,7 +1831,7 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
                     Insert Verified Literature Evidence
                   </h3>
                   <p className="text-xs text-zinc-400">
-                    Select a verified evidence passage from project source records. Only recorded passages and citations will be inserted.
+                    Select a researcher-reviewed evidence passage with verified source provenance. Abstracts and unreviewed text cannot be inserted.
                   </p>
                 </div>
               </div>
@@ -2094,6 +1924,9 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
                       <blockquote className="bg-zinc-900/90 border-l-2 border-emerald-500/60 p-3 rounded-r-xl text-xs text-zinc-200 font-serif italic leading-relaxed">
                         "{item.passageText}"
                       </blockquote>
+                      <div className="text-[10px] text-zinc-500 font-mono">
+                        Provenance: {item.provenance.provider} · Retrieved {item.provenance.retrievedAt}
+                      </div>
 
                       {/* Action Buttons */}
                       <div className="flex items-center justify-end space-x-2 pt-1">
@@ -2143,10 +1976,10 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
                 <BarChart3 className="w-5 h-5" />
                 <div>
                   <h3 className="font-bold text-base text-white">
-                    Insert Researcher-Approved Statistical Findings
+                    Insert Findings Approved for Manuscript
                   </h3>
                   <p className="text-xs text-zinc-400">
-                    Select an approved empirical analysis output. Only real recorded results are available; no fallback numbers are generated.
+                    Select an empirical output with state Approved for Manuscript. Only its recorded values can be inserted; no fallback numbers are generated.
                   </p>
                 </div>
               </div>
@@ -2164,7 +1997,7 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
                 <div className="p-8 text-center bg-zinc-950 rounded-2xl border border-zinc-800 space-y-2">
                   <BarChart3 className="w-8 h-8 text-zinc-600 mx-auto" />
                   <p className="text-xs text-zinc-400">
-                    No researcher-approved analysis outputs found.
+                    No analysis outputs Approved for Manuscript found.
                   </p>
                   <p className="text-[11px] text-zinc-500">
                     Upload a verified dataset and execute an approved analysis plan in the Data Lab first.
@@ -2193,7 +2026,7 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
                           </div>
                         </div>
                         <span className="text-[9px] bg-emerald-950/80 border border-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
-                          Researcher Approved
+                          Approved for Manuscript
                         </span>
                       </div>
 

@@ -146,6 +146,45 @@ export interface ResearchCanvas {
   };
 }
 
+export type MethodologySourceMode = "Researcher Entered" | "Protocol Upload" | "AI Proposal";
+export type MethodologyReviewState = "Draft" | "Needs Review" | "AI Suggested" | "Researcher Approved";
+
+export interface MethodologyFields {
+  design: string;
+  populationOrDataSource: string;
+  sampling: string;
+  eligibility: string;
+  interventionExposureComparator: string;
+  variablesOrOutcomes: string;
+  instruments: string;
+  dataCollection: string;
+  analysisPlan: string;
+  ethics: string;
+  limitations: string;
+}
+
+export interface MethodologyWorkspace {
+  sourceMode: MethodologySourceMode;
+  reviewState: MethodologyReviewState;
+  fields: MethodologyFields;
+  uploadedProtocol?: {
+    fileName: string;
+    mimeType: string;
+    uploadedAt: string;
+    extractedAt: string;
+  };
+  aiProposal?: {
+    generatedAt: string;
+    model: string;
+    promptVersion: string;
+  };
+  researcherApproval?: {
+    approvedAt: string;
+    approvedByUid: string;
+  };
+  updatedAt: string;
+}
+
 export interface Hypothesis {
   id: string;
   type: "Null" | "Alternative" | "Primary" | "Secondary" | "Directional" | "Non-directional";
@@ -875,6 +914,7 @@ export interface ProjectState {
     trialRegistrationNumber?: string;
     notes?: string;
   };
+  methodologyWorkspace?: MethodologyWorkspace;
   datasets: DatasetRecord[];
   analysisPlans: AnalysisPlan[];
   analysisOutputs: AnalysisOutput[];
