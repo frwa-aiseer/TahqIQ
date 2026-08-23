@@ -98,6 +98,8 @@ TQ-VSC-011 removes the built-in Firebase project configuration. Firebase Web cli
 
 TQ-VSC-012 applies least-privilege Firestore rules verified against the real local emulator. Private user profiles are owner-only, project reads require ownership or explicit membership, Viewer/Reviewer writes are denied, non-owner writers cannot modify protected ownership or membership fields, and only `ownerUid` has ownership authority. Version snapshots and audit events are immutable after creation, file actor fields are constrained, and cross-project isolation is enforced.
 
+TQ-VSC-013 moves privileged audit appends to a Firebase Admin server path. Client SDK writes are denied for every role; the server verifies token identity and project RBAC, validates ten action/entity combinations, confirms the entity and current disposition, derives snapshots and timestamp, and appends complete immutable records with rationale and evidence IDs. Legacy client-shaped records remain readable but are never classified as trusted.
+
 ## Firebase, authentication, Firestore, and Storage
 
 ### Client initialization and auth

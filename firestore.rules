@@ -71,9 +71,9 @@ service cloud.firestore {
 
       match /auditEvents/{eventId} {
         allow read: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data);
-        allow create: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data) &&
-          request.resource.data.uid == request.auth.uid;
-        allow update, delete: if false;
+        // High-integrity history is written only by the trusted Admin SDK path,
+        // which bypasses client rules after verifying actor, membership and role.
+        allow create, update, delete: if false;
       }
       
       match /files/{fileId} {

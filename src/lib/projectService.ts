@@ -1,6 +1,6 @@
 import { getFirebaseServices } from "./firebase";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where, addDoc } from "firebase/firestore";
-import { ProjectState, ProjectRole, ProjectMember, ProjectAuditEvent, ProjectVersionSnapshot } from "../types";
+import { ProjectState, ProjectRole, ProjectMember, ProjectVersionSnapshot } from "../types";
 import { createEmptyProject, isDemoRecord } from "../data/demoProject";
 
 const firestore = () => getFirebaseServices().db;
@@ -87,8 +87,7 @@ export async function createProjectInFirestore(
     const docRef = doc(firestore(), "projects", newProject.id);
     await setDoc(docRef, newProject);
 
-    // Record initial immutable version and audit event
-    await logAuditEvent(newProject.id, ownerUid, ownerEmail, "PROJECT_CREATED", `Created project '${newProject.title}'`);
+    // Record initial immutable version. Privileged audit events use the trusted server endpoint.
     await createVersionSnapshot(newProject.id, newProject, ownerUid, ownerEmail, "Initial project baseline creation");
   }
 
@@ -146,7 +145,6 @@ export async function archiveProjectInFirestore(
   try {
     const docRef = doc(firestore(), "projects", projectId);
     await updateDoc(docRef, { isArchived, updatedAt: new Date().toISOString() });
-    await logAuditEvent(projectId, uid, email, isArchived ? "PROJECT_ARCHIVED" : "PROJECT_UNARCHIVED", `Project set isArchived=${isArchived}`);
     return true;
   } catch (err) {
     console.error("Error archiving project:", err);
@@ -164,7 +162,6 @@ export async function deleteProjectInFirestore(
     const docRef = doc(firestore(), "projects", projectId);
     if (softDelete) {
       await updateDoc(docRef, { isDeleted: true, updatedAt: new Date().toISOString() });
-      await logAuditEvent(projectId, uid, email, "PROJECT_SOFT_DELETED", "Project marked as deleted");
     } else {
       await deleteDoc(docRef);
     }
@@ -206,34 +203,10 @@ export async function updateMemberRoleInFirestore(
     }
 
     await updateDoc(docRef, { members, memberList, updatedAt: new Date().toISOString() });
-    await logAuditEvent(projectId, executorUid, executorEmail, "MEMBER_ROLE_UPDATED", `Assigned role '${newRole}' to member ${targetEmail}`);
     return true;
   } catch (err) {
     console.error("Error updating member role:", err);
     return false;
-  }
-}
-
-export async function logAuditEvent(
-  projectId: string,
-  uid: string,
-  userEmail: string,
-  action: string,
-  details: string
-): Promise<void> {
-  try {
-    const eventsRef = collection(firestore(), "projects", projectId, "auditEvents");
-    const event: ProjectAuditEvent = {
-      id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      timestamp: new Date().toISOString(),
-      uid,
-      userEmail,
-      action,
-      details,
-    };
-    await addDoc(eventsRef, event);
-  } catch (err) {
-    console.warn("Audit event log notice:", err);
   }
 }
 

@@ -43,7 +43,7 @@ describe("Firebase client environment configuration", () => {
   it("documents every required public client variable with blank placeholders", () => {
     const example = fs.readFileSync(path.resolve(process.cwd(), ".env.example"), "utf8");
     for (const key of FIREBASE_CLIENT_ENV_KEYS) expect(example).toContain(`${key}=`);
-    expect(example).not.toMatch(/FIREBASE_(?:ADMIN|SERVICE_ACCOUNT|PRIVATE_KEY)/);
+    expect(example).not.toMatch(/VITE_FIREBASE_(?:ADMIN|SERVICE_ACCOUNT|PRIVATE_KEY)/);
   });
 
   it("contains no built-in Firebase project fallback in application logic", () => {

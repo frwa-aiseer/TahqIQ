@@ -97,4 +97,21 @@ emulatorDescribe("Firestore RBAC rules against the emulator", () => {
     await assertFails(updateDoc(snapshot, { titleSnapshot: "Rewritten" }));
     await assertFails(deleteDoc(snapshot));
   });
+
+  it("prevents even an Owner client from forging privileged audit history", async () => {
+    const firestore = environment.authenticatedContext("owner-a").firestore();
+    await assertFails(setDoc(doc(firestore, "projects/project-a/auditEvents/forged-event"), {
+      actor: { uid: "owner-a", email: "forged@test.invalid" },
+      action: "ANALYSIS_APPROVED",
+      entityType: "AnalysisOutput",
+      entityId: "analysis-1",
+      projectId: "project-a",
+      timestamp: new Date().toISOString(),
+      before: null,
+      after: { state: "Approved for Manuscript" },
+      rationale: "Forged directly by an authenticated client.",
+      evidenceIds: [],
+      trustedServerCreated: true,
+    }));
+  });
 });

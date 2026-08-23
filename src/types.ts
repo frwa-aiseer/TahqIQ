@@ -39,12 +39,47 @@ export interface ProjectVersionSnapshot {
 
 export interface ProjectAuditEvent {
   id: string;
+  projectId: string;
   timestamp: string;
-  uid: string;
-  userEmail: string;
-  action: string;
-  details: string;
+  actor: { uid: string; email: string };
+  action: TrustedAuditAction;
+  entityType: TrustedAuditEntityType;
+  entityId: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  rationale: string;
+  evidenceIds: string[];
+  trustedServerCreated: true;
+
+  /** Legacy read aliases. New trusted events never use these fields. */
+  uid?: string;
+  userEmail?: string;
+  details?: string;
 }
+
+export type TrustedAuditAction =
+  | "ROLE_CHANGED"
+  | "ARTIFACT_APPROVED"
+  | "DATASET_APPROVED"
+  | "ANALYSIS_APPROVED"
+  | "AI_ARTIFACT_DISPOSITIONED"
+  | "SOURCE_VERIFICATION_CHANGED"
+  | "CLAIM_VERIFICATION_CHANGED"
+  | "ETHICS_STATUS_CHANGED"
+  | "AUTHOR_SIGNED_OFF"
+  | "EXPORT_RECORDED";
+
+export type TrustedAuditEntityType =
+  | "ProjectMember"
+  | "ManuscriptSection"
+  | "Dataset"
+  | "AnalysisOutput"
+  | "AiArtifact"
+  | "Source"
+  | "Claim"
+  | "Ethics"
+  | "Author"
+  | "ExportJob";
 
 export type ResearchProjectType =
   | "Original quantitative research"

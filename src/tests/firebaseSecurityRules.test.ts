@@ -52,7 +52,7 @@ describe('Firebase Security Rules Verification Tests', () => {
     });
 
     it('enforces immutability on auditEvents (allow update, delete: if false)', () => {
-      expect(rulesContent).toMatch(/match \/auditEvents\/\{eventId\}[\s\S]*?allow update,\s*delete:\s*if false;/);
+      expect(rulesContent).toMatch(/match \/auditEvents\/\{eventId\}[\s\S]*?allow create,\s*update,\s*delete:\s*if false;/);
     });
 
     it('restricts file deletion to project Owner only', () => {

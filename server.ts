@@ -6,6 +6,11 @@ import dotenv from "dotenv";
 import { lookupDoiMetadata, CrossrefDisclaimer } from "./src/lib/metadataProviders";
 import { executePairedCrossoverAnalysis, generateAnalysisFiguresAndTables } from "./src/lib/statsEngine";
 import { hasAttributableManuscriptApproval } from "./src/lib/analysisLifecycle";
+import { applicationDefault, getApps as getAdminApps, initializeApp as initializeAdminApp } from "firebase-admin/app";
+import { getAuth as getAdminAuth } from "firebase-admin/auth";
+import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
+import { createTrustedAuditEvent, validateTrustedAuditRequest } from "./src/server/trustedAudit";
+import type { ProjectRole, TrustedAuditEntityType } from "./src/types";
 
 dotenv.config();
 
@@ -31,9 +36,93 @@ async function startServer() {
     });
   }
 
+  function getTrustedFirebaseAdmin() {
+    const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.GCLOUD_PROJECT;
+    if (!projectId) throw new Error("Trusted Firebase service Not Configured: FIREBASE_ADMIN_PROJECT_ID is missing.");
+    const adminApp = getAdminApps()[0] || initializeAdminApp({ credential: applicationDefault(), projectId });
+    return { adminAuth: getAdminAuth(adminApp), adminDb: getAdminFirestore(adminApp) };
+  }
+
+  function getAuditedEntity(project: Record<string, any>, entityType: TrustedAuditEntityType, entityId: string): Record<string, any> | null {
+    const collectionByType: Partial<Record<TrustedAuditEntityType, string>> = {
+      ManuscriptSection: "sections", Dataset: "datasets", AnalysisOutput: "analysisOutputs", AiArtifact: "aiLedger",
+      Source: "sources", Claim: "claims", Author: "authors", ExportJob: "exportHistory",
+    };
+    if (entityType === "ProjectMember") return project.members?.[entityId] ? { uid: entityId, role: project.members[entityId] } : null;
+    if (entityType === "Ethics") return entityId === "ethics" || entityId === project.id ? project.ethicsInfo || {} : null;
+    const collectionName = collectionByType[entityType];
+    return collectionName && Array.isArray(project[collectionName])
+      ? project[collectionName].find((item: any) => item?.id === entityId) || null
+      : null;
+  }
+
+  function actionMatchesEntity(action: string, entity: Record<string, any>): boolean {
+    if (action === "ARTIFACT_APPROVED") return entity.state === "Approved" || entity.state === "Locked";
+    if (action === "DATASET_APPROVED") return entity.state === "Approved for Analysis" || entity.state === "Locked";
+    if (action === "ANALYSIS_APPROVED") return entity.state === "Approved for Manuscript" || entity.state === "Locked";
+    if (action === "AI_ARTIFACT_DISPOSITIONED") return ["Accepted", "Modified", "Rejected"].includes(entity.researcherDecision);
+    if (action === "AUTHOR_SIGNED_OFF") return entity.finalApproval === true;
+    return true;
+  }
+
+  function priorStateSnapshot(entity: Record<string, any>): Record<string, unknown> | null {
+    const history = Array.isArray(entity.stateHistory) ? entity.stateHistory : [];
+    const last = history[history.length - 1];
+    return last && typeof last.fromState === "string" ? { state: last.fromState, transitionId: last.id || null } : null;
+  }
+
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", app: "TehqIQ", version: "2.4.0" });
+  });
+
+  // Trusted, append-only privileged audit path. Actor and timestamp are never accepted from the client.
+  app.post("/api/projects/:projectId/audit-events", async (req, res) => {
+    try {
+      const authorization = req.header("authorization") || "";
+      if (!authorization.startsWith("Bearer ")) return res.status(401).json({ status: "failed", error: "Firebase ID token required." });
+      const { adminAuth, adminDb } = getTrustedFirebaseAdmin();
+      const decoded = await adminAuth.verifyIdToken(authorization.slice(7));
+      if (!decoded.uid || typeof decoded.email !== "string" || !decoded.email.trim()) {
+        return res.status(403).json({ status: "failed", error: "An authenticated actor with an email claim is required." });
+      }
+
+      const projectId = req.params.projectId;
+      const projectRef = adminDb.collection("projects").doc(projectId);
+      const projectSnapshot = await projectRef.get();
+      if (!projectSnapshot.exists) return res.status(404).json({ status: "failed", error: "Project not found." });
+      const project = { id: projectSnapshot.id, ...projectSnapshot.data() } as Record<string, any>;
+      const role = (project.ownerUid === decoded.uid ? "Owner" : project.members?.[decoded.uid]) as ProjectRole | undefined;
+      if (!role) return res.status(403).json({ status: "failed", error: "Project membership required." });
+
+      const validation = validateTrustedAuditRequest(req.body, role);
+      if (!validation.valid || !validation.request) return res.status(400).json({ status: "failed", errors: validation.errors });
+      const auditedEntity = getAuditedEntity(project, validation.request.entityType, validation.request.entityId);
+      if (!auditedEntity) {
+        return res.status(400).json({ status: "failed", error: "Audited entity does not exist in the project." });
+      }
+      if (!actionMatchesEntity(validation.request.action, auditedEntity)) {
+        return res.status(409).json({ status: "failed", error: "Current entity state does not support the requested audit action." });
+      }
+      if (JSON.stringify(auditedEntity).length > 50_000) return res.status(413).json({ status: "failed", error: "Audited entity snapshot exceeds the size limit." });
+
+      const eventRef = projectRef.collection("auditEvents").doc();
+      const event = createTrustedAuditEvent(
+        projectId,
+        { uid: decoded.uid, email: decoded.email },
+        validation.request,
+        priorStateSnapshot(auditedEntity),
+        auditedEntity,
+        new Date().toISOString(),
+        eventRef.id
+      );
+      await eventRef.create(event);
+      return res.status(201).json({ status: "recorded", event });
+    } catch (error: any) {
+      console.error("Trusted audit append error:", error);
+      const unavailable = String(error?.message || "").includes("Not Configured");
+      return res.status(unavailable ? 503 : 500).json({ status: "failed", error: unavailable ? error.message : "Trusted audit append failed." });
+    }
   });
 
   // 1. AI Agent Orchestrator Endpoint

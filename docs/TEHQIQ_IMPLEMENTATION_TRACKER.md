@@ -26,6 +26,7 @@ This tracker records remediation work verified against the live repository. Stat
 | TQ-VSC-010 | PASS | Built on the uncommitted TQ-VSC-006–009 working tree | `src/types.ts`; `src/lib/outletRequirements.ts`; `src/data/baselineOutlets.ts`; `src/lib/complianceEngine.ts`; `src/components/views/ExportCentreView.tsx`; `src/tests/outletRequirements.test.ts`; `src/tests/baselineOutlets.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Replaced the narrow requirement shape with backward-compatible versioned field records. Legacy arrays normalize known field aliases to Unverified; absent records display Unavailable. No destructive stored-data rewrite. | `npm run lint`: PASS. Focused Vitest: PASS, 33/33. `npm test`: baseline remains FAIL—23/27 files passed, 193/194 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS, 1,992 modules. `git diff --check`: PASS. | All 18 required fields render an exact review state. Only valid field-level Verified records drive outlet compliance; outlet identity URLs and legacy top-level values are not substituted. TQ-VSC-011 and later were not executed. |
 | TQ-VSC-011 | PASS | Built on the uncommitted TQ-VSC-006–010 working tree | `.env.example`; `src/lib/firebaseConfig.ts`; `src/lib/firebase.ts`; `src/context/AuthContext.tsx`; `src/components/AuthModal.tsx`; `src/lib/projectService.ts`; `src/lib/storageService.ts`; `src/tests/firebaseConfiguration.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No stored-data migration. Deployments must provide six validated `VITE_FIREBASE_*` public client variables; missing/invalid values now enter an explicit Not Configured state instead of using a built-in project. | `npm run lint`: PASS. Focused Vitest: PASS, 17/17. `npm test`: baseline remains FAIL—24/28 files passed, 198/199 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Removed hard-coded Firebase project configuration and fallback initialization. No Admin SDK/service-account/private-key variable enters client configuration. TQ-VSC-012 and later were not executed. |
 | TQ-VSC-012 | PASS | Built on the uncommitted TQ-VSC-006–011 working tree | `firestore.rules`; `firebase.json`; `package.json`; `package-lock.json`; `src/tests/firebaseSecurityRules.test.ts`; `src/tests/firestoreRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No document rewrite. Existing owner records remain directly readable by `ownerUid`; owner updates can repair a missing owner-membership entry. New project creation requires the owner to be mapped as Owner. | `npm run lint`: PASS. Static focused Vitest: PASS, 16/16. Firestore Emulator: PASS, 7/7. `npm test`: 26/29 files passed, 216/218 executed tests passed, 7 emulator-only tests skipped outside emulator; Crossref and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Private profiles are owner-only; project reads require membership; Viewer writes and Co-author membership/ownership changes are denied; owner/member integrity and cross-project isolation are enforced; version snapshots are immutable. TQ-VSC-013 and later were not executed. |
+| TQ-VSC-013 | PASS | Committed TQ-VSC-012 checkpoint `2364ab2`; working-tree checkpoint pending commit | `.env.example`; `package.json`; `package-lock.json`; `server.ts`; `firestore.rules`; `src/types.ts`; `src/server/trustedAudit.ts`; `src/lib/projectService.ts`; `src/tests/trustedAudit.test.ts`; `src/tests/firebaseSecurityRules.test.ts`; `src/tests/firebaseConfiguration.test.ts`; `src/tests/firestoreRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Expanded audit records with optional legacy aliases. Existing client-created records remain readable but fail `isTrustedAuditEvent`; no destructive rewrite. | `npm run lint`: PASS. Focused Vitest: PASS, 23/23. Firestore Emulator: PASS, 8/8. `npm test`: 27/30 files passed, 223/225 executed tests passed, 8 emulator-only tests skipped; Crossref and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Client create/update/delete on audit events is denied for every role. Trusted append requires verified Firebase actor, membership/RBAC, action/entity validation, existing entity, server-derived snapshots/timestamp, rationale and evidence IDs. TQ-VSC-014 and later were not executed. |
 
 ## TQ-VSC-000 verification details
 
@@ -553,3 +554,42 @@ None. The harness is test-only and imports existing types without changing them.
 - Installing the requested emulator tooling reported seven dependency audit findings (six moderate, one high); no blanket or breaking `npm audit fix` was run.
 - Full-suite Crossref and localStorage-environment failures remain outside this prompt.
 - TQ-VSC-013 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-013 verification details
+
+### Implementation
+
+- Removed the client `logAuditEvent` writer and all client calls that previously supplied their own actor identity and details.
+- Added a server-only `POST /api/projects/:projectId/audit-events` append path backed by Firebase Admin SDK.
+- The server verifies the Firebase ID token, requires an email-bearing actor, loads the project through Admin Firestore, derives the actor's project role, and rejects non-members.
+- Deterministic validation covers role changes, artifact approvals, dataset/analysis approval, AI-artifact disposition, source/claim verification, ethics changes, author sign-off, and exports. Each action is bound to one entity type; Viewer/Reviewer are rejected and role changes are Owner-only.
+- Clients cannot provide event ID, project ID, actor, timestamp, before, or after fields. The server establishes ID/actor/project/timestamp and derives before/after from the existing project entity and its latest state-history entry.
+- The audited entity must exist. Approval/disposition actions must match the entity's current approved/disposed state, snapshots must remain within a bounded size, rationale is required, and evidence identifiers are validated and deduplicated.
+- New append records contain actor, action, entity type/id, before/after, project ID, timestamp, rationale, evidence IDs, and `trustedServerCreated: true`.
+- Firestore rules deny client create/update/delete for `auditEvents`, including Owner clients. Admin writes remain append-only because the server uses document `create`, never overwrite/update.
+- Added `isTrustedAuditEvent`; legacy/client-shaped records cannot masquerade as trusted history.
+- Documented the server-only `FIREBASE_ADMIN_PROJECT_ID`; credentials use Application Default Credentials and no Admin secret is placed in a `VITE_*` variable.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/trustedAudit.test.ts src/tests/firebaseSecurityRules.test.ts src/tests/firebaseConfiguration.test.ts` — exit `0`; PASS, 3/3 files and 23/23 tests.
+3. `PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" XDG_CONFIG_HOME=/private/tmp/tehqiq-firebase-config npm run test:firestore-rules` — exit `0`; real Firestore Emulator PASS, 1/1 file and 8/8 tests. The added scenario proves an authenticated Owner cannot create a forged audit event.
+4. `npm test` — exit `1`; 27/30 files passed, 223 tests passed and 2 failed out of 225 executed, with 8 emulator-only tests skipped because the general suite does not start the emulator. Remaining failures are the pre-existing Crossref network expectation and localStorage test-environment issue.
+5. `npm run build` — exit `0`; PASS, 1,993 Vite modules transformed and the server bundle produced. Existing browser-`crypto` and large-chunk warnings remain.
+6. `git diff --check` — exit `0`; PASS.
+
+### Tests and compatibility
+
+- Added seven trusted-audit unit tests covering all ten action/entity mappings, write-role enforcement, Owner-only role events, rejection of forged server fields, bounded request validation, complete trusted record creation, and legacy-event rejection.
+- Updated static rules tests to require all client audit mutations to be false.
+- Expanded the real emulator suite to prove Owner-level client forgery is denied.
+- Existing stored audit documents are not rewritten. Optional legacy aliases permit reading them, but absence of the complete server-established shape and trusted marker prevents them from being treated as trusted.
+
+### Remaining blockers and prompt boundary
+
+- The trusted endpoint requires deployment Application Default Credentials and `FIREBASE_ADMIN_PROJECT_ID`; no live Firebase Admin deployment credentials were available for an end-to-end token test. Deterministic service tests, server compilation, and client-denial emulator tests passed.
+- Privileged state mutations still occur through existing project workflows; this prompt secures the high-integrity audit collection and server append validation but does not redesign every state-transition endpoint.
+- Firebase Admin installation reports thirteen dependency audit findings (twelve moderate, one high); no breaking blanket audit fix was run.
+- Full-suite Crossref and localStorage-environment failures remain outside this prompt.
+- TQ-VSC-014 and all later prompts remain `NOT STARTED`.
