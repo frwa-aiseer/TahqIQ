@@ -29,6 +29,8 @@ This tracker records remediation work verified against the live repository. Stat
 | TQ-VSC-013 | PASS | Committed TQ-VSC-012 checkpoint `2364ab2`; working-tree checkpoint pending commit | `.env.example`; `package.json`; `package-lock.json`; `server.ts`; `firestore.rules`; `src/types.ts`; `src/server/trustedAudit.ts`; `src/lib/projectService.ts`; `src/tests/trustedAudit.test.ts`; `src/tests/firebaseSecurityRules.test.ts`; `src/tests/firebaseConfiguration.test.ts`; `src/tests/firestoreRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Expanded audit records with optional legacy aliases. Existing client-created records remain readable but fail `isTrustedAuditEvent`; no destructive rewrite. | `npm run lint`: PASS. Focused Vitest: PASS, 23/23. Firestore Emulator: PASS, 8/8. `npm test`: 27/30 files passed, 223/225 executed tests passed, 8 emulator-only tests skipped; Crossref and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Client create/update/delete on audit events is denied for every role. Trusted append requires verified Firebase actor, membership/RBAC, action/entity validation, existing entity, server-derived snapshots/timestamp, rationale and evidence IDs. TQ-VSC-014 and later were not executed. |
 | TQ-VSC-014 | PASS | Built on committed TQ-VSC-013 checkpoint `3c10717`; working-tree checkpoint pending commit | `src/lib/storageService.ts`; `src/tests/storagePersistence.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Extended newly created file metadata with project, SHA-256, persistence, and provenance fields. No existing records are rewritten; legacy metadata remains readable. Failed attempts create no metadata record. | `npm run lint`: PASS. Focused storage Vitest: PASS, 5/5. Combined focused/regression Vitest: 2/3 files and 13/14 tests passed; only the pre-existing jsdom localStorage failure remains. `npm test`: 28/30 executed files passed, 228/230 executed tests passed, 1 file/8 emulator tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Object URLs are never returned by the research upload path. Only a completed Cloud Storage upload plus download-reference resolution and Firestore metadata write returns success; partial uploads are cleanup-attempted and all failures throw an explicit Local / Unpersisted error. TQ-VSC-015 and later were not executed. |
 | TQ-VSC-015 | PASS | Built on committed TQ-VSC-014 checkpoint `aabd971`; working-tree checkpoint pending commit | `storage.rules`; `firebase.json`; `package.json`; `src/tests/storageRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No stored-object or Firestore document migration. Existing objects become private and may require policy-compliant metadata before overwrite. Locked objects cannot be changed or deleted through client rules. | `npm run lint`: PASS. Firestore + Storage Emulator: PASS, 8/8. `npm test`: 28/30 executed files passed, 228/230 executed tests passed, with 2 emulator-only files/16 tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Authenticated project membership is required to read. Only designated writer roles can create/update, only owners can delete, paths/metadata are project-bound, overwrites cannot use create grants, locked objects are protected, and all unscoped paths are denied. No malware-scanning claim is made. TQ-VSC-016 and later were not executed. |
+| TQ-VSC-016 | PASS | Built on committed TQ-VSC-015 checkpoint `40a2b25`; working-tree checkpoint pending commit | `server.ts`; `src/server/authMiddleware.ts`; `src/lib/authenticatedFetch.ts`; `src/App.tsx`; `src/components/views/ResearchCanvasView.tsx`; `src/components/views/ProtocolBuilderView.tsx`; `src/components/views/SourceLibraryView.tsx`; `src/components/views/WritingStudioView.tsx`; `src/components/views/PeerReviewView.tsx`; `src/components/views/DataLabView.tsx`; `src/tests/authMiddleware.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No stored-data migration. Sensitive API clients now require a configured signed-in Firebase user and project ID; deployments require working Firebase Admin credentials for server authorization. | `npm run lint`: PASS. Focused security Vitest: PASS, 19/19. `npm test`: 29/31 executed files passed, 235/237 executed tests passed, with 2 emulator-only files/16 tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,994 modules. `git diff --check`: PASS. | Seven sensitive endpoints use reusable ID-token verification, Firestore-derived membership/RBAC, bounded bodies, safe errors, audit hooks and per-actor/project/route rate limiting. Health remains public. Frontend identity/role claims are ignored. TQ-VSC-017 and later were not executed. |
+| TQ-VSC-017 | PASS | Built on the uncommitted TQ-VSC-016 working tree | `server.ts`; `src/server/apiSchemas.ts`; `src/tests/apiSchemas.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No stored-data migration. Generic agent success changes from unvalidated `text` to validated structured `result`; malformed model output now fails with 502 instead of being accepted or filled. | `npm run lint`: PASS. Focused schema/security Vitest: PASS, 22/22. `npm test`: 30/32 executed files passed, 243/245 executed tests passed, with 2 emulator-only files/16 tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,994 modules. `git diff --check`: PASS. | Every non-audit server request has deterministic runtime validation; audit retains its strict validator. Structured agent, draft, peer-review and methodology model output is parsed and validated before use. External analysis responses are validated before return. TQ-VSC-018 and later were not executed. |
 
 ## TQ-VSC-000 verification details
 
@@ -669,3 +671,81 @@ None. The harness is test-only and imports existing types without changing them.
 - The rules were verified locally against Firestore Emulator v1.22.0 and Cloud Storage rules runtime v1.1.3 on OpenJDK 21. Deployment to a live Firebase project was not requested or performed.
 - Content-type checks are policy controls, not proof of file contents and not malware scanning.
 - TQ-VSC-016 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-016 verification details
+
+### Implementation
+
+- Added reusable Express middleware that strictly parses a Bearer token and verifies it with Firebase Admin Auth.
+- The middleware resolves project scope from the URL parameter or dedicated project header/body field, loads that project through Admin Firestore, and derives the actor's role from `ownerUid`/`members`. Frontend `userId`, email, role, owner, or membership claims are ignored.
+- Added route-specific RBAC: standard project writers may use AI, drafting, methodology, analysis, and trusted-audit routes; Reviewer additionally may invoke peer review; all authenticated project roles may perform DOI lookup for the scoped project.
+- Added route-specific serialized-body limits from 16 KiB for DOI lookup through 25 MiB for analysis, while retaining the server-wide parser ceiling.
+- Added reusable per-actor/project/route rate-limit hooks with an in-process 60-request/minute policy and structured completion-audit hooks.
+- Added safe authentication, authorization, rate-limit, size-limit, lookup, parser, and handler error responses. Raw token-verifier/provider error details remain server logs and are not returned to clients.
+- Applied middleware to all seven sensitive POST endpoints. `/api/health` intentionally remains public.
+- Added a shared client helper that gets a fresh token from the configured Firebase user's `getIdToken()` and supplies Authorization plus project scope. Updated every current API caller to use it.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/authMiddleware.test.ts src/tests/trustedAudit.test.ts src/tests/firebaseConfiguration.test.ts` — exit `0`; PASS, 3/3 files and 19/19 tests.
+3. `npm test` — exit `1`; 29/31 executed files passed, 235/237 executed tests passed, with 2 emulator-only files and 16 tests skipped. The two failures are pre-existing: offline Crossref returns network-failure wording instead of registry-not-found wording, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 1,994 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+
+### Acceptance coverage
+
+- Missing Authorization header returns 401 without invoking token verification.
+- Invalid/expired token returns a generic 401 without leaking verifier internals.
+- A valid authenticated non-member returns 403.
+- A stored Viewer membership returns insufficient-role 403 for a writer-only route.
+- A valid Co-author request reaches the handler with UID/email from the verified token and role from stored Firestore membership, even when the body supplies forged owner identity/role/membership fields.
+- Rate-limit hook behavior is deterministic and tested.
+- A route-audit test enumerates all seven sensitive endpoints and requires the reusable middleware at registration.
+
+### Compatibility, blockers, and prompt boundary
+
+- No data migration is required. API request authentication is intentionally stricter; unsigned legacy calls now fail closed.
+- Firebase Not Configured returns 503. Real protected requests require Application Default Credentials plus `FIREBASE_ADMIN_PROJECT_ID`/`GCLOUD_PROJECT`, and clients require valid `VITE_FIREBASE_*` configuration and sign-in.
+- The in-memory rate limiter is instance-local and resets on restart; a shared/distributed limiter remains a production deployment consideration.
+- There are no server export endpoints in the inspected repository. Existing client-only export generation was not expanded or redesigned.
+- TQ-VSC-017 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-017 verification details
+
+### Implementation
+
+- Added dependency-free deterministic runtime schemas with typed success/failure results for all non-audit API bodies: generic agent, section drafting, peer review, methodology proposal, DOI lookup, and analysis execution. The privileged audit endpoint continues using its existing strict action/entity/body validator.
+- Validators reject non-object bodies, unsupported top-level fields, missing or wrong-typed fields, invalid enums/DOI syntax, non-finite numbers, over-bound collections/strings, mismatched authenticated project scope, malformed analysis entities/options, and incomplete research identifiers.
+- Added typed structured-output contracts for generic agent, draft section, peer-review comments, and all eleven methodology fields. Exact keys, required fields, bounded strings/arrays, and finite numbers are enforced after JSON parsing.
+- Generic agent calls now request JSON through the SDK response schema and return a validated `result` object instead of unvalidated model text.
+- Drafting now requires every declared evidence/number/missing-information array. Invalid JSON or wrong structure returns a 502 validation failure.
+- Peer review requires one or two complete comments; missing/empty/arbitrary comment structures are rejected.
+- Methodology no longer converts missing model fields into `Researcher input required` after generation. The model must explicitly return every valid field; otherwise no proposal is accepted.
+- External analysis-service responses must match the completed analysis envelope before being returned. Invalid external output is logged and execution proceeds through the existing deterministic native engine fallback.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/apiSchemas.test.ts src/tests/authMiddleware.test.ts src/tests/trustedAudit.test.ts` — exit `0`; PASS, 3/3 files and 22/22 tests.
+3. `npm test` — exit `1`; 30/32 executed files passed and 243/245 executed tests passed, with 2 emulator-only files and 16 tests skipped. The only failures are pre-existing: offline Crossref returns network-failure wording instead of the test's registry-not-found wording, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 1,994 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+
+### Acceptance coverage
+
+- Malformed privileged analysis bodies and forged/unsupported fields are rejected.
+- Methodology body project scope must match the authenticated middleware project.
+- Invalid JSON fails parsing and is never accepted as structured model output.
+- Structurally malformed agent JSON is rejected.
+- Draft JSON missing evidence arrays or containing non-finite numbers is rejected.
+- Empty/incomplete peer-review output is rejected.
+- Incomplete methodology JSON is rejected rather than filled; only all eleven explicit fields pass.
+- Malformed agent, drafting, peer-review and DOI requests are rejected.
+
+### Compatibility, blockers, and prompt boundary
+
+- No persisted documents are migrated. Existing client request shapes are preserved except that malformed or extra top-level fields now fail closed.
+- The generic agent success payload intentionally changes from `{ text }` to `{ result }`; the current caller only uses success/failure state and remains compatible.
+- SDK response schemas constrain generation but are not trusted as validation; server runtime validation remains authoritative.
+- TQ-VSC-018 and all later prompts remain `NOT STARTED`.

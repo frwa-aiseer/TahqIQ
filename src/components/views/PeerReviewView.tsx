@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ReviewerComment, ProjectState, AiLedgerEvent } from "../../types";
 import { Users, CheckCircle2, AlertTriangle, Sparkles, X, Check, ShieldAlert, Sliders } from "lucide-react";
+import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
 
 interface PeerReviewViewProps {
   comments: ReviewerComment[];
@@ -76,7 +77,7 @@ export const PeerReviewView: React.FC<PeerReviewViewProps> = ({
       }
 
       try {
-        const res = await fetch("/api/gemini/peer-review", {
+        const res = await authenticatedProjectFetch("/api/gemini/peer-review", project?.id || "", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

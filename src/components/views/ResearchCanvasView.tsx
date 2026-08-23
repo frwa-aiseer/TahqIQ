@@ -1,16 +1,19 @@
 import React, { useState } from "react";
 import { ResearchCanvas } from "../../types";
 import { Sparkles, Lightbulb, ShieldCheck, FileText, Target, BookOpen } from "lucide-react";
+import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
 
 interface ResearchCanvasViewProps {
   canvas: ResearchCanvas;
   onUpdateCanvas: (updated: ResearchCanvas) => void;
   isDemoProject?: boolean;
+  projectId?: string;
 }
 
 export const ResearchCanvasView: React.FC<ResearchCanvasViewProps> = ({
   canvas,
   onUpdateCanvas,
+  projectId,
 }) => {
   const [formData, setFormData] = useState<ResearchCanvas>(canvas);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -26,7 +29,7 @@ export const ResearchCanvasView: React.FC<ResearchCanvasViewProps> = ({
     setIsGeneratingAi(true);
     setAiNotice(null);
     try {
-      const res = await fetch("/api/gemini/agent", {
+      const res = await authenticatedProjectFetch("/api/gemini/agent", projectId || "", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

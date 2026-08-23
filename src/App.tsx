@@ -275,6 +275,7 @@ function MainAppContent() {
                 canvas={project.canvas}
                 onUpdateCanvas={handleUpdateCanvas}
                 isDemoProject={project.isDemoProject}
+                projectId={project.id}
               />
             )}
 
@@ -286,6 +287,7 @@ function MainAppContent() {
                   onOpenReader={(src) => setReaderSource(src)}
                   isDemoProject={project.isDemoProject}
                   activeCslStyle={activeCslStyle}
+                  projectId={project.id}
                 />
                 <GapMapView gaps={project.gaps || []} />
               </div>

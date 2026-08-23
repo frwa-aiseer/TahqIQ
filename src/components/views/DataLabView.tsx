@@ -17,6 +17,7 @@ import { createNumericEvidenceFromAnalysis } from "../../lib/numericEvidence";
 import { hasAttributableManuscriptApproval, transitionAnalysisOutput } from "../../lib/analysisLifecycle";
 import { ApprovalModal } from "../ApprovalModal";
 import { useAuth } from "../../context/AuthContext";
+import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
 import {
   FileSpreadsheet,
   Play,
@@ -347,7 +348,7 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
 
       // Attempt secure server API execution path
       try {
-        const res = await fetch("/api/analysis/execute", {
+        const res = await authenticatedProjectFetch("/api/analysis/execute", project?.id || "", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

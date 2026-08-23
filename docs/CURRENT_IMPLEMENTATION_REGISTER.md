@@ -100,6 +100,10 @@ TQ-VSC-012 applies least-privilege Firestore rules verified against the real loc
 
 TQ-VSC-013 moves privileged audit appends to a Firebase Admin server path. Client SDK writes are denied for every role; the server verifies token identity and project RBAC, validates ten action/entity combinations, confirms the entity and current disposition, derives snapshots and timestamp, and appends complete immutable records with rationale and evidence IDs. Legacy client-shaped records remain readable but are never classified as trusted.
 
+TQ-VSC-016 adds a shared Firebase Admin authorization boundary to every sensitive Express endpoint. AI, analysis, methodology, DOI/project-literature, peer-review, and trusted-audit routes verify an ID token, derive project membership and role from Firestore, enforce route-specific roles and body limits, apply per-actor/project/route rate limiting, expose completion-audit hooks, and return bounded safe errors. The health endpoint remains public. Client callers obtain a fresh token from the configured Firebase user and send only the project scope needed for server lookup; frontend UID/email/role/membership claims are not authorization inputs.
+
+TQ-VSC-017 adds deterministic runtime contracts in `src/server/apiSchemas.ts` for agent, section-drafting, peer-review, methodology, DOI, and analysis requests. Structured AI outputs are JSON-parsed and then validated for exact fields, types, bounds, finite numbers, and required arrays/objects before any success response. Missing methodology fields are no longer filled after the model call. The generic agent now uses an SDK response schema and returns a validated structured `result`; malformed AI JSON returns a 502 validation failure. External analysis-service success payloads are also validated before they can be returned, otherwise execution falls back to the typed native engine.
+
 ## Firebase, authentication, Firestore, and Storage
 
 ### Client initialization and auth
@@ -203,19 +207,16 @@ The Firestore rule tests inspect rule source and simulate helper behavior; no Fi
 
 These are source observations, not work completed under later prompts:
 
-1. Express AI, DOI, and analysis routes have no authentication, project-membership check, or server-side RBAC.
-2. Firebase client configuration is hard-coded rather than environment validated.
-3. Client code can create high-integrity audit and version records; audit actor/details are not established by a trusted server.
-4. Four direct Gemini integrations are not centralized; the generic agent response is unstructured at the application boundary.
-5. API request bodies are not validated with deterministic schemas.
-6. Several implemented views are unreachable, while legacy route labels misleadingly land on other step content.
-7. Step 9 is labeled References but renders Claim Matrix rather than a dedicated reference-list view.
-8. `q1ManuscriptEngine.ts` still contains synthetic demonstration prose, but TQ-VSC-002 restricts it to explicit demo projects. TQ-VSC-004 removed abstract/unreviewed literature insertion and non-final statistical insertion from Writing Studio; other writing-generation paths remain separately governed.
-9. JATS validation language overstates the local validator's demonstrated assurance.
-10. Build externalizes Node `crypto` from browser code and emits a very large main chunk.
-11. The baseline suite is red because of a network-dependent DOI expectation and a localStorage test-environment issue.
-12. No server rate limiting, request budget, explicit bounded retry policy, or centralized privacy policy is present.
-13. The repository has both npm and Bun lockfiles, creating package-manager ambiguity; the declared verification scripts were run through npm for this baseline.
+1. Four direct Gemini integrations are not centralized; the generic agent response is unstructured at the application boundary.
+2. Some deeply nested research entity fields are validated at their server-use boundary rather than exhaustively re-declaring the full persisted project schema; schema versioning remains a future compatibility consideration.
+3. Several implemented views are unreachable, while legacy route labels misleadingly land on other step content.
+4. Step 9 is labeled References but renders Claim Matrix rather than a dedicated reference-list view.
+5. `q1ManuscriptEngine.ts` still contains synthetic demonstration prose, but TQ-VSC-002 restricts it to explicit demo projects. TQ-VSC-004 removed abstract/unreviewed literature insertion and non-final statistical insertion from Writing Studio; other writing-generation paths remain separately governed.
+6. JATS validation language overstates the local validator's demonstrated assurance.
+7. Build externalizes Node `crypto` from browser code and emits a very large main chunk.
+8. The baseline suite is red because of a network-dependent DOI expectation and a localStorage test-environment issue.
+9. The new in-process API rate limiter is per server instance; no distributed limiter, request budget, explicit bounded provider retry policy, or centralized privacy policy is present.
+10. The repository has both npm and Bun lockfiles, creating package-manager ambiguity; the declared verification scripts were run through npm for this baseline.
 
 ## Data migration and backward compatibility
 

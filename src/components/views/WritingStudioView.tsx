@@ -5,6 +5,7 @@ import { ApprovalModal } from "../ApprovalModal";
 import { AiProposalModal } from "../AiProposalModal";
 import { validateAiGeneratedProse, AIValidationResult, isAnalysisOutputApproved } from "../../lib/aiValidationService";
 import { useAuth } from "../../context/AuthContext";
+import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
 import { formatInTextCitation, formatBibliographyEntry, CSL_STYLES } from "../../lib/cslStyles";
 import { applyToneAndComplexity } from "../../lib/manuscriptTone";
 import {
@@ -333,7 +334,7 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
 
     let generatedText = "";
     try {
-      const res = await fetch("/api/gemini/draft-section", {
+      const res = await authenticatedProjectFetch("/api/gemini/draft-section", project.id, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -440,7 +441,7 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
       }
 
       try {
-        const res = await fetch("/api/gemini/draft-section", {
+        const res = await authenticatedProjectFetch("/api/gemini/draft-section", project.id, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

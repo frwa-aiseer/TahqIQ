@@ -20,12 +20,14 @@ import {
   Layers,
   Database
 } from "lucide-react";
+import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
 
 interface SourceLibraryViewProps {
   sources: SourceRecord[];
   onAddSource: (source: SourceRecord) => void;
   onOpenReaderModal: (source: SourceRecord) => void;
   onUpdateSource?: (source: SourceRecord) => void;
+  projectId?: string;
 }
 
 export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
@@ -33,6 +35,7 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
   onAddSource,
   onOpenReaderModal,
   onUpdateSource,
+  projectId,
 }) => {
   const { user } = useAuth();
   const [doiInput, setDoiInput] = useState("");
@@ -63,7 +66,7 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
     setNotice(null);
 
     try {
-      const res = await fetch("/api/sources/doi", {
+      const res = await authenticatedProjectFetch("/api/sources/doi", projectId || "", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ doi: doiInput }),

@@ -11,6 +11,29 @@ import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import { createTrustedAuditEvent, validateTrustedAuditRequest } from "./src/server/trustedAudit";
 import type { ProjectRole, TrustedAuditEntityType } from "./src/types";
+import {
+  ALL_PROJECT_ROLES,
+  AuthenticatedProjectRequest,
+  createAuthenticatedProjectMiddleware,
+  createInMemoryRateLimitHook,
+  PROJECT_WRITER_ROLES,
+  safeApiErrorHandler,
+} from "./src/server/authMiddleware";
+import {
+  METHODOLOGY_KEYS,
+  parseAndValidateModelJson,
+  validateAgentModelOutput,
+  validateAgentRequest,
+  validateAnalysisRequest,
+  validateDraftSectionModelOutput,
+  validateDraftSectionRequest,
+  validateDoiRequest,
+  validateExternalAnalysisResponse,
+  validateMethodologyModelOutput,
+  validateMethodologyRequest,
+  validatePeerReviewModelOutput,
+  validatePeerReviewRequest,
+} from "./src/server/apiSchemas";
 
 dotenv.config();
 
@@ -41,6 +64,28 @@ async function startServer() {
     if (!projectId) throw new Error("Trusted Firebase service Not Configured: FIREBASE_ADMIN_PROJECT_ID is missing.");
     const adminApp = getAdminApps()[0] || initializeAdminApp({ credential: applicationDefault(), projectId });
     return { adminAuth: getAdminAuth(adminApp), adminDb: getAdminFirestore(adminApp) };
+  }
+
+  const apiRateLimit = createInMemoryRateLimitHook(60, 60_000);
+  const protectedProjectRoute = (
+    allowedRoles: readonly ProjectRole[],
+    maxBodyBytes: number,
+    requireEmail = false
+  ) => createAuthenticatedProjectMiddleware({
+    getAdminServices: getTrustedFirebaseAdmin,
+    allowedRoles,
+    maxBodyBytes,
+    requireEmail,
+    rateLimitHook: apiRateLimit,
+    auditHook: (record) => console.info("[TehqIQ API Audit]", JSON.stringify(record)),
+  });
+
+  function rejectInvalidRequest(res: express.Response, errors: string[]) {
+    return res.status(400).json({ status: "failed", error: "Request validation failed.", errors });
+  }
+
+  function rejectInvalidModelOutput(res: express.Response, errors: string[]) {
+    return res.status(502).json({ status: "failed", error: "AI response validation failed.", errors });
   }
 
   function getAuditedEntity(project: Record<string, any>, entityType: TrustedAuditEntityType, entityId: string): Record<string, any> | null {
@@ -77,25 +122,15 @@ async function startServer() {
   });
 
   // Trusted, append-only privileged audit path. Actor and timestamp are never accepted from the client.
-  app.post("/api/projects/:projectId/audit-events", async (req, res) => {
+  app.post("/api/projects/:projectId/audit-events", protectedProjectRoute(PROJECT_WRITER_ROLES, 64 * 1024, true), async (request, res) => {
+    const req = request as AuthenticatedProjectRequest;
     try {
-      const authorization = req.header("authorization") || "";
-      if (!authorization.startsWith("Bearer ")) return res.status(401).json({ status: "failed", error: "Firebase ID token required." });
-      const { adminAuth, adminDb } = getTrustedFirebaseAdmin();
-      const decoded = await adminAuth.verifyIdToken(authorization.slice(7));
-      if (!decoded.uid || typeof decoded.email !== "string" || !decoded.email.trim()) {
-        return res.status(403).json({ status: "failed", error: "An authenticated actor with an email claim is required." });
-      }
+      const auth = req.projectAuth!;
+      const projectId = auth.projectId;
+      const projectRef = auth.projectRef as any;
+      const project = auth.project as Record<string, any>;
 
-      const projectId = req.params.projectId;
-      const projectRef = adminDb.collection("projects").doc(projectId);
-      const projectSnapshot = await projectRef.get();
-      if (!projectSnapshot.exists) return res.status(404).json({ status: "failed", error: "Project not found." });
-      const project = { id: projectSnapshot.id, ...projectSnapshot.data() } as Record<string, any>;
-      const role = (project.ownerUid === decoded.uid ? "Owner" : project.members?.[decoded.uid]) as ProjectRole | undefined;
-      if (!role) return res.status(403).json({ status: "failed", error: "Project membership required." });
-
-      const validation = validateTrustedAuditRequest(req.body, role);
+      const validation = validateTrustedAuditRequest(req.body, auth.role);
       if (!validation.valid || !validation.request) return res.status(400).json({ status: "failed", errors: validation.errors });
       const auditedEntity = getAuditedEntity(project, validation.request.entityType, validation.request.entityId);
       if (!auditedEntity) {
@@ -109,7 +144,7 @@ async function startServer() {
       const eventRef = projectRef.collection("auditEvents").doc();
       const event = createTrustedAuditEvent(
         projectId,
-        { uid: decoded.uid, email: decoded.email },
+        { uid: auth.actor.uid, email: auth.actor.email! },
         validation.request,
         priorStateSnapshot(auditedEntity),
         auditedEntity,
@@ -126,9 +161,11 @@ async function startServer() {
   });
 
   // 1. AI Agent Orchestrator Endpoint
-  app.post("/api/gemini/agent", async (req, res) => {
+  app.post("/api/gemini/agent", protectedProjectRoute(PROJECT_WRITER_ROLES, 1024 * 1024), async (req, res) => {
     try {
-      const { agentType, prompt, context } = req.body;
+      const requestValidation = validateAgentRequest(req.body);
+      if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
+      const { agentType, prompt, context } = requestValidation.value;
       const ai = getGeminiClient();
 
       const systemInstruction = `You are TehqIQ's specialized research agent (${agentType || "Research Orchestrator"}).
@@ -148,25 +185,41 @@ Notice: TehqIQ assists researchers but does not replace subject expertise, ethic
         config: {
           systemInstruction,
           temperature: 0.2,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              summary: { type: Type.STRING },
+              proposals: { type: Type.ARRAY, items: { type: Type.STRING } },
+              missingInformationFlags: { type: Type.ARRAY, items: { type: Type.STRING } },
+              evidenceIds: { type: Type.ARRAY, items: { type: Type.STRING } },
+            },
+            required: ["summary", "proposals", "missingInformationFlags", "evidenceIds"],
+          },
         },
       });
 
+      const modelValidation = parseAndValidateModelJson(response.text, validateAgentModelOutput);
+      if (!modelValidation.valid) return rejectInvalidModelOutput(res, modelValidation.errors);
+
       res.json({
         status: "completed",
-        text: response.text,
+        result: modelValidation.value,
         agentType,
         timestamp: new Date().toISOString(),
       });
     } catch (error: any) {
       console.error("Gemini Agent Error:", error);
-      res.status(500).json({ status: "failed", error: error.message || "Failed to execute AI agent request." });
+      res.status(500).json({ status: "failed", error: "AI agent request failed safely." });
     }
   });
 
   // 2. Structured Section Drafting Endpoint (Phase 6 Evidence-First Section Generation)
-  app.post("/api/gemini/draft-section", async (req, res) => {
+  app.post("/api/gemini/draft-section", protectedProjectRoute(PROJECT_WRITER_ROLES, 5 * 1024 * 1024), async (req, res) => {
     try {
-      const { sectionTitle, canvas, sources, claims, analysisOutputs, targetWordCount, focusStyle } = req.body;
+      const requestValidation = validateDraftSectionRequest(req.body);
+      if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
+      const { sectionTitle, canvas, sources, claims, analysisOutputs, targetWordCount, focusStyle } = requestValidation.value;
       const titleLower = (sectionTitle || "").toLowerCase();
 
       // Rule 9: Results section blocked without approved analysis outputs
@@ -215,39 +268,33 @@ Approved Analysis Outputs: ${JSON.stringify((analysisOutputs || []).filter((out:
               numbersUsed: { type: Type.ARRAY, items: { type: Type.NUMBER } },
               missingInformationFlags: { type: Type.ARRAY, items: { type: Type.STRING } },
             },
-            required: ["title", "content"],
+            required: ["title", "content", "citationsUsed", "evidenceUsed", "numbersUsed", "missingInformationFlags"],
           },
         },
       });
 
-      let jsonRes = { title: sectionTitle, content: "" };
-      try {
-        jsonRes = JSON.parse(response.text || "{}");
-      } catch (err) {
-        return res.status(500).json({ status: "failed", error: "Failed to parse structured JSON response from Gemini model." });
-      }
+      const modelValidation = parseAndValidateModelJson(response.text, validateDraftSectionModelOutput);
+      if (!modelValidation.valid) return rejectInvalidModelOutput(res, modelValidation.errors);
 
       res.json({
         status: "completed",
-        draft: jsonRes,
+        draft: modelValidation.value,
         promptVersion: "v2.4-phase6",
         model: "gemini-3.6-flash",
         timestamp: new Date().toISOString(),
       });
     } catch (error: any) {
       console.error("Gemini Section Drafting Error:", error);
-      res.status(500).json({ status: "failed", error: error.message || "Failed to draft section via Gemini." });
+      res.status(500).json({ status: "failed", error: "AI section drafting failed safely." });
     }
   });
 
   // 3. Structured Multi-Agent Peer Review Endpoint
-  app.post("/api/gemini/peer-review", async (req, res) => {
+  app.post("/api/gemini/peer-review", protectedProjectRoute([...PROJECT_WRITER_ROLES, "Reviewer"], 5 * 1024 * 1024), async (req, res) => {
     try {
-      const { sections, sources, analysisOutputs, reviewerRole } = req.body;
-
-      if (!reviewerRole) {
-        return res.status(400).json({ status: "failed", error: "reviewerRole parameter is required." });
-      }
+      const requestValidation = validatePeerReviewRequest(req.body);
+      if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
+      const { sections, sources, analysisOutputs, reviewerRole } = requestValidation.value;
 
       const ai = getGeminiClient();
       const systemInstruction = `You are a peer reviewer specialized as: ${reviewerRole}.
@@ -285,11 +332,12 @@ Strict rules: Output structured JSON matching the responseSchema. Never make gen
         },
       });
 
-      let parsed = JSON.parse(response.text || '{"comments":[]}');
+      const modelValidation = parseAndValidateModelJson(response.text, validatePeerReviewModelOutput);
+      if (!modelValidation.valid) return rejectInvalidModelOutput(res, modelValidation.errors);
       res.json({
         status: "completed",
         reviewerRole,
-        comments: parsed.comments || [],
+        comments: modelValidation.value.comments,
         timestamp: new Date().toISOString(),
       });
     } catch (error: any) {
@@ -298,22 +346,19 @@ Strict rules: Output structured JSON matching the responseSchema. Never make gen
         status: "failed",
         reviewerRole: req.body?.reviewerRole,
         unavailable: true,
-        reason: error.message || "Reviewer agent call failed.",
-        error: error.message,
+        reason: "Reviewer agent call failed safely.",
+        error: "Reviewer agent call failed safely.",
       });
     }
   });
 
   // Domain-neutral methodology proposal. Output remains AI Suggested until a researcher approves it.
-  app.post("/api/gemini/methodology-proposal", async (req, res) => {
+  app.post("/api/gemini/methodology-proposal", protectedProjectRoute(PROJECT_WRITER_ROLES, 512 * 1024), async (request, res) => {
+    const req = request as AuthenticatedProjectRequest;
     try {
-      const { projectId, projectContext } = req.body || {};
-      if (!projectId || !projectContext || typeof projectContext !== "object") {
-        return res.status(400).json({
-          status: "failed",
-          error: "projectId and projectContext are required for a methodology proposal.",
-        });
-      }
+      const requestValidation = validateMethodologyRequest(req.body, req.projectAuth!.projectId);
+      if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
+      const { projectId, projectContext } = requestValidation.value;
 
       const ai = getGeminiClient();
       const methodologyProperties = {
@@ -329,7 +374,6 @@ Strict rules: Output structured JSON matching the responseSchema. Never make gen
         ethics: { type: Type.STRING },
         limitations: { type: Type.STRING },
       };
-      const methodologyKeys = Object.keys(methodologyProperties);
 
       const response = await ai.models.generateContent({
         model: "gemini-3.6-flash",
@@ -345,26 +389,19 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
           responseSchema: {
             type: Type.OBJECT,
             properties: methodologyProperties,
-            required: methodologyKeys,
+            required: [...METHODOLOGY_KEYS],
           },
         },
       });
 
-      const parsed = JSON.parse(response.text || "{}");
-      const proposal = Object.fromEntries(
-        methodologyKeys.map((key) => [
-          key,
-          typeof parsed[key] === "string" && parsed[key].trim()
-            ? parsed[key].trim()
-            : "Researcher input required",
-        ])
-      );
+      const modelValidation = parseAndValidateModelJson(response.text, validateMethodologyModelOutput);
+      if (!modelValidation.valid) return rejectInvalidModelOutput(res, modelValidation.errors);
 
       res.json({
         status: "completed",
         projectId,
         reviewState: "AI Suggested",
-        proposal,
+        proposal: modelValidation.value,
         model: "gemini-3.6-flash",
         promptVersion: "tq-vsc-003-v1",
         timestamp: new Date().toISOString(),
@@ -373,18 +410,17 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
       console.error("Gemini Methodology Proposal Error:", error);
       res.status(500).json({
         status: "failed",
-        error: error.message || "AI methodology proposal failed. No fallback content was generated.",
+        error: "AI methodology proposal failed safely. No fallback content was generated.",
       });
     }
   });
 
   // 4. DOI Lookup Proxy Endpoint (Authoritative Registries)
-  app.post("/api/sources/doi", async (req, res) => {
+  app.post("/api/sources/doi", protectedProjectRoute(ALL_PROJECT_ROLES, 16 * 1024), async (req, res) => {
     try {
-      const { doi } = req.body;
-      if (!doi) {
-        return res.status(400).json({ error: "DOI parameter is required." });
-      }
+      const requestValidation = validateDoiRequest(req.body);
+      if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
+      const { doi } = requestValidation.value;
 
       const lookup = await lookupDoiMetadata(doi);
       if (!lookup.success) {
@@ -423,17 +459,11 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
   });
 
   // 5. Statistical Analysis Execution Endpoint (Phase 5 Secure Server Execution)
-  app.post("/api/analysis/execute", async (req, res) => {
+  app.post("/api/analysis/execute", protectedProjectRoute(PROJECT_WRITER_ROLES, 25 * 1024 * 1024), async (req, res) => {
     try {
-      const { dataset, plan, options } = req.body;
-
-      if (!dataset || !plan) {
-        return res.status(400).json({
-          status: "failed",
-          executionStatus: "Failed",
-          error: "Execution blocked: Both dataset and analysis plan parameters are required.",
-        });
-      }
+      const requestValidation = validateAnalysisRequest(req.body);
+      if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
+      const { dataset, plan, options } = requestValidation.value;
 
       // Check external Python Cloud Run Service Interface
       if (process.env.ANALYSIS_SERVICE_URL) {
@@ -444,7 +474,12 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
             body: JSON.stringify({ dataset, plan, options }),
           });
           const result = await serviceResponse.json();
-          return res.json(result);
+          const responseValidation = validateExternalAnalysisResponse(result);
+          if (!responseValidation.valid) {
+            console.error("External analysis response validation failed:", responseValidation.errors);
+          } else {
+            return res.json(responseValidation.value);
+          }
         } catch (serviceErr: any) {
           console.error("Cloud Run Analysis Service Error:", serviceErr);
           // Fall through to native statistical engine execution
@@ -491,10 +526,12 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
       res.status(500).json({
         status: "failed",
         executionStatus: "Failed",
-        error: error.message || "Statistical analysis execution failed.",
+        error: "Statistical analysis execution failed safely.",
       });
     }
   });
+
+  app.use("/api", safeApiErrorHandler);
 
   // Serve static or Vite dev middleware
   if (process.env.NODE_ENV !== "production") {

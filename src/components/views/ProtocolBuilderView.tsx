@@ -9,6 +9,7 @@ import {
   extractMethodologyFieldsFromText,
   getMethodologyWorkspace,
 } from "../../lib/methodologyWorkspace";
+import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
 
 interface ProtocolBuilderViewProps {
   project: ProjectState;
@@ -126,7 +127,7 @@ export const ProtocolBuilderView: React.FC<ProtocolBuilderViewProps> = ({
     setIsRequestingAi(true);
     setNotice(null);
     try {
-      const response = await fetch("/api/gemini/methodology-proposal", {
+      const response = await authenticatedProjectFetch("/api/gemini/methodology-proposal", project.id, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
