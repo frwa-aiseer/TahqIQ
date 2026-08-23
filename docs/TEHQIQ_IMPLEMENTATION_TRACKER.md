@@ -28,6 +28,7 @@ This tracker records remediation work verified against the live repository. Stat
 | TQ-VSC-012 | PASS | Built on the uncommitted TQ-VSC-006–011 working tree | `firestore.rules`; `firebase.json`; `package.json`; `package-lock.json`; `src/tests/firebaseSecurityRules.test.ts`; `src/tests/firestoreRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No document rewrite. Existing owner records remain directly readable by `ownerUid`; owner updates can repair a missing owner-membership entry. New project creation requires the owner to be mapped as Owner. | `npm run lint`: PASS. Static focused Vitest: PASS, 16/16. Firestore Emulator: PASS, 7/7. `npm test`: 26/29 files passed, 216/218 executed tests passed, 7 emulator-only tests skipped outside emulator; Crossref and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Private profiles are owner-only; project reads require membership; Viewer writes and Co-author membership/ownership changes are denied; owner/member integrity and cross-project isolation are enforced; version snapshots are immutable. TQ-VSC-013 and later were not executed. |
 | TQ-VSC-013 | PASS | Committed TQ-VSC-012 checkpoint `2364ab2`; working-tree checkpoint pending commit | `.env.example`; `package.json`; `package-lock.json`; `server.ts`; `firestore.rules`; `src/types.ts`; `src/server/trustedAudit.ts`; `src/lib/projectService.ts`; `src/tests/trustedAudit.test.ts`; `src/tests/firebaseSecurityRules.test.ts`; `src/tests/firebaseConfiguration.test.ts`; `src/tests/firestoreRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Expanded audit records with optional legacy aliases. Existing client-created records remain readable but fail `isTrustedAuditEvent`; no destructive rewrite. | `npm run lint`: PASS. Focused Vitest: PASS, 23/23. Firestore Emulator: PASS, 8/8. `npm test`: 27/30 files passed, 223/225 executed tests passed, 8 emulator-only tests skipped; Crossref and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Client create/update/delete on audit events is denied for every role. Trusted append requires verified Firebase actor, membership/RBAC, action/entity validation, existing entity, server-derived snapshots/timestamp, rationale and evidence IDs. TQ-VSC-014 and later were not executed. |
 | TQ-VSC-014 | PASS | Built on committed TQ-VSC-013 checkpoint `3c10717`; working-tree checkpoint pending commit | `src/lib/storageService.ts`; `src/tests/storagePersistence.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Extended newly created file metadata with project, SHA-256, persistence, and provenance fields. No existing records are rewritten; legacy metadata remains readable. Failed attempts create no metadata record. | `npm run lint`: PASS. Focused storage Vitest: PASS, 5/5. Combined focused/regression Vitest: 2/3 files and 13/14 tests passed; only the pre-existing jsdom localStorage failure remains. `npm test`: 28/30 executed files passed, 228/230 executed tests passed, 1 file/8 emulator tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Object URLs are never returned by the research upload path. Only a completed Cloud Storage upload plus download-reference resolution and Firestore metadata write returns success; partial uploads are cleanup-attempted and all failures throw an explicit Local / Unpersisted error. TQ-VSC-015 and later were not executed. |
+| TQ-VSC-015 | PASS | Built on committed TQ-VSC-014 checkpoint `aabd971`; working-tree checkpoint pending commit | `storage.rules`; `firebase.json`; `package.json`; `src/tests/storageRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No stored-object or Firestore document migration. Existing objects become private and may require policy-compliant metadata before overwrite. Locked objects cannot be changed or deleted through client rules. | `npm run lint`: PASS. Firestore + Storage Emulator: PASS, 8/8. `npm test`: 28/30 executed files passed, 228/230 executed tests passed, with 2 emulator-only files/16 tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Authenticated project membership is required to read. Only designated writer roles can create/update, only owners can delete, paths/metadata are project-bound, overwrites cannot use create grants, locked objects are protected, and all unscoped paths are denied. No malware-scanning claim is made. TQ-VSC-016 and later were not executed. |
 
 ## TQ-VSC-000 verification details
 
@@ -628,3 +629,43 @@ None. The harness is test-only and imports existing types without changing them.
 - Cleanup after a metadata-write failure is best effort. A provider failure during deletion may leave an unreferenced Storage object, but it still cannot create or return a successful research-file record.
 - Full-suite Crossref and localStorage-environment failures remain outside this prompt.
 - TQ-VSC-015 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-015 verification details
+
+### Implementation
+
+- Added private-by-default Cloud Storage rules. No path outside `projects/{projectId}/files/{fileId}` has client access.
+- Reads require an authenticated owner or explicit member of the path's project, resolved from the existing Firestore project document.
+- Creates and updates require Owner, Corresponding Author, Co-author, Supervisor, or Statistician; Viewer and other roles cannot write. Deletes are Owner-only.
+- Creation requires the object not to exist, preventing an overwrite from using the less restrictive create grant. Update identity metadata is immutable and must remain tied to the path project and original uploader/checksum/provenance.
+- Centralized rules policy caps research uploads at 25 MiB and allows only explicit text, CSV/TSV, JSON, PDF, Word, and Excel MIME types.
+- Creation requires matching `projectId`, authenticated `uploaderUid`, a lowercase 64-character SHA-256, and `Researcher Upload` provenance in object metadata.
+- Objects with `locked: "true"` metadata cannot be overwritten, unlocked, or deleted through client rules.
+- Added Storage emulator configuration and a combined Firestore + Storage rules command because Storage membership checks use Firestore project documents.
+- No malware scanning was added or claimed.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" XDG_CONFIG_HOME=/private/tmp/tehqiq-firebase-config npm run test:storage-rules` — exit `0`; real Firestore + Storage Emulator PASS, 1/1 file and 8/8 tests.
+3. `npm test` — exit `1`; 28/30 executed files passed, 228/230 executed tests passed, with 2 emulator-only files and 16 tests skipped. The two failures are pre-existing: offline Crossref returns network-failure wording instead of registry-not-found wording, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 1,993 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+
+### Emulator acceptance coverage
+
+- Authorized Co-author creation and member read succeed for a valid project-scoped file.
+- Unauthenticated reads and writes fail.
+- Viewer upload fails.
+- A user authorized for project B cannot read or overwrite project A, and a project A owner cannot write through project B's path.
+- Mismatched project/uploader metadata and unsupported executable MIME type fail.
+- Files over the centralized 25 MiB limit fail.
+- Locked artifacts cannot be overwritten, unlocked, or deleted.
+- Unscoped paths are denied.
+
+### Compatibility, blockers, and prompt boundary
+
+- No data migration executes. Existing stored objects remain present, but private-by-default access applies when these rules are deployed. Legacy objects without required metadata remain readable to project members but cannot be overwritten until a deliberate migration or replacement creates policy-compliant metadata.
+- The rules were verified locally against Firestore Emulator v1.22.0 and Cloud Storage rules runtime v1.1.3 on OpenJDK 21. Deployment to a live Firebase project was not requested or performed.
+- Content-type checks are policy controls, not proof of file contents and not malware scanning.
+- TQ-VSC-016 and all later prompts remain `NOT STARTED`.

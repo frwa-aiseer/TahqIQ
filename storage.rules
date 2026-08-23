@@ -1,0 +1,98 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function projectData(projectId) {
+      return firestore.get(/databases/(default)/documents/projects/$(projectId)).data;
+    }
+
+    function isProjectMember(projectId) {
+      let project = projectData(projectId);
+      return isSignedIn() && (
+        project.ownerUid == request.auth.uid ||
+        (project.members != null && project.members.get(request.auth.uid, null) != null)
+      );
+    }
+
+    function projectRole(projectId) {
+      let project = projectData(projectId);
+      return project.ownerUid == request.auth.uid
+        ? 'Owner'
+        : project.members.get(request.auth.uid, 'No Access');
+    }
+
+    function canWriteProjectFiles(projectId) {
+      return isProjectMember(projectId) &&
+        projectRole(projectId) in ['Owner', 'Corresponding Author', 'Co-author', 'Supervisor', 'Statistician'];
+    }
+
+    // Centralized deployment policy values. Keep limits here so a deployment can
+    // deliberately revise and emulator-test them without weakening path checks.
+    function maxResearchFileBytes() {
+      return 25 * 1024 * 1024;
+    }
+
+    function hasAllowedResearchContentType() {
+      return request.resource.contentType in [
+        'text/plain',
+        'text/csv',
+        'text/tab-separated-values',
+        'application/json',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ];
+    }
+
+    function hasValidCreateMetadata(projectId) {
+      return request.resource.metadata.keys().hasAll(['projectId', 'uploaderUid', 'sha256', 'provenance']) &&
+        request.resource.metadata.projectId == projectId &&
+        request.resource.metadata.uploaderUid == request.auth.uid &&
+        request.resource.metadata.sha256.matches('^[a-f0-9]{64}$') &&
+        request.resource.metadata.provenance == 'Researcher Upload';
+    }
+
+    function immutableIdentityMetadata() {
+      return request.resource.metadata.projectId == resource.metadata.projectId &&
+        request.resource.metadata.uploaderUid == resource.metadata.uploaderUid &&
+        request.resource.metadata.sha256 == resource.metadata.sha256 &&
+        request.resource.metadata.provenance == resource.metadata.provenance;
+    }
+
+    function existingArtifactIsUnlocked() {
+      return resource.metadata.locked == null || resource.metadata.locked != 'true';
+    }
+
+    match /projects/{projectId}/files/{fileId} {
+      allow read: if isProjectMember(projectId);
+
+      allow create: if resource == null &&
+        canWriteProjectFiles(projectId) &&
+        request.resource.size > 0 &&
+        request.resource.size <= maxResearchFileBytes() &&
+        hasAllowedResearchContentType() &&
+        hasValidCreateMetadata(projectId);
+
+      allow update: if canWriteProjectFiles(projectId) &&
+        existingArtifactIsUnlocked() &&
+        request.resource.size > 0 &&
+        request.resource.size <= maxResearchFileBytes() &&
+        hasAllowedResearchContentType() &&
+        immutableIdentityMetadata();
+
+      allow delete: if isSignedIn() &&
+        projectData(projectId).ownerUid == request.auth.uid &&
+        existingArtifactIsUnlocked();
+    }
+
+    // No unscoped, public, or accidental fallback access.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

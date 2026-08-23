@@ -121,7 +121,9 @@ TQ-VSC-013 moves privileged audit appends to a Firebase Admin server path. Clien
 - Successful metadata records include project ID, actual Storage path, SHA-256, MIME type, size, uploader UID, timestamp, persistence state, and researcher-upload provenance.
 - Failed uploads throw an explicit `Local / Unpersisted` error and create no research-file metadata record. If metadata persistence fails after object upload, cleanup of the incomplete object is attempted. The research upload path has no browser object-URL fallback.
 - Local-storage save/load helpers also exist.
-- No Cloud Storage rules file is present in the inspected repository; only `firestore.rules` exists.
+- `storage.rules` is private by default and restricts `projects/{projectId}/files/{fileId}` using the corresponding Firestore project's owner/member roles. It enforces a centralized 25 MiB limit, an explicit research-document MIME allowlist, project/uploader/checksum/provenance metadata, non-overwrite creation, immutable identity metadata on updates, Owner-only deletion, and locked-object protection.
+- `firebase.json` configures both Firestore and Storage emulators. `npm run test:storage-rules` exercises the combined emulators because Storage authorization reads project membership from Firestore.
+- No malware scanner is implemented or claimed by the Storage policy.
 
 ### Firestore rules observed
 
@@ -204,18 +206,16 @@ These are source observations, not work completed under later prompts:
 1. Express AI, DOI, and analysis routes have no authentication, project-membership check, or server-side RBAC.
 2. Firebase client configuration is hard-coded rather than environment validated.
 3. Client code can create high-integrity audit and version records; audit actor/details are not established by a trusted server.
-4. Cloud Storage object authorization is not yet backed by a repository Storage rules file; TQ-VSC-014 corrected upload success/failure semantics, while project-scoped Storage rules remain separately scoped.
-5. No Cloud Storage rules are present.
-6. Four direct Gemini integrations are not centralized; the generic agent response is unstructured at the application boundary.
-7. API request bodies are not validated with deterministic schemas.
-8. Several implemented views are unreachable, while legacy route labels misleadingly land on other step content.
-9. Step 9 is labeled References but renders Claim Matrix rather than a dedicated reference-list view.
-10. `q1ManuscriptEngine.ts` still contains synthetic demonstration prose, but TQ-VSC-002 restricts it to explicit demo projects. TQ-VSC-004 removed abstract/unreviewed literature insertion and non-final statistical insertion from Writing Studio; other writing-generation paths remain separately governed.
-11. JATS validation language overstates the local validator's demonstrated assurance.
-12. Build externalizes Node `crypto` from browser code and emits a very large main chunk.
-13. The baseline suite is red because of Firebase subpath resolution and a network-dependent DOI expectation.
-14. No server rate limiting, request budget, explicit bounded retry policy, or centralized privacy policy is present.
-15. The repository has both npm and Bun lockfiles, creating package-manager ambiguity; the declared verification scripts were run through npm for this baseline.
+4. Four direct Gemini integrations are not centralized; the generic agent response is unstructured at the application boundary.
+5. API request bodies are not validated with deterministic schemas.
+6. Several implemented views are unreachable, while legacy route labels misleadingly land on other step content.
+7. Step 9 is labeled References but renders Claim Matrix rather than a dedicated reference-list view.
+8. `q1ManuscriptEngine.ts` still contains synthetic demonstration prose, but TQ-VSC-002 restricts it to explicit demo projects. TQ-VSC-004 removed abstract/unreviewed literature insertion and non-final statistical insertion from Writing Studio; other writing-generation paths remain separately governed.
+9. JATS validation language overstates the local validator's demonstrated assurance.
+10. Build externalizes Node `crypto` from browser code and emits a very large main chunk.
+11. The baseline suite is red because of a network-dependent DOI expectation and a localStorage test-environment issue.
+12. No server rate limiting, request budget, explicit bounded retry policy, or centralized privacy policy is present.
+13. The repository has both npm and Bun lockfiles, creating package-manager ambiguity; the declared verification scripts were run through npm for this baseline.
 
 ## Data migration and backward compatibility
 
