@@ -9,6 +9,8 @@ import {
   isOutletVerified,
 } from "../data/baselineOutlets";
 import { TargetOutlet } from "../types";
+import { calculateComplianceRules } from "../lib/complianceEngine";
+import { createEmptyProject } from "../data/demoProject";
 
 describe("TehqIQ Baseline Outlets & Zero Fabrication Policy", () => {
   it("1. Baseline catalog contains NO programmatically fabricated journal titles", () => {
@@ -63,38 +65,22 @@ describe("TehqIQ Baseline Outlets & Zero Fabrication Policy", () => {
     // Check that we don't blanket assume Q1 for every outlet
     let q1Count = 0;
     for (const journal of BASELINE_JOURNALS) {
-      if (journal.metrics?.jcrQuartile?.quartile === "Q1") {
-        q1Count++;
-        // If JCR is declared, it MUST have the official Clarivate source URL
-        expect(journal.metrics.jcrQuartile.officialSourceUrl).toContain("clarivate.com");
-      }
+      q1Count += (journal.metrics || []).filter((metric) => metric.quartile === "Q1").length;
     }
     // Baseline journals do not blindly fabricate JCR metrics on all 20+ outlets
     expect(q1Count).toBeLessThan(BASELINE_JOURNALS.length);
   });
 
-  it("6. Every requirement and claim record has valid provenance fields and no invented values", () => {
+  it("6. Static identity seeds do not auto-create requirements, claims, metrics, or indexing assertions", () => {
     for (const outlet of BASELINE_JOURNALS) {
-      if (outlet.requirementsList) {
-        for (const req of outlet.requirementsList) {
-          expect(req.field).toBeDefined();
-          expect(req.officialSourceUrl).toBe(outlet.officialUrl);
-          expect(req.retrievalDate).toBe(outlet.lastVerifiedDate);
-          expect(req.extractedValue).toBeDefined();
-          expect(["High", "Medium", "Low"]).toContain(req.confidence);
-          expect(typeof req.humanConfirmed).toBe("boolean");
-        }
-      }
-
-      if (outlet.datedClaims) {
-        for (const claim of outlet.datedClaims) {
-          expect(claim.claimName).toBeDefined();
-          expect(claim.value).toBeDefined();
-          expect(claim.officialSourceUrl).toBe(outlet.officialUrl);
-          expect(claim.retrievalDate).toBe(outlet.lastVerifiedDate);
-          expect(typeof claim.humanConfirmed).toBe("boolean");
-        }
-      }
+      expect(outlet.identitySourceUrl).toBe(outlet.officialUrl);
+      expect(outlet.identityRetrievedAt).toBe(outlet.lastVerifiedDate);
+      expect(outlet.requirementsList).toEqual([]);
+      expect(outlet.datedClaims).toEqual([]);
+      expect(outlet.metrics || []).toEqual([]);
+      expect(outlet.indexing).toEqual([]);
+      expect(outlet.openAccessModel).toBe("Unverified");
+      expect(outlet.citationStyle).toBe("Unverified");
     }
   });
 
@@ -115,7 +101,7 @@ describe("TehqIQ Baseline Outlets & Zero Fabrication Policy", () => {
     expect(userOutlet.isUserAdded).toBe(true);
 
     // Requirements must have confidence "Low" and humanConfirmed: false
-    const wordReq = userOutlet.requirementsList?.find((r) => r.field === "wordLimit");
+    const wordReq = userOutlet.requirementsList?.find((r) => r.field === "manuscriptWordLimit");
     expect(wordReq?.confidence).toBe("Low");
     expect(wordReq?.humanConfirmed).toBe(false);
 
@@ -142,10 +128,10 @@ describe("TehqIQ Baseline Outlets & Zero Fabrication Policy", () => {
     expect(liveRecord.provenanceProvider).toBe("OpenAlex");
     expect(liveRecord.verificationStatus).toBe("Verified");
 
-    const wordReq = liveRecord.requirementsList?.find((r) => r.field === "wordLimit");
-    expect(wordReq?.officialSourceUrl).toBe("https://api.openalex.org/sources/s123");
-    expect(wordReq?.confidence).toBe("Medium");
-    expect(wordReq?.humanConfirmed).toBe(false);
+    expect(liveRecord.identitySourceUrl).toBe("https://api.openalex.org/sources/s123");
+    expect(liveRecord.requirementsList).toEqual([]);
+    expect(liveRecord.wordLimit).toBeUndefined();
+    expect(liveRecord.indexing).toEqual([]);
   });
 
   it("9. validateOutletIntegrity intercepts and flags fabricated journals", () => {
@@ -199,5 +185,32 @@ describe("TehqIQ Baseline Outlets & Zero Fabrication Policy", () => {
       "User-added outlet cannot be marked Verified without formal editorial verification."
     );
     expect(isOutletVerified(spoofedOutlet)).toBe(false);
+  });
+
+  it("11. The static factory cannot promote an arbitrary generated outlet to Verified", () => {
+    const generated = createVerifiedStaticOutlet({
+      id: "generated-1",
+      title: "Plausible Looking Journal",
+      type: "Journal",
+      issnOrAcronym: "9999-9999",
+      publisherOrSociety: "Plausible Publisher",
+      subjectCategory: "General",
+      officialUrl: "https://plausible.invalid/journal",
+      indexing: ["Scopus"],
+      openAccessModel: "Gold",
+      citationStyle: "APA 7th",
+      lastVerifiedDate: "2026-08-22",
+      aiPolicySummary: "Claimed policy",
+      metrics: [{ id: "fake-metric", provider: "Claimed Aggregator", providerKind: "THIRD_PARTY", metricName: "JCR Quartile", year: 2026, subjectCategory: "General", quartile: "Q1", sourceUrl: "https://plausible.invalid/metric", retrievedAt: "2026-08-22", verificationState: "Verified" }],
+    });
+    expect(generated.verificationStatus).toBe("Unverified");
+    expect(generated.outletProvenanceType).toBe("USER_ADDED_UNVERIFIED");
+    expect(generated.metrics?.every((metric) => metric.verificationState !== "Verified")).toBe(true);
+    expect(isOutletVerified(generated)).toBe(false);
+    const project = createEmptyProject();
+    project.selectedTargetOutlet = generated;
+    expect(calculateComplianceRules(project)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "rule-outlet-unverified", status: "Fail" }),
+    ]));
   });
 });

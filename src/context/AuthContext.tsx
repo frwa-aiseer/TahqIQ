@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import {
-  auth,
-  db,
+  firebaseStatus,
+  getFirebaseServices,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithEmailAndPassword,
@@ -27,6 +27,7 @@ interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  configurationStatus: "Configured" | "Not Configured";
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (e: string, p: string) => Promise<void>;
   signUpWithEmail: (e: string, p: string, name: string) => Promise<void>;
@@ -38,6 +39,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   userProfile: null,
   loading: true,
+  configurationStatus: firebaseStatus,
   signInWithGoogle: async () => {},
   signInWithEmail: async () => {},
   signUpWithEmail: async () => {},
@@ -51,6 +53,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    if (firebaseStatus === "Not Configured") {
+      setLoading(false);
+      return;
+    }
+    const { auth, db } = getFirebaseServices();
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -97,15 +104,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signInWithGoogle = async () => {
+    const { auth } = getFirebaseServices();
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
   };
 
   const signInWithEmail = async (e: string, p: string) => {
+    const { auth } = getFirebaseServices();
     await signInWithEmailAndPassword(auth, e, p);
   };
 
   const signUpWithEmail = async (e: string, p: string, name: string) => {
+    const { auth } = getFirebaseServices();
     const res = await createUserWithEmailAndPassword(auth, e, p);
     if (res.user) {
       try {
@@ -117,12 +127,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const sendVerificationEmail = async () => {
+    const { auth } = getFirebaseServices();
     if (auth.currentUser) {
       await sendEmailVerification(auth.currentUser);
     }
   };
 
   const logout = async () => {
+    const { auth } = getFirebaseServices();
     await signOut(auth);
   };
 
@@ -132,6 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         userProfile,
         loading,
+        configurationStatus: firebaseStatus,
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,

@@ -8,7 +8,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { user, userProfile, signInWithGoogle, signInWithEmail, signUpWithEmail, sendVerificationEmail, logout } = useAuth();
+  const { user, userProfile, configurationStatus, signInWithGoogle, signInWithEmail, signUpWithEmail, sendVerificationEmail, logout } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -101,6 +101,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             ✕
           </button>
         </div>
+
+        {configurationStatus === "Not Configured" && (
+          <div role="status" className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg">
+            <strong>Firebase: Not Configured.</strong> Cloud sign-in and persistence are unavailable until valid VITE_FIREBASE_* client settings are provided.
+          </div>
+        )}
 
         {user ? (
           /* Logged In User State */

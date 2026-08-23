@@ -2,147 +2,48 @@ import {
   TargetOutlet,
   VersionedRequirementRecord,
   VersionedClaimRecord,
-  OutletMetrics,
   OutletProvenanceType,
   OutletVerificationStatus,
 } from "../types";
+import { normalizeOutletMetricRecords, validateOutletMetricRecord } from "../lib/outletMetrics";
+import { normalizeOutletRequirements } from "../lib/outletRequirements";
 
 /**
- * Builds a verified static seed outlet with explicit provenance and strictly verified real-world fields.
- * No fields are fabricated or auto-invented.
+ * Builds an identity-verified static seed. Requirement, metric, fee, indexing,
+ * deadline, and formatting claims are deliberately discarded unless modeled
+ * later as separately sourced records.
  */
 export function createVerifiedStaticOutlet(
   data: Omit<TargetOutlet, "outletProvenanceType" | "verificationStatus"> & {
     provenanceProvider?: string;
   }
 ): TargetOutlet {
-  const url = data.officialUrl;
-  const date = data.lastVerifiedDate;
-
-  // Build versioned requirement records ONLY for fields that actually exist
-  const requirementsList: VersionedRequirementRecord[] = [];
-
-  if (data.wordLimit !== undefined) {
-    requirementsList.push({
-      id: `${data.id}-req-word`,
-      field: "wordLimit",
-      officialSourceUrl: url,
-      retrievalDate: date,
-      extractedValue: data.wordLimit,
-      confidence: "High",
-      humanConfirmed: true,
-    });
+  const identityKey = `${data.id}|${data.title}|${data.officialUrl}|${data.issnOrAcronym}`;
+  if (!VERIFIED_STATIC_IDENTITY_KEYS.has(identityKey)) {
+    return createUserAddedOutlet(data, undefined);
   }
-
-  if (data.abstractWordLimit !== undefined) {
-    requirementsList.push({
-      id: `${data.id}-req-abstract`,
-      field: "abstractWordLimit",
-      officialSourceUrl: url,
-      retrievalDate: date,
-      extractedValue: data.abstractWordLimit,
-      confidence: "High",
-      humanConfirmed: true,
-    });
-  }
-
-  if (data.citationStyle) {
-    requirementsList.push({
-      id: `${data.id}-req-citation`,
-      field: "citationStyle",
-      officialSourceUrl: url,
-      retrievalDate: date,
-      extractedValue: data.citationStyle,
-      confidence: "High",
-      humanConfirmed: true,
-    });
-  }
-
-  if (data.figureTableLimit !== undefined) {
-    requirementsList.push({
-      id: `${data.id}-req-figtbl`,
-      field: "figureTableLimit",
-      officialSourceUrl: url,
-      retrievalDate: date,
-      extractedValue: data.figureTableLimit,
-      confidence: "High",
-      humanConfirmed: true,
-    });
-  }
-
-  if (data.aiPolicySummary) {
-    requirementsList.push({
-      id: `${data.id}-req-ai`,
-      field: "aiPolicySummary",
-      officialSourceUrl: url,
-      retrievalDate: date,
-      extractedValue: data.aiPolicySummary,
-      confidence: "High",
-      humanConfirmed: true,
-    });
-  }
-
-  // Build dated claims ONLY for verified data
-  const datedClaims: VersionedClaimRecord[] = [];
-
-  if (data.acceptanceRateEstimate) {
-    datedClaims.push({
-      claimName: "acceptance_rate",
-      value: data.acceptanceRateEstimate,
-      officialSourceUrl: url,
-      retrievalDate: date,
-      humanConfirmed: true,
-    });
-  }
-
-  if (data.apcFee) {
-    datedClaims.push({
-      claimName: "apc_fee",
-      value: data.apcFee,
-      officialSourceUrl: url,
-      retrievalDate: date,
-      humanConfirmed: true,
-    });
-  }
-
-  if (data.indexing && data.indexing.length > 0) {
-    datedClaims.push({
-      claimName: "indexing",
-      value: data.indexing.join(", "),
-      officialSourceUrl: url,
-      retrievalDate: date,
-      humanConfirmed: true,
-    });
-  }
-
-  if (data.reviewTimeWeeks !== undefined) {
-    datedClaims.push({
-      claimName: "review_time",
-      value: `${data.reviewTimeWeeks} weeks estimated initial decision`,
-      officialSourceUrl: url,
-      retrievalDate: date,
-      humanConfirmed: true,
-    });
-  }
-
-  if (data.submissionDeadline) {
-    datedClaims.push({
-      claimName: "submission_deadline",
-      value: data.submissionDeadline,
-      officialSourceUrl: url,
-      retrievalDate: date,
-      humanConfirmed: true,
-    });
-  }
-
+  const provenanceProvider = data.provenanceProvider?.trim() || "Official publisher or society outlet page";
   return {
-    ...data,
+    id: data.id,
+    title: data.title,
+    type: data.type,
+    issnOrAcronym: data.issnOrAcronym,
+    publisherOrSociety: data.publisherOrSociety,
+    subjectCategory: data.subjectCategory,
+    officialUrl: data.officialUrl,
+    indexing: [],
+    openAccessModel: "Unverified",
+    citationStyle: "Unverified",
+    lastVerifiedDate: data.lastVerifiedDate,
+    aiPolicySummary: "Unverified",
     outletProvenanceType: "VERIFIED_STATIC_SEED",
     verificationStatus: "Verified",
-    provenanceProvider: data.provenanceProvider || "Curated Verified Static Seed",
-    requirementsList: data.requirementsList || requirementsList,
-    datedClaims: data.datedClaims || datedClaims,
-    metrics: data.metrics, // Only real metrics passed, no auto Q1
+    provenanceProvider,
+    identitySourceUrl: data.officialUrl,
+    identityRetrievedAt: data.lastVerifiedDate,
+    requirementsList: normalizeOutletRequirements(data.requirementsList),
+    datedClaims: [],
+    metrics: normalizeOutletMetricRecords(data.metrics),
   };
 }
 
@@ -155,32 +56,8 @@ export function createLiveRetrievedOutlet(
   rawRecordUrl?: string
 ): TargetOutlet {
   const date = data.lastVerifiedDate || new Date().toISOString().split("T")[0];
-  const sourceUrl = rawRecordUrl || data.officialUrl;
-
-  const requirementsList: VersionedRequirementRecord[] = [];
-  if (data.wordLimit !== undefined) {
-    requirementsList.push({
-      id: `${data.id}-req-word`,
-      field: "wordLimit",
-      officialSourceUrl: sourceUrl,
-      retrievalDate: date,
-      extractedValue: data.wordLimit,
-      confidence: "Medium",
-      humanConfirmed: false,
-    });
-  }
-
-  if (data.citationStyle) {
-    requirementsList.push({
-      id: `${data.id}-req-citation`,
-      field: "citationStyle",
-      officialSourceUrl: sourceUrl,
-      retrievalDate: date,
-      extractedValue: data.citationStyle,
-      confidence: "Medium",
-      humanConfirmed: false,
-    });
-  }
+  const sourceUrl = rawRecordUrl?.trim();
+  const hasProviderProvenance = Boolean(provider.trim() && sourceUrl?.startsWith("https://"));
 
   return {
     id: data.id,
@@ -190,27 +67,19 @@ export function createLiveRetrievedOutlet(
     publisherOrSociety: data.publisherOrSociety || "Unknown Publisher",
     subjectCategory: data.subjectCategory || "General Scholarly Research",
     officialUrl: data.officialUrl,
-    indexing: data.indexing || [],
-    openAccessModel: data.openAccessModel || "Subscription",
-    citationStyle: data.citationStyle || "APA 7th",
+    indexing: [],
+    openAccessModel: "Unverified",
+    citationStyle: "Unverified",
     lastVerifiedDate: date,
-    aiPolicySummary: data.aiPolicySummary || "AI disclosure policy not yet retrieved for this provider record.",
+    aiPolicySummary: "Unverified",
     outletProvenanceType: "LIVE_RETRIEVED_RECORD",
-    verificationStatus: "Verified",
+    verificationStatus: hasProviderProvenance ? "Verified" : "Pending_Verification",
     provenanceProvider: provider,
-    wordLimit: data.wordLimit,
-    abstractWordLimit: data.abstractWordLimit,
-    figureTableLimit: data.figureTableLimit,
-    apcFee: data.apcFee,
-    acceptanceRateEstimate: data.acceptanceRateEstimate,
-    reviewTimeWeeks: data.reviewTimeWeeks,
-    submissionDeadline: data.submissionDeadline,
-    requirementsList: data.requirementsList || requirementsList,
-    metrics: data.metrics,
-    datedClaims: data.datedClaims,
-    fitScore: data.fitScore,
-    fitReasons: data.fitReasons,
-    fitRisks: data.fitRisks,
+    identitySourceUrl: sourceUrl,
+    identityRetrievedAt: date,
+    requirementsList: normalizeOutletRequirements(data.requirementsList),
+    datedClaims: [],
+    metrics: normalizeOutletMetricRecords(data.metrics),
   };
 }
 
@@ -224,30 +93,30 @@ export function createUserAddedOutlet(
 ): TargetOutlet {
   const date = data.lastVerifiedDate || new Date().toISOString().split("T")[0];
 
-  const requirementsList: VersionedRequirementRecord[] = [];
+  const requirementsList: Partial<VersionedRequirementRecord>[] = [];
   if (data.wordLimit !== undefined) {
     requirementsList.push({
       id: `${data.id}-req-word`,
-      field: "wordLimit",
-      officialSourceUrl: data.officialUrl || "User Input",
-      retrievalDate: date,
-      extractedValue: data.wordLimit,
+      field: "manuscriptWordLimit",
+      value: data.wordLimit,
+      state: "Unverified",
       confidence: "Low",
       humanConfirmed: false,
-      confirmedByEmail: userEmail,
+      version: 1,
+      history: [],
     });
   }
 
   if (data.citationStyle) {
     requirementsList.push({
       id: `${data.id}-req-citation`,
-      field: "citationStyle",
-      officialSourceUrl: data.officialUrl || "User Input",
-      retrievalDate: date,
-      extractedValue: data.citationStyle,
+      field: "referenceStyle",
+      value: data.citationStyle,
+      state: "Unverified",
       confidence: "Low",
       humanConfirmed: false,
-      confirmedByEmail: userEmail,
+      version: 1,
+      history: [],
     });
   }
 
@@ -275,9 +144,9 @@ export function createUserAddedOutlet(
     acceptanceRateEstimate: data.acceptanceRateEstimate,
     reviewTimeWeeks: data.reviewTimeWeeks,
     submissionDeadline: data.submissionDeadline,
-    requirementsList: data.requirementsList || requirementsList,
-    metrics: data.metrics,
-    datedClaims: data.datedClaims,
+    requirementsList: normalizeOutletRequirements(data.requirementsList || requirementsList, true),
+    metrics: normalizeOutletMetricRecords(data.metrics, true),
+    datedClaims: (data.datedClaims || []).map((claim) => ({ ...claim, humanConfirmed: false })),
     dueDiligenceCheck: data.dueDiligenceCheck || {
       editorialBoardTransparent: false,
       peerReviewClear: false,
@@ -328,16 +197,24 @@ export function validateOutletIntegrity(outlet: TargetOutlet): {
     issues.push("Missing verificationStatus declaration.");
   }
 
+  if (outlet.verificationStatus === "Verified") {
+    if (!outlet.provenanceProvider?.trim() || !outlet.identitySourceUrl?.startsWith("https://") || !outlet.identityRetrievedAt?.trim()) {
+      issues.push("Verified outlet identity requires provider, HTTPS source URL, and retrieval date provenance.");
+    }
+    if (outlet.outletProvenanceType === "LIVE_RETRIEVED_RECORD" && outlet.identitySourceUrl === outlet.officialUrl) {
+      issues.push("Live retrieved identity must cite the provider raw-record URL, not only the outlet homepage.");
+    }
+  }
+
   // 4. Provenance vs. verification alignment
   if (outlet.outletProvenanceType === "USER_ADDED_UNVERIFIED" && outlet.verificationStatus === "Verified") {
     issues.push("User-added outlet cannot be marked Verified without formal editorial verification.");
   }
 
-  // 5. Check for fabricated Q1 assertions without verified JCR source URL
-  if (outlet.metrics?.jcrQuartile) {
-    const jcr = outlet.metrics.jcrQuartile;
-    if (!jcr.officialSourceUrl || !jcr.officialSourceUrl.includes("clarivate.com")) {
-      issues.push("JCR Quartile claim must cite official Clarivate JCR source URL.");
+  for (const metric of Array.isArray(outlet.metrics) ? outlet.metrics : []) {
+    const metricValidation = validateOutletMetricRecord(metric);
+    if (metric.verificationState === "Verified" && !metricValidation.valid) {
+      issues.push(...metricValidation.issues.map((issue) => `Verified metric ${metric.id}: ${issue}`));
     }
   }
 
@@ -364,8 +241,8 @@ export function isOutletVerified(outlet: TargetOutlet): boolean {
 }
 
 /**
- * Authentic, manually verified static baseline journal catalogue.
- * Every entry is a real, world-renowned journal with legitimate ISSN and official URL.
+ * Static outlet identities. The factory exposes only identity fields backed by
+ * the recorded official publisher/society page; other raw legacy fields are ignored.
  */
 const VERIFIED_STATIC_JOURNALS_DATA: (Omit<TargetOutlet, "outletProvenanceType" | "verificationStatus"> & {
   provenanceProvider?: string;
@@ -924,7 +801,6 @@ const VERIFIED_STATIC_CONFERENCES_DATA: (Omit<TargetOutlet, "outletProvenanceTyp
     abstractWordLimit: 300,
     citationStyle: "APA 7th",
     figureTableLimit: 10,
-    submissionDeadline: "2026-05-15",
     lastVerifiedDate: "2026-07-01",
     aiPolicySummary: "AI tools permitted for writing assist; AI generated code must be disclosed. Double-blind submission.",
     pageMargins: "1.0 in (2.54 cm)",
@@ -950,7 +826,6 @@ const VERIFIED_STATIC_CONFERENCES_DATA: (Omit<TargetOutlet, "outletProvenanceTyp
     abstractWordLimit: 250,
     citationStyle: "APA 7th",
     figureTableLimit: 10,
-    submissionDeadline: "2026-02-01",
     lastVerifiedDate: "2026-06-25",
     aiPolicySummary: "Strict double-blind review. Mandatory Reproducibility Checklist required.",
     pageMargins: "1.0 in (2.54 cm)",
@@ -976,7 +851,6 @@ const VERIFIED_STATIC_CONFERENCES_DATA: (Omit<TargetOutlet, "outletProvenanceTyp
     abstractWordLimit: 200,
     citationStyle: "IEEE",
     figureTableLimit: 10,
-    submissionDeadline: "2026-11-15",
     lastVerifiedDate: "2026-06-25",
     aiPolicySummary: "IEEE guidelines apply. IEEE double-column 8 page paper limit plus references.",
     pageMargins: "0.75 in (1.91 cm)",
@@ -1002,7 +876,6 @@ const VERIFIED_STATIC_CONFERENCES_DATA: (Omit<TargetOutlet, "outletProvenanceTyp
     abstractWordLimit: 250,
     citationStyle: "APA 7th",
     figureTableLimit: 8,
-    submissionDeadline: "2026-01-15",
     lastVerifiedDate: "2026-06-20",
     aiPolicySummary: "ACL AI writing assistance policy: Use of LLMs for rewriting, grammar check, or brainstorming is permitted with explicit disclosure.",
     pageMargins: "1.0 in (2.54 cm)",
@@ -1028,7 +901,6 @@ const VERIFIED_STATIC_CONFERENCES_DATA: (Omit<TargetOutlet, "outletProvenanceTyp
     abstractWordLimit: 250,
     citationStyle: "IEEE",
     figureTableLimit: 8,
-    submissionDeadline: "2026-02-08",
     lastVerifiedDate: "2026-06-15",
     aiPolicySummary: "ACM Policy on generative AI tools applies. Full disclosure required in submission metadata.",
     pageMargins: "0.75 in (1.91 cm)",
@@ -1042,10 +914,12 @@ const VERIFIED_STATIC_CONFERENCES_DATA: (Omit<TargetOutlet, "outletProvenanceTyp
   },
 ];
 
-/**
- * Verified production static catalog.
- * Only authenticated, real journals and conferences.
- */
+const VERIFIED_STATIC_IDENTITY_KEYS = new Set(
+  [...VERIFIED_STATIC_JOURNALS_DATA, ...VERIFIED_STATIC_CONFERENCES_DATA]
+    .map((data) => `${data.id}|${data.title}|${data.officialUrl}|${data.issnOrAcronym}`)
+);
+
+/** Identity-verified static catalogue. Unsourced requirements and claims are intentionally absent. */
 export const BASELINE_JOURNALS: TargetOutlet[] = VERIFIED_STATIC_JOURNALS_DATA.map(createVerifiedStaticOutlet);
 
 export const BASELINE_CONFERENCES: TargetOutlet[] = VERIFIED_STATIC_CONFERENCES_DATA.map(createVerifiedStaticOutlet);

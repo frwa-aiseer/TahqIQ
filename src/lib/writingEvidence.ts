@@ -1,5 +1,6 @@
-import type { AnalysisOutput, AnalysisPlan, ProjectState, SourceRecord } from "../types";
+import type { AnalysisOutput, AnalysisPlan, GeneratedFigure, GeneratedTable, ProjectState, SourceRecord } from "../types";
 import { formatInTextCitation } from "./cslStyles";
+import { hasAttributableManuscriptApproval } from "./analysisLifecycle";
 
 export interface InsertableLiteratureEvidence {
   id: string;
@@ -116,7 +117,7 @@ export function getInsertableLiteratureEvidence(project: ProjectState): Insertab
 
 export function getApprovedManuscriptAnalysisOutputs(project: ProjectState): AnalysisOutput[] {
   return (project.analysisOutputs || []).filter((output) => {
-    if (output.state !== "Approved for Manuscript") return false;
+    if (!hasAttributableManuscriptApproval(output)) return false;
     if (!project.isDemoProject && (output.isDemo || output.isSynthetic)) return false;
 
     return Boolean(
@@ -127,6 +128,22 @@ export function getApprovedManuscriptAnalysisOutputs(project: ProjectState): Ana
         output.assumptionChecks?.length
     );
   });
+}
+
+export function getApprovedManuscriptFigures(project: ProjectState): GeneratedFigure[] {
+  const approvedRunIds = new Set(getApprovedManuscriptAnalysisOutputs(project).map((output) => output.id));
+  return (project.figures || []).filter((figure) =>
+    approvedRunIds.has(figure.analysisRunId) &&
+    (project.isDemoProject || (!figure.isDemo && !figure.isSynthetic))
+  );
+}
+
+export function getApprovedManuscriptTables(project: ProjectState): GeneratedTable[] {
+  const approvedRunIds = new Set(getApprovedManuscriptAnalysisOutputs(project).map((output) => output.id));
+  return (project.tables || []).filter((table) =>
+    approvedRunIds.has(table.analysisRunId) &&
+    (project.isDemoProject || (!table.isDemo && !table.isSynthetic))
+  );
 }
 
 export function buildLiteratureEvidenceInsertion(

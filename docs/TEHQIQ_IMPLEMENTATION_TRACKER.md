@@ -19,6 +19,13 @@ This tracker records remediation work verified against the live repository. Stat
 | TQ-VSC-003 | PASS | Built on TQ-VSC-002 working tree; checkpoint pending commit | `src/types.ts`; `src/lib/methodologyWorkspace.ts`; `src/components/views/ProtocolBuilderView.tsx`; `src/App.tsx`; `server.ts`; `src/tests/methodologyWorkspace.test.tsx`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Backward-compatible optional `methodologyWorkspace`; old projects hydrate to blank Draft fields at read/render time. No persisted data rewrite. | `npm run lint`: PASS. Focused methodology Vitest: PASS, 8/8. `npm test`: baseline remains FAIL—18/22 files passed, 156/157 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS. | Removed all fixed crossover/washout/power/sample defaults from Protocol Builder. Supports researcher entry, label-only text protocol extraction as Needs Review, and structured AI Suggested proposals with attributable human approval. TQ-VSC-004 and later were not executed. |
 | TQ-VSC-004 | PASS | Built on TQ-VSC-003 working tree; checkpoint pending commit | `src/lib/writingEvidence.ts`; `src/components/views/WritingStudioView.tsx`; `src/tests/writingEvidenceIntegrity.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | None. Uses existing source, evidence, claim, and analysis fields; no stored-data migration. Older records lacking provenance or exact manuscript approval remain visible elsewhere but are intentionally not insertable. | `npm run lint`: PASS. Focused Vitest: PASS, 25/25. `npm test`: baseline remains FAIL—19/23 files passed, 164/165 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS. | Literature requires researcher-reviewed passage/claim evidence plus verified source provenance. Statistics require exact `Approved for Manuscript`. Both are revalidated at insertion time; empty/invalid state cannot generate fallback science. TQ-VSC-005 and later were not executed. |
 | TQ-VSC-005 | PASS | Built on TQ-VSC-004 working tree; checkpoint pending commit | `src/lib/aiValidationService.ts`; `src/lib/numericEvidence.ts`; `src/components/views/DataLabView.tsx`; `src/tests/numericGrounding.test.ts`; `src/tests/numericEvidence.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No destructive migration. `numericEvidenceRecords` remains optional for old projects; old/dangling records fail closed until traceable evidence is generated. New completed Data Lab runs persist deterministic evidence records alongside output state. | `npm run lint`: PASS. Focused Vitest: PASS, 28/28. `npm test`: baseline remains FAIL—20/24 files passed, 168/169 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS. `git diff --check`: PASS. | The existing `src/types.ts` contract already contained every required `NumericEvidence` field and was reused unchanged by this prompt. Removed numeric value/range allowances. Empirical values require traceable Verified evidence. TQ-VSC-006 and later were not executed. |
+| TQ-VSC-006 | PASS | Built on committed TQ-VSC-005 checkpoint `de96307`; working-tree checkpoint pending commit | `src/types.ts`; `src/lib/analysisLifecycle.ts`; `src/lib/aiValidationService.ts`; `src/lib/writingEvidence.ts`; `src/lib/complianceEngine.ts`; `src/lib/exportUtils.ts`; `src/lib/statsEngine.ts`; `src/components/views/DataLabView.tsx`; `src/components/ApprovalModal.tsx`; `server.ts`; `src/tests/lifecycle.test.ts`; `src/tests/numericGrounding.test.ts`; `src/tests/phase6.test.ts`; `src/tests/writingEvidenceIntegrity.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Backward-compatible optional approval/state-history fields. Legacy `isApproved` flags and unaudited approval states remain readable but fail closed for manuscript use. No stored-data rewrite. | `npm run lint`: PASS. Focused Vitest: PASS, 57/57. `npm test`: baseline remains FAIL—20/24 files passed, 171/172 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS. `git diff --check`: PASS. | Completed/QC alone never unlock Results. Approval requires ordered lifecycle plus authenticated human actor, timestamp, rationale, matching output ID, dataset hash, and plan ID. Figures/tables share the gate. TQ-VSC-007 and later were not executed. |
+| TQ-VSC-007 | PASS | Built on the uncommitted TQ-VSC-006 working tree | `src/types.ts`; `src/lib/aiValidationService.ts`; `src/lib/complianceEngine.ts`; `src/lib/exportUtils.ts`; `src/components/views/AiLedgerView.tsx`; `src/components/views/WritingStudioView.tsx`; `src/components/views/PeerReviewView.tsx`; `src/components/views/ProtocolBuilderView.tsx`; `src/components/views/ResearchCanvasView.tsx`; `src/tests/aiLedgerIntegrity.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Added optional `aiLedgerIntegrity`; old projects hydrate behaviorally to Unknown without rewriting. Empty legacy ledgers no longer imply no AI use. | `npm run lint`: PASS. Focused Vitest: PASS, 20/20. `npm test`: baseline remains FAIL—21/25 files passed, 176/177 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS. `git diff --check`: PASS. | Unknown/incomplete history is disclosed explicitly. Four direct server SDK paths and five client call sites are recorded for later gateway centralization. TQ-VSC-008 and later were not executed. |
+| TQ-VSC-008 | PASS | Built on the uncommitted TQ-VSC-006/007 working tree | `src/data/baselineOutlets.ts`; `src/types.ts`; `src/lib/complianceEngine.ts`; `src/lib/exportUtils.ts`; `src/components/JournalSelectorDropdown.tsx`; `src/components/views/JournalFinderView.tsx`; `src/components/views/DashboardView.tsx`; `src/tests/baselineOutlets.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Added optional identity provenance fields and `Unverified` OA state. Legacy selected outlets remain readable, but unverified/spoofed outlets cannot drive compliance. No stored-data rewrite. | `npm run lint`: PASS. Focused Vitest: PASS, 33/33. `npm test`: baseline remains FAIL—21/25 files passed, 177/178 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS. `git diff --check`: PASS. | Static seeds expose verified identity only; unsourced requirements/claims are discarded. Arbitrary factory input becomes user-added Unverified, live identity requires provider raw-record provenance, and no Q1/human confirmation is auto-set. TQ-VSC-009 and later were not executed. |
+| TQ-VSC-009 | PASS | Built on the uncommitted TQ-VSC-006–008 working tree | `src/types.ts`; `src/lib/outletMetrics.ts`; `src/data/baselineOutlets.ts`; `src/components/views/ExportCentreView.tsx`; `src/tests/outletMetrics.test.ts`; `src/tests/baselineOutlets.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Replaced the typed global metric object with optional metric-record arrays. Legacy runtime objects remain readable but normalize to no verified records; no destructive rewrite. | `npm run lint`: PASS. Focused Vitest: PASS, 39/39. `npm test`: baseline remains FAIL—22/26 files passed, 183/184 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS. `git diff --check`: PASS. | Every authoritative metric is provider/year/category/source/retrieval specific. Multiple quartiles are supported; missing/legacy metrics show Not Verified; third parties cannot masquerade as JCR/Scopus. TQ-VSC-010 and later were not executed. |
+| TQ-VSC-010 | PASS | Built on the uncommitted TQ-VSC-006–009 working tree | `src/types.ts`; `src/lib/outletRequirements.ts`; `src/data/baselineOutlets.ts`; `src/lib/complianceEngine.ts`; `src/components/views/ExportCentreView.tsx`; `src/tests/outletRequirements.test.ts`; `src/tests/baselineOutlets.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Replaced the narrow requirement shape with backward-compatible versioned field records. Legacy arrays normalize known field aliases to Unverified; absent records display Unavailable. No destructive stored-data rewrite. | `npm run lint`: PASS. Focused Vitest: PASS, 33/33. `npm test`: baseline remains FAIL—23/27 files passed, 193/194 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS, 1,992 modules. `git diff --check`: PASS. | All 18 required fields render an exact review state. Only valid field-level Verified records drive outlet compliance; outlet identity URLs and legacy top-level values are not substituted. TQ-VSC-011 and later were not executed. |
+| TQ-VSC-011 | PASS | Built on the uncommitted TQ-VSC-006–010 working tree | `.env.example`; `src/lib/firebaseConfig.ts`; `src/lib/firebase.ts`; `src/context/AuthContext.tsx`; `src/components/AuthModal.tsx`; `src/lib/projectService.ts`; `src/lib/storageService.ts`; `src/tests/firebaseConfiguration.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No stored-data migration. Deployments must provide six validated `VITE_FIREBASE_*` public client variables; missing/invalid values now enter an explicit Not Configured state instead of using a built-in project. | `npm run lint`: PASS. Focused Vitest: PASS, 17/17. `npm test`: baseline remains FAIL—24/28 files passed, 198/199 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Removed hard-coded Firebase project configuration and fallback initialization. No Admin SDK/service-account/private-key variable enters client configuration. TQ-VSC-012 and later were not executed. |
+| TQ-VSC-012 | PASS | Built on the uncommitted TQ-VSC-006–011 working tree | `firestore.rules`; `firebase.json`; `package.json`; `package-lock.json`; `src/tests/firebaseSecurityRules.test.ts`; `src/tests/firestoreRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No document rewrite. Existing owner records remain directly readable by `ownerUid`; owner updates can repair a missing owner-membership entry. New project creation requires the owner to be mapped as Owner. | `npm run lint`: PASS. Static focused Vitest: PASS, 16/16. Firestore Emulator: PASS, 7/7. `npm test`: 26/29 files passed, 216/218 executed tests passed, 7 emulator-only tests skipped outside emulator; Crossref and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Private profiles are owner-only; project reads require membership; Viewer writes and Co-author membership/ownership changes are denied; owner/member integrity and cross-project isolation are enforced; version snapshots are immutable. TQ-VSC-013 and later were not executed. |
 
 ## TQ-VSC-000 verification details
 
@@ -297,4 +304,252 @@ None. The harness is test-only and imports existing types without changing them.
 
 - Projects whose prior analysis outputs predate numeric-evidence persistence must rerun the analysis or acquire explicitly traceable evidence before AI numeric prose is accepted; silently blessing legacy numbers would violate the task.
 - Full-suite baseline failures remain unchanged from earlier prompts.
-- TQ-VSC-006 and all later prompts remain `NOT STARTED`.
+- At completion of TQ-VSC-005, TQ-VSC-006 and later remained `NOT STARTED`. See the subsequent TQ-VSC-006 row and details.
+
+## TQ-VSC-006 verification details
+
+### Implementation
+
+- Added `src/lib/analysisLifecycle.ts` as the shared policy for ordered analysis transitions and attributable manuscript approval.
+- Enforced Draft Plan → Awaiting Approval → Approved → Queued → Running → Completed → QC Passed → Researcher Reviewed → Approved for Manuscript → Locked. Direct Completed/QC-to-approval shortcuts are rejected.
+- Data Lab displays execution status separately from lifecycle state and exposes distinct actions for automated QC, researcher review, and final manuscript approval.
+- Automated QC can only record `QC Passed`; it cannot grant either human state. Review and final approval require a currently authenticated researcher and non-empty rationale.
+- Final approval records actor UID/email, timestamp, rationale, output ID, dataset hash, and plan ID. All fields must match the output before a Results/manuscript gate opens.
+- Removed legacy boolean approval compatibility from client validation and the Gemini drafting server gate.
+- Writing Studio, compliance, figures, tables, and PDF/DOCX export use the same attributable approval policy. Generated figures/tables begin unapproved and synchronize only when the linked output reaches valid manuscript approval.
+- Researcher-supplied and Not Independently Reproduced flags are preserved through review and approval; approval does not claim reproduction.
+
+### Exact verification results
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. Focused Vitest commands — PASS; final union totals 57 passing tests across lifecycle, writing evidence, numeric grounding, Phase 5, Phase 6, export validation, and scientific-integrity invariants.
+3. `npm test` — exit `1`; 20/24 files passed and 171/172 executed tests passed. TQ-VSC-006 tests pass; remaining failures are the pre-existing Crossref assertion and Firebase Firestore/Storage resolution failures.
+4. `npm run build` — exit `0`; PASS, 1,990 Vite modules transformed and server bundle produced. Existing browser-`crypto` and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+6. Production gate scan found only a Data Lab execution-status presentation check and an unrelated claim-review flag; no Results/manuscript gate uses Completed or legacy output approval booleans.
+
+### Tests and compatibility
+
+- Rebuilt `src/tests/lifecycle.test.ts` around the exact sequence, shortcut rejection, automated-QC separation, attributable approval, and imported-output provenance preservation.
+- Updated numeric-grounding and Phase 6 fixtures with matching approval provenance.
+- Extended Writing Evidence tests to require matching metadata and verify figures/tables remain excluded when the linked output is merely Completed.
+- Existing records are not rewritten. Legacy approval flags/states without an attributable matching record intentionally remain ineligible until a researcher completes the lifecycle.
+
+### Remaining blockers and prompt boundary
+
+- Approval transitions are attributable to the authenticated client user and stored through existing project persistence. Server-side Firebase Admin token verification and project-membership/RBAC remain an already documented broader security gap; the UI no longer calls this client audit server-audited.
+- Full-suite baseline failures remain unchanged.
+- At completion of TQ-VSC-006, TQ-VSC-007 and later remained `NOT STARTED`. See the subsequent TQ-VSC-007 row and details.
+
+## TQ-VSC-007 verification details
+
+### Implementation
+
+- Added optional `AiLedgerIntegrity` with Complete, Incomplete, Unknown, and No AI Use Confirmed states plus attributable assessment metadata and known bypass paths.
+- Empty or missing legacy ledgers now produce an explicit Unknown/Incomplete disclosure stating that emptiness is not proof of no AI use.
+- A no-use statement is emitted only for `No AI Use Confirmed` with assessment timestamp, assessor UID, and rationale.
+- Non-empty ledgers without an attributable completeness assessment disclose the recorded events but warn that they are not a complete history.
+- Removed invented default model and CRediT values from disclosure generation. Missing event metadata is shown as Unrecorded/Not recorded.
+- PDF/DOCX disclosure export, compliance rules, submission gates, and the ledger UI now use the same fail-closed integrity semantics.
+- Direct Methodology, Writing, and Peer Review model paths mark ledger integrity Incomplete in project state. Canvas cannot persist project-level ledger state through its current props, so its UI explicitly reports that the route is unconnected rather than claiming it was logged.
+
+### Model-call paths recorded for later gateway centralization
+
+- `POST /api/gemini/agent` → direct server SDK call; Canvas caller does not create an `AiLedgerEvent`.
+- `POST /api/gemini/methodology-proposal` → direct server SDK call; caller records Incomplete integrity but no event.
+- `POST /api/gemini/draft-section` → direct server SDK call; event creation occurs later on a researcher decision, so attempted/generated calls are not a complete invocation ledger.
+- `POST /api/gemini/peer-review` → direct server SDK call; event creation occurs later on comment disposition and does not establish complete invocation history.
+- Writing Studio has both single-section and bulk client call sites for the same drafting endpoint, producing five client call sites across four direct server model routes.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/aiLedgerIntegrity.test.ts src/tests/phase6.test.ts src/tests/exportValidation.test.ts` — exit `0`; PASS, 3/3 files and 20/20 tests.
+3. `npm test` — exit `1`; 21/25 files passed and 176/177 executed tests passed. New tests pass; remaining failures are the pre-existing Crossref assertion and three Firebase import-resolution failures.
+4. `npm run build` — exit `0`; PASS, 1,990 Vite modules transformed and server bundle produced. Existing browser-`crypto` and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+
+### Compatibility, blockers, and prompt boundary
+
+- No data rewrite is required. Missing integrity state is intentionally interpreted as Unknown.
+- Centralized gateway logging remains future work; this prompt records and truthfully surfaces the current bypasses without executing that later architecture.
+- Full-suite baseline failures remain unchanged.
+- At completion of TQ-VSC-007, TQ-VSC-008 and later remained `NOT STARTED`. See the subsequent TQ-VSC-008 row and details.
+
+## TQ-VSC-008 verification details
+
+### Implementation
+
+- Reworked `createVerifiedStaticOutlet` into an identity-only boundary. It retains the allowlisted static title, type, ISSN/acronym, publisher/society, category, official identity page, and retrieval metadata while discarding unsourced requirements, indexing, OA model, AI policy, formatting, APC, acceptance, deadline, review-time, fit, and metric claims.
+- Removed automatic requirement/claim construction and every automatic `humanConfirmed: true` assignment.
+- Added an exact static-identity allowlist derived from the audited catalogue constants. Arbitrary or altered input passed to the static factory is downgraded to `USER_ADDED_UNVERIFIED` and cannot become a Verified production record.
+- Live retrieved records become Verified only with a named provider plus a distinct HTTPS raw-record URL. Arbitrary caller-supplied requirements, metrics, indexing, fees, and guidelines are not promoted.
+- User-added outlets remain Unverified. Supplied requirement/claim confirmation flags are forced false and structured verified metrics are stripped; only explicitly labeled unverified metrics may remain.
+- Outlet integrity validation now requires identity provider, source URL, and retrieval date provenance. Live records cannot cite only an outlet homepage as provider provenance.
+- Compliance fails closed for unverified/spoofed selected outlets, so their claims cannot drive production compliance results.
+- Removed the selector's implicit default journal, Dashboard's fabricated 92% fit fallback, the export `Q1` fallback, and UI wording that represented missing indexing/guidelines/layout as verified defaults.
+- Removed hard-coded conference deadline claims from the seed source.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/baselineOutlets.test.ts src/tests/scientificIntegrityInvariants.test.ts src/tests/exportValidation.test.ts` — exit `0`; PASS, 3/3 files and 33/33 tests.
+3. `npm test` — exit `1`; 21/25 files passed and 177/178 executed tests passed. TQ-VSC-008 tests pass; remaining failures are the pre-existing Crossref assertion and three Firebase import-resolution failures.
+4. `npm run build` — exit `0`; PASS, 1,990 Vite modules transformed and server bundle produced. Existing browser-`crypto` and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+
+### Tests and compatibility
+
+- Updated baseline outlet tests to verify identity provenance, absence of auto-generated requirements/claims/metrics/indexing, live provider provenance, and arbitrary static-factory downgrade.
+- Added regression coverage proving a generated Q1-looking outlet remains Unverified and produces a compliance failure rather than authoritative rules.
+- Existing outlet objects remain schema-readable. Newly optional identity provenance fields do not require document migration; old records lacking them fail closed if they claim Verified.
+
+### Remaining blockers and prompt boundary
+
+- Static catalogue identity provenance does not establish current requirements, indexing, metrics, fees, or policies. Those fields remain Unverified until separately retrieved and modeled.
+- Metric provider/year/category modeling belongs to TQ-VSC-009 and was not implemented.
+- Full-suite baseline failures remain unchanged.
+- At completion of TQ-VSC-008, TQ-VSC-009 and later remained `NOT STARTED`. See the subsequent TQ-VSC-009 row and details.
+
+## TQ-VSC-009 verification details
+
+### Implementation
+
+- Replaced the timeless `jcrQuartile`/`citeScorePercentile` singleton structure with `OutletMetricRecord[]`.
+- Each record now carries ID, provider, provider kind, metric name, year, subject category, value, percentile, quartile, source URL/record ID, retrieval time, and verification state.
+- Added `src/lib/outletMetrics.ts` for deterministic validation, normalization, verified-record selection, and legacy fail-closed handling.
+- Supports multiple records for the same outlet, including different categories, years, and quartiles without collapsing them into a global journal rank.
+- JCR, Scopus, and SCImago records must cite the matching official provider domain. Provider names must align with JCR or Scopus provider kinds.
+- THIRD_PARTY and other non-provider records cannot use JCR, Journal Citation Reports, CiteScore, or Scopus labels. Invalid records cannot enter the verified selector.
+- Missing metrics and legacy singleton objects normalize to no verified records and display `Metrics: Not Verified`.
+- Export Centre renders each metric with provider, metric name, verification badge, year, category, value/percentile/quartile, and its actual source link. It has no default provider link or Q1 fallback.
+- Static/live factories accept only valid record arrays; user-added metric records are forced Unverified.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/outletMetrics.test.ts src/tests/baselineOutlets.test.ts src/tests/scientificIntegrityInvariants.test.ts src/tests/exportValidation.test.ts` — exit `0`; PASS, 4/4 files and 39/39 tests.
+3. `npm test` — exit `1`; 22/26 files passed and 183/184 executed tests passed. TQ-VSC-009 tests pass; remaining failures are the pre-existing Crossref assertion and three Firebase import-resolution failures.
+4. `npm run build` — exit `0`; PASS, 1,991 Vite modules transformed and server bundle produced. Existing browser-`crypto` and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+6. Production scan for `jcrQuartile`, `citeScorePercentile`, `unverifiedMetrics`, and Q1 fallback expressions returned no matches.
+
+### Tests and compatibility
+
+- Added `src/tests/outletMetrics.test.ts` with six tests for multi-category/year quartiles, timeless/category-free rejection, third-party masquerade rejection, official provider domains, legacy/missing fail-closed behavior, and forced user-entry Unverified state.
+- Updated baseline outlet tests for the record-array schema and generated-metric downgrade.
+- Old persisted singleton metric objects are not treated as authoritative. They remain loadable at runtime but surface as Not Verified until migrated from a real provider record.
+
+### Remaining blockers and prompt boundary
+
+- This task introduces no live JCR or Scopus credentials/integration and therefore creates no metric values. Records must come from separately authorized provider retrieval or explicit unverified entry.
+- Outlet-requirement versioning belongs to TQ-VSC-010 and was not implemented.
+- Full-suite baseline failures remain unchanged.
+- TQ-VSC-010 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-010 verification details
+
+### Implementation
+
+- Expanded `VersionedRequirementRecord` to cover article type; manuscript and abstract limits; abstract structure; reference style and limit; figure and table limits; supplements; title page; authors; AI policy; ethics; data sharing; APC; and conference deadline, template, and file requirements.
+- Each record now carries an explicit state, value, source provider, real source URL when available, retrieval date, confidence, human-confirmation metadata, version, and prior-version history.
+- Added deterministic normalization, validation, latest-version selection, verified selection, display-state calculation, and version creation in `src/lib/outletRequirements.ts`.
+- A Verified state is valid only with a non-placeholder HTTPS source, named provider, retrieval date, and human confirmation. Invalid Verified inputs downgrade to Unverified.
+- Static and live outlet factories normalize requirement arrays without inventing records. User-added values are retained only as Unverified, unconfirmed requirement records.
+- Compliance now reads only valid field-level Verified requirements. It no longer treats top-level legacy word limits/styles or the outlet identity homepage/retrieval date as requirement evidence.
+- Export Centre renders a complete requirement register with exact `Verified`, `AI Extracted—Needs Review`, `Unverified`, or `Unavailable` states, value, confidence, version/history count, provider, retrieval date, and a link only when the record contains one.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/outletRequirements.test.ts src/tests/baselineOutlets.test.ts src/tests/outletMetrics.test.ts src/tests/phase6.test.ts` — exit `0`; PASS, 4/4 files and 33/33 tests.
+3. `npm test` — exit `1`; 23/27 files passed and 193/194 executed tests passed. The TQ-VSC-010 suite passes; remaining failures are the pre-existing network-sensitive Crossref assertion and three Firebase import-resolution failures.
+4. `npm run build` — exit `0`; PASS, 1,992 Vite modules transformed and the server bundle produced. Existing browser-`crypto` and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+
+### Tests and compatibility
+
+- Added ten tests for full field coverage, valid and invalid Verified provenance, AI review state, explicit Unavailable state, legacy alias normalization, version history, latest-version selection, top-level fallback rejection, and exact compliance provenance.
+- Updated the user-added outlet assertion to use the new `manuscriptWordLimit` field.
+- Older `requirementsList` arrays remain readable. Recognized legacy fields normalize to the new field names but fail closed as Unverified unless a complete new Verified record is supplied. Missing records remain Unavailable.
+
+### Remaining blockers and prompt boundary
+
+- This prompt adds no publisher scraper or live guideline ingestion, so it creates no factual requirement claims. Authorized retrieval and researcher review must populate records.
+- Client-held records are not server-trusted audit evidence; server-side authentication/RBAC remains a recorded architectural risk for later prompts.
+- Full-suite baseline failures remain unchanged.
+- TQ-VSC-011 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-011 verification details
+
+### Implementation
+
+- Removed the built-in Firebase API key, project ID, domains, sender ID, app ID, and fallback initialization from `src/lib/firebase.ts`.
+- Added a deterministic client-environment validator for the six required `VITE_FIREBASE_*` values. It rejects missing values, common placeholders, malformed hostnames, malformed project/sender/app identifiers, and malformed Firebase Web API-key structure.
+- Added an explicit `Configured` / `Not Configured` state. Missing or invalid values do not initialize Firebase; SDK initialization failures also downgrade the runtime state to Not Configured.
+- Firebase handles are nullable until initialization succeeds. Authentication, project persistence, and storage obtain handles through a guarded accessor that throws a clear Not Configured error rather than retrying with invented values.
+- Auth context completes loading safely without registering an auth observer when Firebase is unavailable. Auth UI displays a visible Not Configured notice.
+- Cloud file upload fails explicitly when Firebase is Not Configured rather than returning a transient object URL as if it were a cloud upload.
+- Added blank public-client placeholders to `.env.example`. No Firebase Admin credential, service-account value, or private key is exposed through Vite client variables.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/firebaseConfiguration.test.ts src/tests/firebaseSecurityRules.test.ts` — exit `0`; PASS, 2/2 files and 17/17 tests.
+3. `npm test` — exit `1`; 24/28 files passed and 198/199 executed tests passed. The new configuration suite passes; remaining failures are the pre-existing network-sensitive Crossref assertion and three Firebase subpath import-resolution failures.
+4. `npm run build` — exit `0`; PASS, 1,993 Vite modules transformed and the server bundle produced. Existing browser-`crypto` and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+6. Production-source scan for the removed API-key prefix, old project identifier, `defaultConfig`, literal sender/app configuration, and client Admin/service-account/private-key variables returned no built-in Firebase project configuration or client secret variables.
+
+### Tests and compatibility
+
+- Added five configuration tests for missing state, valid configuration, malformed/placeholder rejection, complete blank `.env.example` coverage, absence of client Admin secrets, and removal of the built-in fallback.
+- Existing local/demo project behavior remains available. Cloud authentication, Firestore, and Storage now require valid deployment environment configuration.
+- No Firestore document or browser-storage schema changed.
+
+### Remaining blockers and prompt boundary
+
+- Real Firebase connectivity was not exercised because no deployment configuration or emulator was supplied. The configuration boundary and production compilation were verified locally.
+- The full-suite Firebase import-resolution baseline remains: Vite cannot resolve `firebase/firestore` in accessibility/E2E imports or `firebase/storage` in integration imports in this installed dependency environment. TQ-VSC-011 does not alter package installation or implement later security-rule work.
+- Full-suite Crossref network expectation remains unchanged.
+- TQ-VSC-012 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-012 verification details
+
+### Implementation
+
+- Replaced broad signed-in `/users/{userId}` reads with owner-only read, create, update, and delete access. No public-profile collection was introduced.
+- Removed the public demo-project read exception. Project documents now require authenticated ownership or explicit membership.
+- Project creation requires `ownerUid` to match the authenticated UID and requires that UID to be present in `members` with the Owner role.
+- Project ownership is immutable on client updates. Only the `ownerUid` owner may change `members`, `memberList`, or `organizationId`; non-owner writers must preserve all four protected membership/ownership fields.
+- Viewer and Reviewer roles cannot write projects. Corresponding Author, Co-author, Supervisor, and Statistician may update project content but cannot self-promote or alter membership/ownership fields.
+- Owner identity is derived only from `ownerUid`, so assigning an `Owner` label in the members map cannot transfer ownership or grant deletion/membership-management authority.
+- Version snapshots and audit events remain immutable after creation. Snapshot creation now requires `createdByUid` to match the authenticated writer. File creation requires matching `uploadedByUid`, file updates cannot change it, and deletion is owner-only.
+- Added Firebase Emulator configuration plus an executable `test:firestore-rules` package script and the official Rules Unit Testing/CLI dev dependencies.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/firebaseSecurityRules.test.ts src/tests/firebaseConfiguration.test.ts` — exit `0`; PASS, 2/2 files and 16/16 tests.
+3. `PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" XDG_CONFIG_HOME=/private/tmp/tehqiq-firebase-config npm run test:firestore-rules` — exit `0`; real Firestore Emulator PASS, 1/1 file and 7/7 tests.
+4. `npm test` — exit `1`; 26/29 files passed, 216 tests passed and 2 failed out of 218 executed, with 7 emulator-only tests skipped because the general suite does not start the emulator. Firebase subpath import failures are resolved after restoring the declared Firebase 12.17.0 package. Remaining failures are the existing network-sensitive Crossref assertion and an integration localStorage test where `window.localStorage.setItem` is unavailable under the current Node local-storage option.
+5. `npm run build` — exit `0`; PASS, 1,993 Vite modules transformed and the server bundle produced. Existing browser-`crypto` and large-chunk warnings remain.
+6. `git diff --check` — exit `0`; PASS.
+
+### Emulator acceptance coverage
+
+- User A can read A's profile but cannot read B's private profile.
+- A non-member cannot read a project.
+- An authorized member can read its project but cannot read another project.
+- Viewer cannot edit.
+- Co-author cannot self-promote or transfer ownership.
+- Owner can perform a valid member-role change while ownership remains fixed.
+- Finalized version snapshots cannot be updated or deleted, including by the Owner.
+
+### Compatibility, blockers, and prompt boundary
+
+- No Firestore document migration runs automatically. Current application-created projects already store the owner in both `ownerUid` and `members`. A legacy owner without the members entry can still read by `ownerUid` and can repair the record in an owner-authorized update.
+- The rules were verified locally with Firestore Emulator v1.22.0 on OpenJDK 21. Deployment to a real Firebase project was not requested or performed.
+- Installing the requested emulator tooling reported seven dependency audit findings (six moderate, one high); no blanket or breaking `npm audit fix` was run.
+- Full-suite Crossref and localStorage-environment failures remain outside this prompt.
+- TQ-VSC-013 and all later prompts remain `NOT STARTED`.

@@ -1,8 +1,22 @@
-import { ProjectState, TargetOutlet, CalculatedComplianceRule, GateCheckResult, VersionedRequirementRecord } from "../types";
+import { ProjectState, TargetOutlet, CalculatedComplianceRule, GateCheckResult, OutletRequirementField } from "../types";
+import { hasAttributableManuscriptApproval } from "./analysisLifecycle";
+import { isOutletVerified } from "../data/baselineOutlets";
+import { getVerifiedRequirement } from "./outletRequirements";
 
 export function calculateComplianceRules(project: ProjectState, customOutlet?: TargetOutlet): CalculatedComplianceRule[] {
   const outlet = customOutlet || project.selectedTargetOutlet;
   if (!outlet) return [];
+  if (!isOutletVerified(outlet)) {
+    return [{
+      id: "rule-outlet-unverified",
+      category: "Ethics & AI",
+      requirementName: "Outlet Identity Verification",
+      requiredValue: "Verified static identity or live provider record",
+      actualValue: outlet.verificationStatus || "Unverified",
+      status: "Fail",
+      actionRequired: "Verify the outlet through an approved provider or retain it as a user-added Unverified record; its claims cannot drive compliance.",
+    }];
+  }
 
   const rules: CalculatedComplianceRule[] = [];
   const sections = project.sections || [];
@@ -11,71 +25,89 @@ export function calculateComplianceRules(project: ProjectState, customOutlet?: T
   const totalWordCount = sections.reduce((acc, s) => acc + (s.currentWordCount || 0), 0);
   const abstractSection = sections.find((s) => s.title.toLowerCase().includes("abstract"));
   const abstractWordCount = abstractSection ? abstractSection.currentWordCount || 0 : 0;
-  const totalFiguresAndTables = (project.figures?.length || 0) + (project.tables?.length || 0);
+  const figureCount = project.figures?.length || 0;
+  const tableCount = project.tables?.length || 0;
 
-  // Helper to find versioned requirement source for a field
-  const getRequirementMeta = (field: string) => {
-    const req = (outlet.requirementsList || []).find((r) => r.field === field);
+  // Only a valid, human-confirmed field record may provide outlet-requirement provenance.
+  // Outlet identity provenance is deliberately not inherited by individual factual claims.
+  const getVerifiedMeta = (field: OutletRequirementField) => {
+    const requirement = getVerifiedRequirement(outlet, field);
     return {
-      sourceRecordId: req?.id,
-      officialSourceUrl: req?.officialSourceUrl || outlet.officialUrl,
-      retrievalDate: req?.retrievalDate || outlet.lastVerifiedDate,
-      humanConfirmed: req?.humanConfirmed ?? true,
+      sourceRecordId: requirement?.id,
+      officialSourceUrl: requirement?.sourceUrl,
+      retrievalDate: requirement?.retrievedAt,
+      humanConfirmed: requirement?.humanConfirmed,
     };
   };
 
+  const numericValue = (value: unknown): number | undefined => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+    return undefined;
+  };
+
   // Rule 1: Manuscript Total Word Limit
-  if (outlet.wordLimit) {
-    const meta = getRequirementMeta("wordLimit");
-    const isPass = totalWordCount <= outlet.wordLimit;
+  const wordMeta = getVerifiedMeta("manuscriptWordLimit");
+  const manuscriptWordLimit = numericValue(getVerifiedRequirement(outlet, "manuscriptWordLimit")?.value);
+  if (manuscriptWordLimit !== undefined) {
+    const isPass = totalWordCount <= manuscriptWordLimit;
     rules.push({
       id: "rule-word-limit",
       category: "Word Count",
       requirementName: "Manuscript Word Limit",
-      requiredValue: `Max ${outlet.wordLimit.toLocaleString()} words`,
+      requiredValue: `Max ${manuscriptWordLimit.toLocaleString()} words`,
       actualValue: `${totalWordCount.toLocaleString()} words`,
       status: isPass ? "Pass" : "Fail",
-      actionRequired: isPass ? undefined : `Reduce word count by ${(totalWordCount - outlet.wordLimit).toLocaleString()} words to comply with ${outlet.title} rules.`,
-      ...meta,
+      actionRequired: isPass ? undefined : `Reduce word count by ${(totalWordCount - manuscriptWordLimit).toLocaleString()} words to comply with ${outlet.title} rules.`,
+      ...wordMeta,
     });
   }
 
   // Rule 2: Abstract Word Limit
-  if (outlet.abstractWordLimit) {
-    const meta = getRequirementMeta("abstractWordLimit");
-    const isPass = abstractWordCount <= outlet.abstractWordLimit;
+  const abstractMeta = getVerifiedMeta("abstractWordLimit");
+  const abstractWordLimit = numericValue(getVerifiedRequirement(outlet, "abstractWordLimit")?.value);
+  if (abstractWordLimit !== undefined) {
+    const isPass = abstractWordCount <= abstractWordLimit;
     rules.push({
       id: "rule-abstract-limit",
       category: "Abstract",
       requirementName: "Abstract Word Limit",
-      requiredValue: `Max ${outlet.abstractWordLimit} words`,
+      requiredValue: `Max ${abstractWordLimit} words`,
       actualValue: `${abstractWordCount} words`,
       status: isPass ? "Pass" : "Fail",
-      actionRequired: isPass ? undefined : `Trim abstract by ${abstractWordCount - outlet.abstractWordLimit} words.`,
-      ...meta,
+      actionRequired: isPass ? undefined : `Trim abstract by ${abstractWordCount - abstractWordLimit} words.`,
+      ...abstractMeta,
     });
   }
 
-  // Rule 3: Figure & Table Count Limit
-  if (outlet.figureTableLimit !== undefined) {
-    const meta = getRequirementMeta("figureTableLimit");
-    const isPass = totalFiguresAndTables <= outlet.figureTableLimit;
+  // Rule 3: independently sourced figure and table limits
+  const countRequirements: Array<["figureLimit" | "tableLimit", string, number]> = [
+    ["figureLimit", "Figure Limit", figureCount],
+    ["tableLimit", "Table Limit", tableCount],
+  ];
+  for (const [field, name, count] of countRequirements) {
+    const meta = getVerifiedMeta(field);
+    const limit = numericValue(getVerifiedRequirement(outlet, field)?.value);
+    if (limit === undefined) continue;
+    const isPass = count <= limit;
     rules.push({
-      id: "rule-fig-table-limit",
+      id: `rule-${field}`,
       category: "Figures & Tables",
-      requirementName: "Combined Figure & Table Limit",
-      requiredValue: `Max ${outlet.figureTableLimit} items`,
-      actualValue: `${totalFiguresAndTables} items (${project.figures?.length || 0} figs, ${project.tables?.length || 0} tbls)`,
+      requirementName: name,
+      requiredValue: `Max ${limit} items`,
+      actualValue: `${count} items`,
       status: isPass ? "Pass" : "Fail",
-      actionRequired: isPass ? undefined : `Combine or move ${totalFiguresAndTables - outlet.figureTableLimit} items to supplementary materials.`,
+      actionRequired: isPass ? undefined : `Reduce or move ${count - limit} item(s) to supplementary materials.`,
       ...meta,
     });
   }
 
   // Rule 4: Citation Style Alignment
-  const metaStyle = getRequirementMeta("citationStyle");
+  const metaStyle = getVerifiedMeta("referenceStyle");
   const currentStyle = project.activeCslStyle;
-  const expectedStyleStr = outlet.citationStyle.toLowerCase();
+  const referenceRequirement = getVerifiedRequirement(outlet, "referenceStyle");
+  const expectedStyle = typeof referenceRequirement?.value === "string" ? referenceRequirement.value : undefined;
+  const expectedStyleStr = expectedStyle?.toLowerCase() || "";
   const isStyleMatch =
     (expectedStyleStr.includes("apa") && currentStyle.includes("apa")) ||
     (expectedStyleStr.includes("ieee") && currentStyle.includes("ieee")) ||
@@ -85,19 +117,18 @@ export function calculateComplianceRules(project: ProjectState, customOutlet?: T
     (expectedStyleStr.includes("acs") && currentStyle.includes("acs")) ||
     (expectedStyleStr.includes("plos") && currentStyle.includes("plos"));
 
-  rules.push({
+  if (expectedStyle) rules.push({
     id: "rule-citation-style",
     category: "Citation Style",
     requirementName: "Target Citation Format",
-    requiredValue: outlet.citationStyle,
+    requiredValue: expectedStyle,
     actualValue: currentStyle.toUpperCase(),
     status: isStyleMatch ? "Pass" : "Warning",
-    actionRequired: isStyleMatch ? undefined : `Switch project bibliography style to ${outlet.citationStyle} in settings.`,
+    actionRequired: isStyleMatch ? undefined : `Switch project bibliography style to ${expectedStyle} in settings.`,
     ...metaStyle,
   });
 
   // Rule 5: Ethics & Mandatory Declaration
-  const metaEthics = getRequirementMeta("ethics");
   const hasEthicsApproval = !project.ethicsInfo?.approvalRequired || Boolean(project.ethicsInfo?.approvalNumber);
   rules.push({
     id: "rule-ethics",
@@ -107,29 +138,37 @@ export function calculateComplianceRules(project: ProjectState, customOutlet?: T
     actualValue: project.ethicsInfo?.approvalNumber ? `Approved (${project.ethicsInfo.approvalNumber})` : project.ethicsInfo?.approvalRequired ? "Missing Approval ID" : "Exempt",
     status: hasEthicsApproval ? "Pass" : "Fail",
     actionRequired: hasEthicsApproval ? undefined : "Provide valid Institutional Review Board (IRB) / Ethics Committee approval ID.",
-    ...metaEthics,
   });
 
   // Rule 6: AI Usage Transparency Policy
-  const metaAi = getRequirementMeta("aiPolicySummary");
+  const metaAi = getVerifiedMeta("aiPolicy");
+  const aiRequirement = getVerifiedRequirement(outlet, "aiPolicy");
   const hasAiCalls = (project.aiLedger || []).length > 0;
+  const ledgerAssessed = Boolean(
+    project.aiLedgerIntegrity?.assessedAt?.trim() &&
+    project.aiLedgerIntegrity.assessedByUid?.trim() &&
+    project.aiLedgerIntegrity.rationale?.trim()
+  );
+  const ledgerComplete = ledgerAssessed && project.aiLedgerIntegrity?.status === "Complete";
+  const noAiUseConfirmed = ledgerAssessed && !hasAiCalls && project.aiLedgerIntegrity?.status === "No AI Use Confirmed";
   const fullText = sections.map((s) => s.content).join("\n").toLowerCase();
   const mentionsAiDisclosure = fullText.includes("artificial intelligence") || fullText.includes("ai assistance") || fullText.includes("gemini") || fullText.includes("generative ai");
 
-  const aiStatus = !hasAiCalls || mentionsAiDisclosure ? "Pass" : "Warning";
+  const aiStatus = noAiUseConfirmed || (hasAiCalls && ledgerComplete && mentionsAiDisclosure) ? "Pass" : "Warning";
   rules.push({
     id: "rule-ai-policy",
     category: "Ethics & AI",
     requirementName: "Publisher AI Disclosure Compliance",
-    requiredValue: outlet.aiPolicySummary ? "Disclosure Required" : "Standard Policy",
-    actualValue: hasAiCalls ? (mentionsAiDisclosure ? "AI Disclosure Statement Included" : "AI Used without Explicit Disclosure Text") : "No Material AI Calls Registered",
+    requiredValue: aiRequirement ? String(aiRequirement.value ?? "Not available") : "Outlet AI policy Unverified",
+    actualValue: hasAiCalls
+      ? (ledgerComplete ? (mentionsAiDisclosure ? "Complete AI ledger and disclosure present" : "AI used without explicit disclosure text") : "AI ledger integrity Unknown/Incomplete")
+      : (noAiUseConfirmed ? "No AI use confirmed by attributable assessment" : "Empty ledger; AI-use history Unknown/Incomplete"),
     status: aiStatus,
     actionRequired: aiStatus === "Pass" ? undefined : "Include ICJME AI Assistance Disclosure statement in manuscript Declarations/Methods.",
     ...metaAi,
   });
 
   // Rule 7: Author Sign-off Confirmation
-  const metaAuthors = getRequirementMeta("authors");
   const totalAuthors = project.authors?.length || 0;
   const approvedAuthors = (project.authors || []).filter((a) => a.finalApproval).length;
   const allAuthorsApproved = totalAuthors > 0 && approvedAuthors === totalAuthors;
@@ -142,7 +181,6 @@ export function calculateComplianceRules(project: ProjectState, customOutlet?: T
     actualValue: `${approvedAuthors} / ${totalAuthors} Authors Approved`,
     status: allAuthorsApproved ? "Pass" : "Fail",
     actionRequired: allAuthorsApproved ? undefined : `Obtain sign-off approval from ${totalAuthors - approvedAuthors} pending co-author(s).`,
-    ...metaAuthors,
   });
 
   return rules;
@@ -178,7 +216,7 @@ export function evaluateExportGateChecks(
     (c) => c.verificationStatus === "Unverified" || c.state === "Unlinked" || (c.linkedSourceIds || []).length === 0
   );
   const resultsSection = (project.sections || []).find((s) => s.title.toLowerCase().includes("result"));
-  const hasApprovedOutputs = (project.analysisOutputs || []).length > 0;
+  const hasApprovedOutputs = (project.analysisOutputs || []).some(hasAttributableManuscriptApproval);
   const resultsUnlinked = Boolean(resultsSection && !hasApprovedOutputs);
 
   const resultsPass = unverifiedClaims.length === 0 && !resultsUnlinked;
@@ -227,7 +265,14 @@ export function evaluateExportGateChecks(
     fullContent.includes("gemini") ||
     fullContent.includes("generative ai");
 
-  const aiPass = (!hasAiEvents && !hasAiSections) || hasDisclosureText;
+  const integrityAssessed = Boolean(
+    project.aiLedgerIntegrity?.assessedAt?.trim() &&
+    project.aiLedgerIntegrity.assessedByUid?.trim() &&
+    project.aiLedgerIntegrity.rationale?.trim()
+  );
+  const completeLedger = integrityAssessed && project.aiLedgerIntegrity?.status === "Complete";
+  const confirmedNoUse = integrityAssessed && !hasAiEvents && project.aiLedgerIntegrity?.status === "No AI Use Confirmed" && !hasAiSections;
+  const aiPass = confirmedNoUse || (hasAiEvents && completeLedger && hasDisclosureText);
 
   gateChecks.push({
     checkId: "gate-ai-disclosure",
@@ -236,10 +281,12 @@ export function evaluateExportGateChecks(
     status: aiPass ? "Pass" : "Blocker",
     message: aiPass
       ? hasAiEvents
-        ? `Generative AI assistance logged in AI Ledger (${project.aiLedger.length} events) with matching disclosure statement.`
-        : "No AI generated material detected."
-      : "Material AI assistance recorded in AI Ledger, but manuscript lacks mandatory AI Disclosure statement.",
-    resolutionPath: "Generate and append ICJME AI Disclosure statement from AI Assistance Ledger into Declarations.",
+        ? `Generative AI assistance logged in a researcher-assessed Complete ledger (${project.aiLedger.length} events) with matching disclosure text.`
+        : "No AI use confirmed by an attributable researcher ledger-integrity assessment."
+      : !hasAiEvents
+        ? "AI ledger is empty, but historical AI use is Unknown/Incomplete; emptiness is not proof of no AI use."
+        : "AI ledger/disclosure completeness is insufficient for submission.",
+    resolutionPath: "Complete an attributable ledger-integrity review and append a truthful AI-use disclosure into Declarations.",
   });
 
   // Check 5: Author Sign-off Approval

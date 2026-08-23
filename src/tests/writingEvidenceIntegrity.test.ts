@@ -4,6 +4,8 @@ import {
   buildApprovedAnalysisInsertion,
   buildLiteratureEvidenceInsertion,
   getApprovedManuscriptAnalysisOutputs,
+  getApprovedManuscriptFigures,
+  getApprovedManuscriptTables,
   getInsertableLiteratureEvidence,
 } from "../lib/writingEvidence";
 import type { AnalysisOutput, SourceRecord } from "../types";
@@ -33,6 +35,8 @@ function analysisOutput(overrides: Partial<AnalysisOutput> = {}): AnalysisOutput
   return {
     id: "analysis-1",
     analysisPlanId: "plan-1",
+    planId: "plan-1",
+    datasetHash: "dataset-hash",
     executionTimestamp: "2026-08-22T00:00:00.000Z",
     softwareEnvironment: "Recorded environment",
     summaryText: "Recorded analysis summary.",
@@ -153,6 +157,14 @@ describe("TQ-VSC-004 safe literature and statistical insertion", () => {
     const project = createEmptyProject();
     const approved = analysisOutput({
       state: "Approved for Manuscript",
+      researcherApproval: {
+        actor: { uid: "researcher-1", email: "researcher@example.org" },
+        timestamp: "2026-08-22T00:00:00.000Z",
+        rationale: "Reviewed and approved",
+        outputId: "analysis-1",
+        datasetHash: "dataset-hash",
+        planId: "plan-1",
+      },
       summaryText: "Researcher-approved recorded summary.",
       numericResults: { estimate: 2.75 },
       pValues: [{ test: "Recorded test", pValue: 0.02, significant: true, formatted: "p = 0.02" }],
@@ -177,6 +189,30 @@ describe("TQ-VSC-004 safe literature and statistical insertion", () => {
     expect(() => buildApprovedAnalysisInsertion(output, project, "metrics_only")).toThrow(
       /not Approved for Manuscript/i
     );
+  });
+
+  it("gates figures and tables by the same attributable output approval", () => {
+    const project = createEmptyProject();
+    const completed = analysisOutput({ id: "completed", state: "Completed" });
+    const approved = analysisOutput({
+      id: "approved",
+      state: "Approved for Manuscript",
+      researcherApproval: {
+        actor: { uid: "researcher-1", email: "researcher@example.org" },
+        timestamp: "2026-08-22T00:00:00.000Z",
+        rationale: "Reviewed and approved",
+        outputId: "approved",
+        datasetHash: "dataset-hash",
+        planId: "plan-1",
+      },
+      summaryText: "Approved output",
+    });
+    project.analysisOutputs = [completed, approved];
+    project.figures = [{ id: "fig-completed", analysisRunId: "completed" } as any, { id: "fig-approved", analysisRunId: "approved" } as any];
+    project.tables = [{ id: "table-completed", analysisRunId: "completed" } as any, { id: "table-approved", analysisRunId: "approved" } as any];
+
+    expect(getApprovedManuscriptFigures(project).map((item) => item.id)).toEqual(["fig-approved"]);
+    expect(getApprovedManuscriptTables(project).map((item) => item.id)).toEqual(["table-approved"]);
   });
 
   it("excludes demo evidence and analysis from a real project", () => {

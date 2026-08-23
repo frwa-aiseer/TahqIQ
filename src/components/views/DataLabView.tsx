@@ -8,11 +8,13 @@ import {
   ProjectState,
   DatasetState,
   DatasetVariable,
+  AnalysisState,
 } from "../../types";
 import { performStateTransition, DATASET_TRANSITIONS } from "../../lib/stateMachines";
 import { parseAndProfileDataset, updateDatasetVariableDictionary } from "../../lib/datasetIngestion";
 import { executePairedCrossoverAnalysis, generateAnalysisFiguresAndTables } from "../../lib/statsEngine";
 import { createNumericEvidenceFromAnalysis } from "../../lib/numericEvidence";
+import { hasAttributableManuscriptApproval, transitionAnalysisOutput } from "../../lib/analysisLifecycle";
 import { ApprovalModal } from "../ApprovalModal";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -123,7 +125,7 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
     entityTitle: string;
     currentState: string;
     targetState: string;
-    itemRef: DatasetRecord | AnalysisPlan | null;
+    itemRef: DatasetRecord | AnalysisOutput | null;
   }>({
     isOpen: false,
     entityType: "Dataset",
@@ -234,6 +236,45 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
     } else {
       alert(result.error || "Prohibited dataset transition failed.");
     }
+  };
+
+  const persistAnalysisTransition = (
+    output: AnalysisOutput,
+    targetState: AnalysisState,
+    rationale: string,
+    actorType: "human" | "system"
+  ) => {
+    if (!project || !onUpdateProject) return;
+    if (actorType === "human" && (!user?.uid || !user.email)) {
+      throw new Error("An authenticated researcher is required for review and manuscript approval.");
+    }
+    const actor = actorType === "human"
+      ? { uid: user!.uid, email: user!.email! }
+      : { uid: "tehqiq-qc", email: "system@tehqiq.local" };
+    const updatedOutput = transitionAnalysisOutput(output, targetState, actor, rationale, actorType);
+    const updatedOutputs = (project.analysisOutputs || []).map((item) => item.id === output.id ? updatedOutput : item);
+    const artifactApproved = hasAttributableManuscriptApproval(updatedOutput);
+    const updatedFigures = (project.figures || []).map((item) => item.analysisRunId === output.id ? { ...item, isApproved: artifactApproved } : item);
+    const updatedTables = (project.tables || []).map((item) => item.analysisRunId === output.id ? { ...item, isApproved: artifactApproved } : item);
+    onUpdateProject({ ...project, analysisOutputs: updatedOutputs, figures: updatedFigures, tables: updatedTables, updatedAt: new Date().toISOString() });
+    setLatestOutput(updatedOutput);
+    setParsedMessage(`Analysis output '${output.id}' transitioned to '${targetState}'.`);
+  };
+
+  const requestHumanAnalysisTransition = (output: AnalysisOutput, targetState: AnalysisState) => {
+    if (!user?.uid || !user.email) {
+      alert("An authenticated researcher is required for review and manuscript approval.");
+      return;
+    }
+    setApprovalModalConfig({
+      isOpen: true,
+      entityType: "Analysis",
+      entityId: output.id,
+      entityTitle: `Analysis output ${output.id}`,
+      currentState: output.state || "Completed",
+      targetState,
+      itemRef: output,
+    });
   };
 
   // Start Editing a Variable
@@ -731,7 +772,10 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
                             : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
                         }`}
                       >
-                        Status: {latestOutput.executionStatus || "Completed"}
+                        Execution: {latestOutput.executionStatus || "Not available"}
+                      </span>
+                      <span className="bg-sky-500/20 text-sky-200 border border-sky-500/30 px-3 py-1 rounded-full text-xs font-bold">
+                        Lifecycle: {latestOutput.state || "Completed"}
                       </span>
 
                       {latestOutput.isResearcherSupplied && !latestOutput.isReproduced && latestOutput.reproductionStatus !== "Independently Reproduced" ? (
@@ -767,6 +811,29 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
                   </div>
 
                   <p className="text-xs text-slate-200 font-sans pt-1 italic">{latestOutput.summaryText}</p>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {latestOutput.state === "Completed" && (
+                      <button
+                        type="button"
+                        onClick={() => persistAnalysisTransition(latestOutput, "QC Passed", "Automated deterministic QC checks recorded; no researcher approval granted.", "system")}
+                        className="bg-sky-700 hover:bg-sky-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
+                      >Record QC Passed</button>
+                    )}
+                    {latestOutput.state === "QC Passed" && (
+                      <button
+                        type="button"
+                        onClick={() => requestHumanAnalysisTransition(latestOutput, "Researcher Reviewed")}
+                        className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
+                      >Record Researcher Review</button>
+                    )}
+                    {latestOutput.state === "Researcher Reviewed" && (
+                      <button
+                        type="button"
+                        onClick={() => requestHumanAnalysisTransition(latestOutput, "Approved for Manuscript")}
+                        className="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
+                      >Approve for Manuscript</button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Paired Statistical Results Table */}
@@ -1285,6 +1352,13 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
                 approvalModalConfig.targetState as DatasetState,
                 reason,
                 evidenceRecordIds
+              );
+            } else {
+              persistAnalysisTransition(
+                approvalModalConfig.itemRef as AnalysisOutput,
+                approvalModalConfig.targetState as AnalysisState,
+                reason,
+                "human"
               );
             }
           }}

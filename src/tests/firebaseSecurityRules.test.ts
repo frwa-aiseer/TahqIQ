@@ -13,24 +13,21 @@ describe('Firebase Security Rules Verification Tests', () => {
   });
 
   describe('2. User Collection Rules (/users/{userId})', () => {
-    it('requires authentication for read access', () => {
-      expect(rulesContent).toMatch(/match \/users\/\{userId\}[\s\S]*?allow read:\s*if isSignedIn\(\);/);
-    });
-
-    it('enforces request.auth.uid == userId for user profile write', () => {
-      expect(rulesContent).toMatch(/allow write:\s*if isSignedIn\(\) && request\.auth\.uid == userId;/);
+    it('enforces owner-only access for every private profile operation', () => {
+      expect(rulesContent).toMatch(/match \/users\/\{userId\}[\s\S]*?allow read, create, update, delete:\s*if isSignedIn\(\) && request\.auth\.uid == userId;/);
+      expect(rulesContent).not.toMatch(/allow read:\s*if isSignedIn\(\);/);
     });
   });
 
   describe('3. Project Collection Rules (/projects/{projectId})', () => {
-    it('allows read for demo projects OR project owner OR project members', () => {
-      expect(rulesContent).toContain("resource.data.isDemoProject == true");
-      expect(rulesContent).toContain("resource.data.ownerUid == request.auth.uid");
-      expect(rulesContent).toContain("resource.data.members != null");
+    it('allows reads only through project membership', () => {
+      expect(rulesContent).toContain("allow read: if isMember(resource.data);");
+      expect(rulesContent).not.toContain("resource.data.isDemoProject == true");
     });
 
     it('enforces creation rule: ownerUid must match authenticated user UID', () => {
-      expect(rulesContent).toContain("allow create: if isSignedIn() && request.resource.data.ownerUid == request.auth.uid;");
+      expect(rulesContent).toContain("request.resource.data.ownerUid == request.auth.uid");
+      expect(rulesContent).toContain("hasValidOwnerMembership(request.resource.data)");
     });
 
     it('restricts project updates to authorized write roles', () => {
@@ -40,6 +37,7 @@ describe('Firebase Security Rules Verification Tests', () => {
 
     it('prohibits non-owners from modifying ownerUid or members list during project update', () => {
       expect(rulesContent).toContain("request.resource.data.ownerUid == resource.data.ownerUid");
+      expect(rulesContent).toContain("protectedMembershipFieldsUnchanged()");
       expect(rulesContent).toContain("request.resource.data.members == resource.data.members");
     });
 
@@ -58,7 +56,7 @@ describe('Firebase Security Rules Verification Tests', () => {
     });
 
     it('restricts file deletion to project Owner only', () => {
-      expect(rulesContent).toMatch(/match \/files\/\{fileId\}[\s\S]*?allow delete:\s*if isSignedIn\(\) && isOwner/);
+      expect(rulesContent).toMatch(/match \/files\/\{fileId\}[\s\S]*?allow delete:\s*if isOwner/);
     });
   });
 
@@ -71,8 +69,7 @@ describe('Firebase Security Rules Verification Tests', () => {
     function isOwner(projectData: any, auth: { uid: string } | null) {
       if (!isSignedIn(auth)) return false;
       return (
-        projectData.ownerUid === auth!.uid ||
-        (projectData.members != null && projectData.members[auth!.uid] === 'Owner')
+        projectData.ownerUid === auth!.uid
       );
     }
 

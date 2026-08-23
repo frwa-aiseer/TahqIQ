@@ -1,4 +1,5 @@
-import { ProjectState, AnalysisOutput, NumericEvidence } from "../types";
+import { ProjectState, AnalysisOutput, NumericEvidence, AiLedgerEvent, AiLedgerIntegrity } from "../types";
+import { hasAttributableManuscriptApproval } from "./analysisLifecycle";
 
 export interface AIValidationResult {
   valid: boolean;
@@ -115,22 +116,7 @@ export function validateManuscriptNumericContent(
  * Checks if an analysis output is formally approved by a researcher for manuscript use.
  */
 export function isAnalysisOutputApproved(out: AnalysisOutput): boolean {
-  // Requirement 1 & 2 & 3: Results drafting can use an analysis output only if:
-  // state === "Approved for Manuscript" OR an equivalent backwards-compatible explicit researcher approval field.
-  // "Completed" only means execution completed. Automated QC cannot grant researcher approval.
-  const isApproved =
-    out.state === "Approved for Manuscript" ||
-    out.isApproved === true ||
-    (out as any).isResearcherApproved === true ||
-    (out as any).state === "Researcher Approved";
-
-  // Requirement 6: Imported external statistical outputs preserve status unless reproduced.
-  if (out.isResearcherSupplied && out.reproductionStatus === "Not Independently Reproduced" && !out.isReproduced) {
-    // If it's external and not reproduced, it can still be used IF the researcher explicitly approved it.
-    // The requirement is to "preserve" the flag (e.g. for audit/disclosure), not necessarily block it if approved.
-  }
-
-  return !!isApproved;
+  return hasAttributableManuscriptApproval(out);
 }
 
 export function validateAiGeneratedProse(
@@ -272,18 +258,25 @@ export function validateAiGeneratedProse(
  * Generates dynamic ICJME / Journal-compliant AI Disclosure text strictly matching actual AI Assistance Ledger events.
  */
 export function generateLedgerDisclosureStatement(
-  ledgerEvents: any[],
-  projectTitle: string = "Scholarly Manuscript"
+  ledgerEvents: readonly AiLedgerEvent[],
+  projectTitle: string = "Scholarly Manuscript",
+  integrity?: AiLedgerIntegrity
 ): string {
+  const hasAssessment = Boolean(integrity?.assessedAt?.trim() && integrity.assessedByUid?.trim() && integrity.rationale?.trim());
+  const completeness = hasAssessment ? integrity!.status : "Unknown";
+
   if (!ledgerEvents || ledgerEvents.length === 0) {
-    return `**AI-Use Disclosure Statement:**\nNo AI assistance tools were utilized in the generation, statistical analysis, or drafting of "${projectTitle}".`;
+    if (completeness === "No AI Use Confirmed") {
+      return `**AI-Use Disclosure Statement:**\nNo AI use is recorded for "${projectTitle}". An attributable researcher assessment states that no AI assistance was used. Assessment: ${integrity!.rationale} (${integrity!.assessedAt}).`;
+    }
+    return `**AI-Use Disclosure Statement — Unknown/Incomplete:**\nThe AI Assistance Ledger contains no events for "${projectTitle}". An empty ledger is not proof that no AI assistance was used. Historical AI-use completeness cannot be established from current records; researcher verification is required before submission.`;
   }
 
   const acceptedEvents = ledgerEvents.filter((e) => e.userDecision === "Accepted" || e.userDecision === "Edited");
-  const modelsUsed = Array.from(new Set(ledgerEvents.map((e) => e.model || "Gemini 3.6 Flash")));
+  const modelsUsed = Array.from(new Set(ledgerEvents.map((e) => e.model?.trim() || "Unrecorded model")));
   const featuresUsed = Array.from(new Set(ledgerEvents.map((e) => e.featureUsed)));
   const sectionsDrafted = Array.from(new Set(ledgerEvents.map((e) => e.manuscriptSection).filter(Boolean)));
-  const creditRoles = Array.from(new Set(ledgerEvents.map((e) => e.creditRoleAssigned || "Writing - original draft")));
+  const creditRoles = Array.from(new Set(ledgerEvents.map((e) => e.creditRoleAssigned?.trim() || "Not recorded")));
 
   const totalEvents = ledgerEvents.length;
   const acceptedCount = ledgerEvents.filter((e) => e.userDecision === "Accepted").length;
@@ -302,6 +295,8 @@ ${featuresUsed.map((f) => `- ${f}`).join("\n")}
 ${sectionsDrafted.length > 0 ? `- Target Manuscript Sections: ${sectionsDrafted.join(", ")}\n` : ""}
 **CRediT Mappings:** ${creditRoles.join(", ")}.
 
+**Ledger Completeness:** ${completeness}${completeness === "Complete" ? "." : ". The recorded events must not be treated as a complete history of AI use; researcher verification is required."}
+
 **Author Responsibility Statement:**
-All AI-generated text and analytical suggestions were critically reviewed, verified against empirical primary sources and dataset outputs, and edited by the human authors prior to submission. The authors retain full accountability for the scientific integrity and accuracy of all content.`;
+The ledger records the decisions shown above. It does not independently prove review, verification, or historical completeness beyond its recorded events. Human authors retain responsibility for verifying the disclosure and all submitted content.`;
 }

@@ -5,6 +5,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { lookupDoiMetadata, CrossrefDisclaimer } from "./src/lib/metadataProviders";
 import { executePairedCrossoverAnalysis, generateAnalysisFiguresAndTables } from "./src/lib/statsEngine";
+import { hasAttributableManuscriptApproval } from "./src/lib/analysisLifecycle";
 
 dotenv.config();
 
@@ -84,18 +85,7 @@ Notice: TehqIQ assists researchers but does not replace subject expertise, ethic
         const hasApprovedAnalysis =
           analysisOutputs &&
           analysisOutputs.length > 0 &&
-          analysisOutputs.some(
-            
-            (out: any) => {
-              const isExplicitlyApproved =
-                out.state === "Approved for Manuscript" ||
-                out.isApproved === true ||
-                out.isResearcherApproved === true ||
-                out.state === "Researcher Approved";
-              return isExplicitlyApproved;
-            }
-
-          );
+          analysisOutputs.some((out: any) => hasAttributableManuscriptApproval(out));
 
         if (!hasApprovedAnalysis) {
           return res.status(400).json({
@@ -118,7 +108,7 @@ STRICT EVIDENCE RULES:
 Canvas Context: ${JSON.stringify(canvas || {})}
 Available Verified Sources: ${JSON.stringify(sources || [])}
 Verified Claims: ${JSON.stringify(claims || [])}
-Approved Analysis Outputs: ${JSON.stringify((analysisOutputs || []).filter((out: any) => out.state === "Approved for Manuscript" || out.isApproved === true || out.isResearcherApproved === true || out.state === "Researcher Approved"))}`;
+Approved Analysis Outputs: ${JSON.stringify((analysisOutputs || []).filter((out: any) => hasAttributableManuscriptApproval(out)))}`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3.6-flash",

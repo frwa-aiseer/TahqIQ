@@ -118,7 +118,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
         <div className="bg-amber-50 border border-amber-200/80 p-3 rounded-xl text-xs text-amber-900 flex items-start space-x-2.5">
           <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            By confirming approval, you log a server-audited state transition certifying that this {entityType.toLowerCase()} has been reviewed according to TehqIQ scholarly research integrity guidelines.
+            By confirming approval, you log an attributable project state transition certifying that this {entityType.toLowerCase()} has been reviewed according to TehqIQ scholarly research integrity guidelines.
           </p>
         </div>
 
@@ -158,7 +158,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
               className="px-4 py-2 rounded-lg bg-[#053B2E] hover:bg-[#053B2E]/90 text-white text-xs font-medium transition shadow-2xs flex items-center space-x-1.5"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{isSubmitting ? "Recording Server Approval..." : "Confirm & Record Server Approval"}</span>
+              <span>{isSubmitting ? "Recording Approval..." : "Confirm & Record Approval"}</span>
             </button>
           </div>
         </form>

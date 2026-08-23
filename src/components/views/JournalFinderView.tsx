@@ -46,7 +46,7 @@ export const JournalFinderView: React.FC<JournalFinderViewProps> = ({
             Scholarly Outlet Catalogue & Format Engine
           </h2>
           <p className="text-xs text-slate-600 mt-1">
-            Strict provenance-verified catalogue. Every outlet links directly to official publisher author guidelines and primary indexing sources. Zero fabricated titles.
+            Identity-verified catalogue sourced from official publisher or society outlet pages. Requirements, indexing, metrics, and fees remain Unverified unless separately sourced.
           </p>
         </div>
       </div>
@@ -112,7 +112,7 @@ export const JournalFinderView: React.FC<JournalFinderViewProps> = ({
                     {outlet.verificationStatus === "Verified" ? (
                       <span className="inline-flex items-center space-x-1 text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded font-semibold">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        <span>Verified Seed</span>
+                        <span>Identity Verified</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center space-x-1 text-[10px] bg-amber-50 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded font-semibold">
@@ -144,7 +144,7 @@ export const JournalFinderView: React.FC<JournalFinderViewProps> = ({
               <div className="grid grid-cols-3 gap-2 text-[11px] bg-[#F8F5EC] p-2.5 rounded-lg border border-slate-200">
                 <div>
                   <span className="text-slate-500 block font-medium">Word Limit</span>
-                  <strong className="text-slate-800">{outlet.wordLimit ? `${outlet.wordLimit.toLocaleString()} words` : "Uncapped / Guidelines"}</strong>
+                  <strong className="text-slate-800">{outlet.wordLimit ? `${outlet.wordLimit.toLocaleString()} words` : "Unverified"}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block font-medium">Open Access</span>
@@ -157,7 +157,7 @@ export const JournalFinderView: React.FC<JournalFinderViewProps> = ({
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                <span className="truncate max-w-[280px]">Indexing: {outlet.indexing.length ? outlet.indexing.join(", ") : "Publisher verified"}</span>
+                <span className="truncate max-w-[280px]">Indexing: {outlet.indexing.length ? outlet.indexing.join(", ") : "Unverified"}</span>
                 {outlet.officialUrl && (
                   <a
                     href={outlet.officialUrl}

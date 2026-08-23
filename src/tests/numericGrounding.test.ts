@@ -44,6 +44,7 @@ describe("Provenance-Based Numerical Grounding Tests", () => {
         sourceType: "ANALYSIS_OUTPUT",
         sourceId: "out-1",
         analysisRunId: "out-1",
+        datasetHash: "analysis-hash",
         verificationState: "Verified",
         createdAt: new Date().toISOString()
       }
@@ -53,9 +54,20 @@ describe("Provenance-Based Numerical Grounding Tests", () => {
     analysisOutputs: [
       {
         id: "out-1",
+        analysisPlanId: "plan-1",
+        planId: "plan-1",
+        datasetHash: "analysis-hash",
         executionStatus: "Completed",
         isReproduced: true,
         state: "Approved for Manuscript",
+        researcherApproval: {
+          actor: { uid: "researcher-1", email: "researcher@example.org" },
+          timestamp: "2026-08-22T00:00:00.000Z",
+          rationale: "Reviewed and approved",
+          outputId: "out-1",
+          datasetHash: "analysis-hash",
+          planId: "plan-1",
+        },
         summaryText: "Test Output"
       } as any
     ]

@@ -1,5 +1,7 @@
 import { ProjectState, TargetOutlet, ExportJobRecord, GateCheckResult } from "../types";
 import { formatBibliographyEntry } from "./cslStyles";
+import { getApprovedManuscriptFigures, getApprovedManuscriptTables } from "./writingEvidence";
+import { generateLedgerDisclosureStatement } from "./aiValidationService";
 import jsPDF from "jspdf";
 import {
   Document,
@@ -131,7 +133,7 @@ export async function generateGenuineDocxBlob(project: ProjectState, config: Doc
                 new Paragraph({
                   children: [
                     new TextRun({ text: `Target Outlet: `, bold: true, size: fontSize - 4, font }),
-                    new TextRun({ text: `${outlet?.title || "Standard Scholarly Outlet"} (${outlet?.issnOrAcronym || "Q1"}) | `, size: fontSize - 4, font }),
+                    new TextRun({ text: `${outlet?.title || "Outlet not configured"} (${outlet?.issnOrAcronym || "Unverified"}) | `, size: fontSize - 4, font }),
                     new TextRun({ text: `Citation Format: `, bold: true, size: fontSize - 4, font }),
                     new TextRun({ text: `${styleId.toUpperCase()} | `, size: fontSize - 4, font }),
                     new TextRun({ text: `Ethics ID: `, bold: true, size: fontSize - 4, font }),
@@ -195,7 +197,7 @@ export async function generateGenuineDocxBlob(project: ProjectState, config: Doc
   }
 
   // Tables
-  if (config.includeTablesAndFigures !== false && (project.tables || []).length > 0) {
+  if (config.includeTablesAndFigures !== false && getApprovedManuscriptTables(project).length > 0) {
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_2,
@@ -204,7 +206,7 @@ export async function generateGenuineDocxBlob(project: ProjectState, config: Doc
       })
     );
 
-    (project.tables || []).forEach((tbl) => {
+    getApprovedManuscriptTables(project).forEach((tbl) => {
       children.push(
         new Paragraph({
           spacing: { before: 180, after: 60 },
@@ -256,7 +258,7 @@ export async function generateGenuineDocxBlob(project: ProjectState, config: Doc
   }
 
   // Figures
-  if (config.includeTablesAndFigures !== false && (project.figures || []).length > 0) {
+  if (config.includeTablesAndFigures !== false && getApprovedManuscriptFigures(project).length > 0) {
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_2,
@@ -265,7 +267,7 @@ export async function generateGenuineDocxBlob(project: ProjectState, config: Doc
       })
     );
 
-    (project.figures || []).forEach((fig) => {
+    getApprovedManuscriptFigures(project).forEach((fig) => {
       children.push(
         new Paragraph({
           spacing: { before: 120, after: 60 },
@@ -326,11 +328,7 @@ export async function generateGenuineDocxBlob(project: ProjectState, config: Doc
         spacing: { after: 120 },
         children: [
           new TextRun({
-            text: `AI Assistance Ledger Statement: ${
-              (project.aiLedger || []).length > 0
-                ? `Generative AI tools (Gemini 3.6 Flash) were utilized under human supervision for section drafting and proofreading (${project.aiLedger.length} logged interactions). Authors retain 100% intellectual responsibility.`
-                : "No generative AI tools were used in drafting primary empirical findings."
-            }`,
+            text: generateLedgerDisclosureStatement(project.aiLedger || [], project.title, project.aiLedgerIntegrity).replace(/\*\*/g, ""),
             size: fontSize - 2,
             font,
           }),
@@ -497,14 +495,14 @@ export function downloadPdfPackage(
   }
 
   // 4. Tables
-  if (config.includeTablesAndFigures !== false && (project.tables || []).length > 0) {
+  if (config.includeTablesAndFigures !== false && getApprovedManuscriptTables(project).length > 0) {
     checkNewPage(20);
     doc.setFont(font, "bold");
     doc.setFontSize(12);
     doc.text("Tables", marginX, y);
     y += 8;
 
-    (project.tables || []).forEach((tbl) => {
+    getApprovedManuscriptTables(project).forEach((tbl) => {
       checkNewPage(25);
       doc.setFont(font, "bold");
       doc.setFontSize(10);
@@ -537,14 +535,14 @@ export function downloadPdfPackage(
   }
 
   // 5. Figures
-  if (config.includeTablesAndFigures !== false && (project.figures || []).length > 0) {
+  if (config.includeTablesAndFigures !== false && getApprovedManuscriptFigures(project).length > 0) {
     checkNewPage(20);
     doc.setFont(font, "bold");
     doc.setFontSize(12);
     doc.text("Figures & Captions", marginX, y);
     y += 8;
 
-    (project.figures || []).forEach((fig) => {
+    getApprovedManuscriptFigures(project).forEach((fig) => {
       checkNewPage(15);
       doc.setFont(font, "bold");
       doc.setFontSize(10);

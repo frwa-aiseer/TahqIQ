@@ -37,12 +37,12 @@ export const ResearchCanvasView: React.FC<ResearchCanvasViewProps> = ({
       });
 
       if (res.ok) {
-        setAiNotice("AI Suggestions generated and logged to AI Assistance Ledger. Proposals are marked as suggestions until approved by human author.");
+        setAiNotice("AI suggestions were returned as proposals. This direct Canvas model-call path is not connected to the AI ledger, so ledger history remains Incomplete.");
       } else {
-        setAiNotice("Generated structured suggestions based on PICO parameters.");
+        setAiNotice("AI suggestions were unavailable. No substitute suggestions were generated.");
       }
     } catch (e) {
-      setAiNotice("Generated structured suggestions based on PICO parameters.");
+      setAiNotice("AI suggestions were unavailable. No substitute suggestions were generated.");
     } finally {
       setIsGeneratingAi(false);
     }
@@ -234,4 +234,3 @@ export const ResearchCanvasView: React.FC<ResearchCanvasViewProps> = ({
     </div>
   );
 };
-

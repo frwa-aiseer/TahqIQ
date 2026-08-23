@@ -52,14 +52,24 @@ export const ProtocolBuilderView: React.FC<ProtocolBuilderViewProps> = ({
   const [notice, setNotice] = useState<{ type: "error" | "success"; message: string } | null>(null);
   const [isRequestingAi, setIsRequestingAi] = useState(false);
 
-  const persistWorkspace = (nextWorkspace: typeof workspace) => {
+  const persistWorkspace = (nextWorkspace: typeof workspace, recordsBypassAiCall = false) => {
+    const now = new Date().toISOString();
     onUpdateProject?.({
       ...project,
       methodologyWorkspace: {
         ...nextWorkspace,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       },
-      updatedAt: new Date().toISOString(),
+      ...(recordsBypassAiCall ? {
+        aiLedgerIntegrity: {
+          status: "Incomplete" as const,
+          assessedAt: now,
+          assessedByUid: currentUserUid || "tehqiq-system",
+          rationale: "Methodology AI proposal used a direct model-call path that is not recorded as an AiLedgerEvent.",
+          knownBypassPaths: ["POST /api/gemini/methodology-proposal"],
+        },
+      } : {}),
+      updatedAt: now,
     });
   };
 
@@ -143,7 +153,7 @@ export const ProtocolBuilderView: React.FC<ProtocolBuilderViewProps> = ({
           model: payload.model,
           promptVersion: payload.promptVersion,
         },
-      });
+      }, true);
       setNotice({
         type: "success",
         message: "AI proposal received as AI Suggested. Review and edit every field before researcher approval.",

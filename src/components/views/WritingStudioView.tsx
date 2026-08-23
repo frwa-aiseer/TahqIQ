@@ -289,6 +289,13 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
     onUpdateProject({
       ...project,
       aiLedger: updatedLedger,
+      aiLedgerIntegrity: {
+        status: "Incomplete",
+        assessedAt: new Date().toISOString(),
+        assessedByUid: user?.uid || "tehqiq-system",
+        rationale: "Section drafting uses a direct model-call path pending centralized gateway coverage verification.",
+        knownBypassPaths: ["POST /api/gemini/draft-section"],
+      },
     });
   };
 

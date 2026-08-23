@@ -592,14 +592,15 @@ export interface AnalysisOutput {
     note: string;
   }[];
   state?: AnalysisState;
+  stateHistory?: StateTransitionRecord[];
   isApproved?: boolean;
   researcherApproval?: {
-    actor: string;
+    actor: { uid: string; email: string };
     timestamp: string;
     rationale: string;
     outputId: string;
     datasetHash: string;
-    analysisPlanId: string;
+    planId: string;
   };
 }
 
@@ -656,40 +657,62 @@ export interface CSLStyleOption {
   citationFormat: "author-date" | "numeric" | "footnote" | "superscript";
 }
 
+export type OutletRequirementField =
+  | "articleType" | "manuscriptWordLimit" | "abstractWordLimit" | "abstractStructure"
+  | "referenceStyle" | "referenceLimit" | "figureLimit" | "tableLimit" | "supplements"
+  | "titlePage" | "authors" | "aiPolicy" | "ethics" | "dataSharing" | "apc"
+  | "conferenceDeadline" | "conferenceTemplate" | "conferenceFileRequirements";
+
+export type OutletRequirementState = "Verified" | "AI Extracted—Needs Review" | "Unverified" | "Unavailable";
+
+export interface OutletRequirementHistoryEntry {
+  version: number;
+  value: string | number | boolean | string[] | null;
+  state: OutletRequirementState;
+  sourceProvider?: string;
+  sourceUrl?: string;
+  retrievedAt?: string;
+  recordedAt: string;
+}
+
 export interface VersionedRequirementRecord {
   id: string;
-  field: string; // e.g. "wordLimit", "abstractWordLimit", "citationStyle", "apcFee", "acceptanceRate", "submissionDeadline", "indexing", "reviewTimeWeeks"
-  officialSourceUrl: string;
-  retrievalDate: string; // ISO date format "YYYY-MM-DD"
-  extractedValue: string | number | string[];
+  field: OutletRequirementField;
+  value: string | number | boolean | string[] | null;
+  state: OutletRequirementState;
+  sourceProvider?: string;
+  sourceUrl?: string;
+  retrievedAt?: string;
   confidence: "High" | "Medium" | "Low";
   humanConfirmed: boolean;
   confirmedByUid?: string;
   confirmedByEmail?: string;
   confirmedAt?: string;
+  version: number;
+  history: OutletRequirementHistoryEntry[];
+
+  /** Legacy read aliases; never sufficient for Verified state. */
+  officialSourceUrl?: string;
+  retrievalDate?: string;
+  extractedValue?: string | number | string[];
 }
 
-export interface OutletMetrics {
-  jcrQuartile?: {
-    quartile: "Q1" | "Q2" | "Q3" | "Q4";
-    year: number;
-    officialSourceUrl: string;
-    retrievalDate: string;
-    humanConfirmed: boolean;
-  };
-  citeScorePercentile?: {
-    percentile: number; // e.g. 94
-    rank: string; // e.g. "#12/150 in General Medicine"
-    year: number;
-    officialSourceUrl: string;
-    retrievalDate: string;
-    humanConfirmed: boolean;
-  };
-  unverifiedMetrics?: {
-    metricName: string;
-    value: string;
-    note: string;
-  }[];
+export type OutletMetricProviderKind = "JCR" | "SCOPUS" | "SCIMAGO" | "OTHER_OFFICIAL" | "THIRD_PARTY";
+
+export interface OutletMetricRecord {
+  id: string;
+  provider: string;
+  providerKind: OutletMetricProviderKind;
+  metricName: string;
+  year: number;
+  subjectCategory: string;
+  value?: number | string;
+  percentile?: number;
+  quartile?: "Q1" | "Q2" | "Q3" | "Q4";
+  sourceUrl: string;
+  sourceRecordId?: string;
+  retrievedAt: string;
+  verificationState: "Verified" | "Unverified" | "Rejected";
 }
 
 export interface VersionedClaimRecord {
@@ -719,7 +742,7 @@ export interface TargetOutlet {
   subjectCategory: string;
   officialUrl: string;
   indexing: string[]; // e.g., ["Scopus", "PubMed", "DOAJ"]
-  openAccessModel: "Gold" | "Hybrid" | "Green" | "Subscription";
+  openAccessModel: "Gold" | "Hybrid" | "Green" | "Subscription" | "Unverified";
   apcFee?: string;
   wordLimit?: number;
   abstractWordLimit?: number;
@@ -742,11 +765,13 @@ export interface TargetOutlet {
   fitReasons?: string[];
   fitRisks?: string[];
   requirementsList?: VersionedRequirementRecord[];
-  metrics?: OutletMetrics;
+  metrics?: OutletMetricRecord[];
   datedClaims?: VersionedClaimRecord[];
   outletProvenanceType?: OutletProvenanceType;
   verificationStatus?: OutletVerificationStatus;
   provenanceProvider?: string;
+  identitySourceUrl?: string;
+  identityRetrievedAt?: string;
   isUserAdded?: boolean;
   dueDiligenceCheck?: {
     editorialBoardTransparent: boolean;
@@ -813,6 +838,16 @@ export interface AiLedgerEvent {
   generatedSummary: string;
   userDecision: "Accepted" | "Edited" | "Rejected";
   creditRoleAssigned?: string;
+}
+
+export type AiLedgerIntegrityStatus = "Complete" | "Incomplete" | "Unknown" | "No AI Use Confirmed";
+
+export interface AiLedgerIntegrity {
+  status: AiLedgerIntegrityStatus;
+  assessedAt?: string;
+  assessedByUid?: string;
+  rationale?: string;
+  knownBypassPaths?: string[];
 }
 
 export interface IntegrityGateCheck {
@@ -927,6 +962,7 @@ export interface ProjectState {
   complianceReport?: ComplianceReport;
   reviewerComments: ReviewerComment[];
   aiLedger: AiLedgerEvent[];
+  aiLedgerIntegrity?: AiLedgerIntegrity;
   exportHistory?: ExportJobRecord[];
   pipelineStages: PipelineStage[];
   readinessScore: {

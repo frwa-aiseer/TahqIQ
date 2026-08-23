@@ -11,50 +11,41 @@ import {
   onAuthStateChanged,
   User
 } from "firebase/auth";
-import {
-  getFirestore,
-  Firestore,
-  enableIndexedDbPersistence
-} from "firebase/firestore";
+import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
+import { validateFirebaseClientEnv } from "./firebaseConfig";
 
-// Default configuration fallback
-const defaultConfig = {
-  apiKey: "AIzaSyDemoKeyForTehqIQPlatformApplet2026",
-  authDomain: "tehqiq-applet.firebaseapp.com",
-  projectId: "tehqiq-applet",
-  storageBucket: "tehqiq-applet.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:demo1234567890"
-};
+const viteEnv = (import.meta as ImportMeta & { env?: Record<string, unknown> }).env || {};
+export const firebaseConfiguration = validateFirebaseClientEnv(viteEnv);
+export let firebaseStatus: "Configured" | "Not Configured" = firebaseConfiguration.status;
 
-let app: FirebaseApp;
-let auth: Auth;
-let db: Firestore;
-let storage: FirebaseStorage;
+export let app: FirebaseApp | null = null;
+export let auth: Auth | null = null;
+export let db: Firestore | null = null;
+export let storage: FirebaseStorage | null = null;
 
-try {
-  if (getApps().length === 0) {
-    app = initializeApp(defaultConfig);
-  } else {
-    app = getApp();
+if (firebaseConfiguration.status === "Configured") {
+  try {
+    app = getApps().length === 0 ? initializeApp(firebaseConfiguration.config) : getApp();
+    auth = getAuth(app);
+    db = getFirestore(app);
+    storage = getStorage(app);
+  } catch (error) {
+    firebaseStatus = "Not Configured";
+    console.warn("Firebase is Not Configured: client initialization failed.", error);
   }
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = getStorage(app);
-} catch (error) {
-  console.warn("Firebase initialization warning:", error);
-  app = getApps()[0] || initializeApp(defaultConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = getStorage(app);
+} else {
+  console.info("Firebase is Not Configured. Cloud authentication and persistence are disabled.");
+}
+
+export function getFirebaseServices(): { app: FirebaseApp; auth: Auth; db: Firestore; storage: FirebaseStorage } {
+  if (!app || !auth || !db || !storage) {
+    throw new Error("Firebase Not Configured: provide valid VITE_FIREBASE_* client environment values.");
+  }
+  return { app, auth, db, storage };
 }
 
 export {
-  app,
-  auth,
-  db,
-  storage,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithEmailAndPassword,

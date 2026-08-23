@@ -1,7 +1,9 @@
-import { db } from "./firebase";
+import { getFirebaseServices } from "./firebase";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where, addDoc } from "firebase/firestore";
 import { ProjectState, ProjectRole, ProjectMember, ProjectAuditEvent, ProjectVersionSnapshot } from "../types";
 import { createEmptyProject, isDemoRecord } from "../data/demoProject";
+
+const firestore = () => getFirebaseServices().db;
 
 export interface ProjectSaveResult {
   success: boolean;
@@ -12,7 +14,7 @@ export interface ProjectSaveResult {
 
 export async function getUserProjects(uid: string): Promise<ProjectState[]> {
   try {
-    const projectsRef = collection(db, "projects");
+    const projectsRef = collection(firestore(), "projects");
     // Fetch user projects where members[uid] exists or ownerUid == uid
     const q = query(projectsRef, where(`members.${uid}`, "!=", null));
     const snap = await getDocs(q);
@@ -33,7 +35,7 @@ export async function getUserProjects(uid: string): Promise<ProjectState[]> {
 
 export async function getProjectById(projectId: string): Promise<ProjectState | null> {
   try {
-    const docRef = doc(db, "projects", projectId);
+    const docRef = doc(firestore(), "projects", projectId);
     const snap = await getDoc(docRef);
     if (snap.exists()) {
       return snap.data() as ProjectState;
@@ -82,7 +84,7 @@ export async function createProjectInFirestore(
   };
 
   if (!newProject.isDemoProject) {
-    const docRef = doc(db, "projects", newProject.id);
+    const docRef = doc(firestore(), "projects", newProject.id);
     await setDoc(docRef, newProject);
 
     // Record initial immutable version and audit event
@@ -116,7 +118,7 @@ export async function saveProjectToFirestore(
       updatedAt: now,
     };
 
-    const docRef = doc(db, "projects", project.id);
+    const docRef = doc(firestore(), "projects", project.id);
     await setDoc(docRef, updatedProject, { merge: true });
 
     return {
@@ -142,7 +144,7 @@ export async function archiveProjectInFirestore(
   email: string
 ): Promise<boolean> {
   try {
-    const docRef = doc(db, "projects", projectId);
+    const docRef = doc(firestore(), "projects", projectId);
     await updateDoc(docRef, { isArchived, updatedAt: new Date().toISOString() });
     await logAuditEvent(projectId, uid, email, isArchived ? "PROJECT_ARCHIVED" : "PROJECT_UNARCHIVED", `Project set isArchived=${isArchived}`);
     return true;
@@ -159,7 +161,7 @@ export async function deleteProjectInFirestore(
   email: string
 ): Promise<boolean> {
   try {
-    const docRef = doc(db, "projects", projectId);
+    const docRef = doc(firestore(), "projects", projectId);
     if (softDelete) {
       await updateDoc(docRef, { isDeleted: true, updatedAt: new Date().toISOString() });
       await logAuditEvent(projectId, uid, email, "PROJECT_SOFT_DELETED", "Project marked as deleted");
@@ -182,7 +184,7 @@ export async function updateMemberRoleInFirestore(
   executorEmail: string
 ): Promise<boolean> {
   try {
-    const docRef = doc(db, "projects", projectId);
+    const docRef = doc(firestore(), "projects", projectId);
     const snap = await getDoc(docRef);
     if (!snap.exists()) return false;
 
@@ -220,7 +222,7 @@ export async function logAuditEvent(
   details: string
 ): Promise<void> {
   try {
-    const eventsRef = collection(db, "projects", projectId, "auditEvents");
+    const eventsRef = collection(firestore(), "projects", projectId, "auditEvents");
     const event: ProjectAuditEvent = {
       id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       timestamp: new Date().toISOString(),
@@ -243,7 +245,7 @@ export async function createVersionSnapshot(
   summary: string
 ): Promise<void> {
   try {
-    const versionsRef = collection(db, "projects", projectId, "versions");
+    const versionsRef = collection(firestore(), "projects", projectId, "versions");
     const snapshot: ProjectVersionSnapshot = {
       id: `ver-${project.version || 1}-${Date.now()}`,
       version: project.version || 1,

@@ -73,6 +73,14 @@ describe("Phase 6 Acceptance Tests: Structured, Reviewable & Evidence-Grounded A
         executionStatus: "Completed",
         isReproduced: true,
         state: "Approved for Manuscript",
+        researcherApproval: {
+          actor: { uid: "researcher-1", email: "researcher@example.org" },
+          timestamp: "2026-08-22T00:00:00.000Z",
+          rationale: "Reviewed and approved",
+          outputId: "out-1",
+          datasetHash: "hash123",
+          planId: "plan-1",
+        },
         summaryText: "DWU elicited significant peak EMG elevation (+8.40 % MVIC, t(17)=6.84, p<0.001, d=1.41).",
         numericResults: {
           t_statistic: 6.84,

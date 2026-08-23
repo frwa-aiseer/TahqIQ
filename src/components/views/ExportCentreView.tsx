@@ -16,6 +16,13 @@ import { calculateComplianceRules, evaluateExportGateChecks } from "../../lib/co
 import { CSL_STYLES } from "../../lib/cslStyles";
 import { JournalSelectorDropdown } from "../JournalSelectorDropdown";
 import { ManuscriptPreviewPane } from "../ManuscriptPreviewPane";
+import { getOutletMetricRecords, getVerifiedOutletMetrics } from "../../lib/outletMetrics";
+import {
+  OUTLET_REQUIREMENT_FIELDS,
+  OUTLET_REQUIREMENT_LABELS,
+  getLatestRequirement,
+  getRequirementDisplayState,
+} from "../../lib/outletRequirements";
 import {
   ShieldCheck,
   Download,
@@ -359,10 +366,10 @@ export const ExportCentreView: React.FC<ExportCentreViewProps> = ({
               <BookOpen className="w-5 h-5 text-[#0B5D4B]" />
               <div>
                 <h3 className="font-serif font-bold text-lg text-[#102A43]">
-                  Versioned Outlet Requirements & Verified Dated Claims
+                  Versioned Outlet Requirements & Dated Claims
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Requirements and metrics anchored to official publisher primary URLs and verification dates.
+                  Every factual requirement shows its review state and field-level provenance; missing sources remain explicit.
                 </p>
               </div>
             </div>
@@ -372,97 +379,66 @@ export const ExportCentreView: React.FC<ExportCentreViewProps> = ({
             )}
           </div>
 
-          {/* Metrics & Metrics Separation (JCR Quartile / CiteScore Percentile / Unverified) */}
+          <div className="space-y-3">
+            <h4 className="font-bold text-[#102A43] uppercase tracking-wider text-[11px]">Outlet requirement register</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+              {OUTLET_REQUIREMENT_FIELDS.map((field) => {
+                const requirement = getLatestRequirement(outlet, field);
+                const state = getRequirementDisplayState(outlet, field);
+                const stateClass = state === "Verified"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : state === "AI Extracted—Needs Review"
+                  ? "bg-indigo-100 text-indigo-800"
+                  : state === "Unverified"
+                  ? "bg-amber-100 text-amber-900"
+                  : "bg-slate-200 text-slate-700";
+                const value = requirement?.value;
+                const displayValue = Array.isArray(value) ? value.join(", ") : value === null || value === undefined || value === "" ? "Not available" : String(value);
+                return (
+                  <div key={field} className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-bold text-slate-900">{OUTLET_REQUIREMENT_LABELS[field]}</span>
+                      <span className={`${stateClass} px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap`}>{state}</span>
+                    </div>
+                    <p className="font-mono text-[11px] text-slate-800">{displayValue}</p>
+                    <p className="text-[10px] text-slate-500">
+                      {requirement ? `v${requirement.version} • ${requirement.confidence} confidence • ${requirement.history.length} prior version(s)` : "No requirement record"}
+                    </p>
+                    {requirement?.sourceProvider && <p className="text-[10px] text-slate-600">Provider: {requirement.sourceProvider}</p>}
+                    {requirement?.retrievedAt && <p className="text-[10px] text-slate-600">Retrieved: {requirement.retrievedAt}</p>}
+                    {requirement?.sourceUrl?.startsWith("https://") && (
+                      <a href={requirement.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-1 text-indigo-700 hover:underline text-[10px] font-semibold">
+                        <span>Requirement source</span><ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            {/* JCR Quartile */}
-            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-2">
-              <div className="flex items-center justify-between font-bold text-[#102A43]">
-                <span>Clarivate JCR Quartile</span>
-                {outlet.metrics?.jcrQuartile?.quartile ? (
-                  <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold text-[11px]">
-                    {outlet.metrics.jcrQuartile.quartile}
-                  </span>
-                ) : (
-                  <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px] uppercase font-bold">
-                    Not Available
-                  </span>
-                )}
+            {getOutletMetricRecords(outlet).length === 0 ? (
+              <div className="md:col-span-3 bg-slate-50 p-4 rounded-lg border border-slate-200 text-slate-700">
+                <strong>Metrics: Not Verified</strong>
+                <p className="text-[11px] mt-1">No provider-, year-, and category-specific metric record is linked.</p>
               </div>
-              <p className="text-[11px] text-slate-600">
-                {outlet.metrics?.jcrQuartile ? (
-                  <>
-                    Official Year: {outlet.metrics.jcrQuartile.year} | Human Confirmed:{" "}
-                    {outlet.metrics.jcrQuartile.humanConfirmed ? "Yes" : "No"}
-                  </>
-                ) : (
-                  "Official JCR record not linked. Researcher confirmation required."
-                )}
-              </p>
-              <a
-                href={outlet.metrics?.jcrQuartile?.officialSourceUrl || "https://journalcitationreports.clarivate.com/"}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center space-x-1 text-indigo-700 hover:underline text-[11px] font-semibold"
-              >
-                <span>Clarivate Journal Citation Reports</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-
-            {/* Scopus CiteScore Percentile */}
-            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-2">
-              <div className="flex items-center justify-between font-bold text-[#102A43]">
-                <span>Scopus CiteScore Percentile</span>
-                {outlet.metrics?.citeScorePercentile?.percentile !== undefined ? (
-                  <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-mono font-bold text-[11px]">
-                    {outlet.metrics.citeScorePercentile.percentile}%ile
-                  </span>
-                ) : (
-                  <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px] uppercase font-bold">
-                    Not Available
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-600">
-                {outlet.metrics?.citeScorePercentile ? (
-                  <>
-                    Rank: {outlet.metrics.citeScorePercentile.rank} | Source Verified:{" "}
-                    {outlet.metrics.citeScorePercentile.retrievalDate}
-                  </>
-                ) : (
-                  "Official CiteScore record not linked. Primary Scopus lookup required."
-                )}
-              </p>
-              <a
-                href={outlet.metrics?.citeScorePercentile?.officialSourceUrl || "https://www.scopus.com/sources"}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center space-x-1 text-indigo-700 hover:underline text-[11px] font-semibold"
-              >
-                <span>Scopus Primary Source Directory</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-
-            {/* Unverified / Aggregated Metrics Notice */}
-            <div className="bg-amber-50/70 p-3.5 rounded-lg border border-amber-200 space-y-1.5">
-              <div className="flex items-center justify-between font-bold text-amber-900">
-                <span>Unverified Third-Party Metrics</span>
-                <span className="bg-amber-200 text-amber-900 px-2 py-0.5 rounded text-[10px] uppercase font-bold">
-                  {outlet.metrics?.unverifiedMetrics?.length ? "Unverified" : "None"}
-                </span>
-              </div>
-              <p className="text-[11px] text-amber-800">
-                {outlet.metrics?.unverifiedMetrics?.[0] ? (
-                  `${outlet.metrics.unverifiedMetrics[0].metricName}: ${outlet.metrics.unverifiedMetrics[0].value}`
-                ) : (
-                  "No unverified metrics recorded. Strict publisher claims only."
-                )}
-              </p>
-              <p className="text-[10px] text-amber-700 italic">
-                Notice: Third-party aggregated indices are kept strictly separate from verified publisher metrics per TehqIQ standards.
-              </p>
-            </div>
+            ) : getOutletMetricRecords(outlet).map((metric) => {
+              const verified = getVerifiedOutletMetrics(outlet).some((item) => item.id === metric.id);
+              return (
+                <div key={metric.id} className={`${verified ? "bg-slate-50 border-slate-200" : "bg-amber-50 border-amber-200"} p-3.5 rounded-lg border space-y-2`}>
+                  <div className="flex items-center justify-between font-bold text-[#102A43]">
+                    <span>{metric.provider}: {metric.metricName}</span>
+                    <span className={`${verified ? "bg-emerald-100 text-emerald-800" : "bg-amber-200 text-amber-900"} px-2 py-0.5 rounded text-[10px] uppercase`}>
+                      {verified ? "Verified" : "Not Verified"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-700">Year: {metric.year || "Not available"} | Category: {metric.subjectCategory || "Not available"}</p>
+                  <p className="font-mono text-[11px]">{metric.quartile ? `Quartile: ${metric.quartile}` : metric.percentile !== undefined ? `Percentile: ${metric.percentile}` : `Value: ${metric.value ?? "Not available"}`}</p>
+                  {metric.sourceUrl?.startsWith("https://") && <a href={metric.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-1 text-indigo-700 hover:underline text-[11px] font-semibold"><span>Provider source</span><ExternalLink className="w-3 h-3" /></a>}
+                </div>
+              );
+            })}
           </div>
 
           {/* Dated Claims Grid */}
@@ -480,15 +456,12 @@ export const ExportCentreView: React.FC<ExportCentreViewProps> = ({
                     <span className="text-[10px] font-mono text-slate-500">{claim.retrievalDate}</span>
                   </div>
                   <p className="font-semibold text-slate-900">{claim.value}</p>
-                  <a
-                    href={claim.officialSourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center space-x-1 text-indigo-600 hover:underline text-[10px] font-mono truncate max-w-full"
-                  >
-                    <span className="truncate">{claim.officialSourceUrl}</span>
-                    <ExternalLink className="w-3 h-3 shrink-0" />
-                  </a>
+                  {claim.officialSourceUrl?.startsWith("https://") ? (
+                    <a href={claim.officialSourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-1 text-indigo-600 hover:underline text-[10px] font-mono truncate max-w-full">
+                      <span className="truncate">{claim.officialSourceUrl}</span><ExternalLink className="w-3 h-3 shrink-0" />
+                    </a>
+                  ) : <span className="text-[10px] text-amber-700">Official source URL: Unavailable</span>}
+                  <span className="text-[10px] text-slate-500 block">{claim.humanConfirmed ? "Human confirmed" : "Unverified"}</span>
                 </div>
               ))}
             </div>
@@ -551,16 +524,12 @@ export const ExportCentreView: React.FC<ExportCentreViewProps> = ({
                     )}
                   </td>
                   <td className="p-3 font-mono text-[11px]">
-                    <a
-                      href={rule.officialSourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-indigo-600 hover:underline flex items-center space-x-1"
-                    >
-                      <span className="truncate max-w-[140px]">{rule.officialSourceUrl}</span>
-                      <ExternalLink className="w-3 h-3 shrink-0" />
-                    </a>
-                    <span className="text-[10px] text-slate-400 block">Verified: {rule.retrievalDate}</span>
+                    {rule.officialSourceUrl?.startsWith("https://") ? (
+                      <a href={rule.officialSourceUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline flex items-center space-x-1">
+                        <span className="truncate max-w-[140px]">{rule.officialSourceUrl}</span><ExternalLink className="w-3 h-3 shrink-0" />
+                      </a>
+                    ) : <span className="text-slate-500">Not applicable / Unverified</span>}
+                    {rule.retrievalDate && <span className="text-[10px] text-slate-400 block">Retrieved: {rule.retrievalDate}</span>}
                   </td>
                 </tr>
               ))}

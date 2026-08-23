@@ -173,6 +173,13 @@ export const PeerReviewView: React.FC<PeerReviewViewProps> = ({
         ...project,
         reviewerComments: updatedComments,
         aiLedger: [...(project.aiLedger || []), newEvent],
+        aiLedgerIntegrity: {
+          status: "Incomplete",
+          assessedAt: new Date().toISOString(),
+          assessedByUid: "tehqiq-system",
+          rationale: "Peer review uses a direct model-call path pending centralized gateway coverage verification.",
+          knownBypassPaths: ["POST /api/gemini/peer-review"],
+        },
       });
     }
   };

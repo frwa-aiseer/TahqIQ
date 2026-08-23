@@ -35,7 +35,7 @@ export const JournalSelectorDropdown: React.FC<JournalSelectorDropdownProps> = (
     setIsOpen(false);
   };
 
-  const currentOutlet = selectedOutlet || BASELINE_JOURNALS[4]; // Default JAB or first journal
+  const currentOutlet = selectedOutlet;
 
   if (variant === "toolbar") {
     return (
@@ -46,10 +46,8 @@ export const JournalSelectorDropdown: React.FC<JournalSelectorDropdownProps> = (
           title="Change Target Journal/Conference & Auto-Adjust Layout"
         >
           <BookOpen className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-          <span className="truncate max-w-[180px] font-bold text-white">{currentOutlet.title}</span>
-          <span className="bg-indigo-950 text-indigo-300 border border-indigo-500/30 text-[9px] px-1.5 py-0.5 rounded font-mono">
-            {currentOutlet.citationStyle}
-          </span>
+          <span className="truncate max-w-[180px] font-bold text-white">{currentOutlet?.title || "Select target outlet"}</span>
+          {currentOutlet && <span className="bg-indigo-950 text-indigo-300 border border-indigo-500/30 text-[9px] px-1.5 py-0.5 rounded font-mono">{currentOutlet.citationStyle}</span>}
         </button>
 
         {isOpen && (
@@ -88,7 +86,7 @@ export const JournalSelectorDropdown: React.FC<JournalSelectorDropdownProps> = (
 
             <div className="overflow-y-auto space-y-1.5 flex-1 pr-1 custom-scrollbar">
               {filteredOutlets.map((o) => {
-                const isSelected = currentOutlet.id === o.id;
+                const isSelected = currentOutlet?.id === o.id;
                 return (
                   <div
                     key={o.id}
@@ -109,8 +107,8 @@ export const JournalSelectorDropdown: React.FC<JournalSelectorDropdownProps> = (
                         <span className="bg-indigo-950 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold">
                           {o.citationStyle}
                         </span>
-                        <span>{o.pageMargins || "1.0 in"} margins</span>
-                        <span>• {o.columnLayout === "double" ? "2-Col" : "1-Col"}</span>
+                        <span>{o.pageMargins ? `${o.pageMargins} margins` : "Margins Unverified"}</span>
+                        <span>• {o.columnLayout ? (o.columnLayout === "double" ? "2-Col" : "1-Col") : "Columns Unverified"}</span>
                       </div>
                     </div>
                   </div>
@@ -130,10 +128,8 @@ export const JournalSelectorDropdown: React.FC<JournalSelectorDropdownProps> = (
         className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 px-3 py-1.5 rounded-2xl text-xs font-semibold flex items-center space-x-2 transition shadow-sm"
       >
         <BookOpen className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-        <span className="max-w-[140px] truncate text-white font-bold">{currentOutlet.title}</span>
-        <span className="bg-indigo-500/20 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
-          {currentOutlet.citationStyle}
-        </span>
+        <span className="max-w-[140px] truncate text-white font-bold">{currentOutlet?.title || "Select target outlet"}</span>
+        {currentOutlet && <span className="bg-indigo-500/20 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">{currentOutlet.citationStyle}</span>}
       </button>
 
       {isOpen && (
@@ -144,7 +140,7 @@ export const JournalSelectorDropdown: React.FC<JournalSelectorDropdownProps> = (
                 <Sparkles className="w-4 h-4 text-amber-400" />
                 <span>Journal / Conference Database</span>
               </h4>
-              <p className="text-[10px] text-zinc-400">Auto-adjusts document margins, layout, & references</p>
+              <p className="text-[10px] text-zinc-400">Applies only separately verified outlet requirements</p>
             </div>
           </div>
 
@@ -174,7 +170,7 @@ export const JournalSelectorDropdown: React.FC<JournalSelectorDropdownProps> = (
 
           <div className="overflow-y-auto space-y-2 flex-1 pr-1 custom-scrollbar">
             {filteredOutlets.map((o) => {
-              const isSelected = currentOutlet.id === o.id;
+              const isSelected = currentOutlet?.id === o.id;
               return (
                 <div
                   key={o.id}

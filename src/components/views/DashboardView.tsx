@@ -263,7 +263,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <span className="text-[11px] text-zinc-400 font-medium block">Target Journal Fit</span>
           <div className="text-2xl font-bold font-mono text-white mt-1">
-            {project.selectedTargetOutlet?.fitScore || 92}%
+            {project.selectedTargetOutlet?.fitScore !== undefined ? `${project.selectedTargetOutlet.fitScore}%` : "Not available"}
           </div>
           <p className="text-[10px] text-indigo-400 font-medium mt-1 truncate">
             {project.selectedTargetOutlet?.title || "Journal Fit"}

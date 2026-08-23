@@ -86,6 +86,18 @@ All observed model calls are server-side in `server.ts`, but they are separate d
 
 Client callers are `ResearchCanvasView`, `WritingStudioView`, `ProtocolBuilderView`, and `PeerReviewView` (the latter is currently unreachable). No source evidence of a centralized AI gateway, model router, budget enforcement, retry policy, privacy router, or complete automatic AI-ledger write path was found.
 
+TQ-VSC-007 records the current ledger coverage gap precisely: `/api/gemini/agent` and `/api/gemini/methodology-proposal` create no `AiLedgerEvent`; `/api/gemini/draft-section` is logged only after a later researcher decision; `/api/gemini/peer-review` is logged only after comment disposition. All four remain direct SDK paths pending later gateway centralization. Project `aiLedgerIntegrity` therefore defaults to Unknown, and known direct paths mark it Incomplete where the current component can persist project state.
+
+TQ-VSC-008 restricts the outlet catalogue to identity-level verification. Static seeds retain only allowlisted identity fields plus official-page retrieval provenance; legacy unsourced requirements, indexing, OA, policy, formatting, fees, acceptance, deadlines, fit, and metrics are not exposed as verified. Live records require provider raw-record provenance, arbitrary static-factory inputs downgrade to user-added Unverified, and unverified outlets cannot drive compliance.
+
+TQ-VSC-009 models outlet metrics as independent provider/year/category records rather than timeless journal properties. Verified selection requires complete provenance and official provider-domain alignment; multiple category quartiles coexist, third-party records cannot use JCR/Scopus branding, and missing or legacy singleton metrics surface as Not Verified.
+
+TQ-VSC-010 models all journal and conference requirements as independently versioned field records with provenance, confidence, human-confirmation state, and history. The Export Centre exposes Verified, AI Extracted—Needs Review, Unverified, and Unavailable states for every required field. Only valid field-level Verified records can drive outlet-specific compliance; identity URLs and legacy top-level values are never substituted as requirement evidence.
+
+TQ-VSC-011 removes the built-in Firebase project configuration. Firebase Web client identifiers now come exclusively from six validated `VITE_FIREBASE_*` values; missing, placeholder, malformed, or initialization-failed configuration produces an explicit Not Configured runtime with cloud authentication and persistence disabled. The example environment file contains blank public-client placeholders and no Admin/service-account secrets.
+
+TQ-VSC-012 applies least-privilege Firestore rules verified against the real local emulator. Private user profiles are owner-only, project reads require ownership or explicit membership, Viewer/Reviewer writes are denied, non-owner writers cannot modify protected ownership or membership fields, and only `ownerUid` has ownership authority. Version snapshots and audit events are immutable after creation, file actor fields are constrained, and cross-project isolation is enforced.
+
 ## Firebase, authentication, Firestore, and Storage
 
 ### Client initialization and auth
@@ -127,6 +139,7 @@ Client callers are `ResearchCanvasView`, `WritingStudioView`, `ProtocolBuilderVi
 - `src/lib/writingEvidence.ts` is the Writing Studio insertion policy boundary: literature requires researcher-reviewed passage/claim evidence with verified source provenance, while statistics require exact `Approved for Manuscript` state and are revalidated at insertion time.
 - `src/lib/aiValidationService.ts` now grounds empirical numbers by exact, Verified `NumericEvidence` provenance rather than value allowlists. It context-classifies bibliographic citations and labeled structural numbering and exposes validation for prose, tables, captions, and supplements.
 - Completed, hash-linked Data Lab runs deterministically create `NumericEvidence` records from stored numeric output fields through `src/lib/numericEvidence.ts`; failed or hashless runs create none.
+- Analysis completion is separate from manuscript approval. `src/lib/analysisLifecycle.ts` requires Completed → QC Passed → Researcher Reviewed → Approved for Manuscript, with an attributable human approval record matching the output, dataset hash, and plan ID. Results drafting, insertion, compliance, and figure/table export use this common gate.
 - `src/lib/complianceEngine.ts` calculates outlet rules and export gates.
 
 Client-side guards and Firestore rules are not substitutes for authentication and RBAC on the Express API routes.

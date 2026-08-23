@@ -1,17 +1,18 @@
 import React, { useState } from "react";
-import { AiLedgerEvent } from "../../types";
+import { AiLedgerEvent, AiLedgerIntegrity } from "../../types";
 import { ShieldCheck, Copy, Sparkles, Check, Database, Lock } from "lucide-react";
 import { generateLedgerDisclosureStatement } from "../../lib/aiValidationService";
 
 interface AiLedgerViewProps {
   ledgerEvents: AiLedgerEvent[];
   projectTitle?: string;
+  integrity?: AiLedgerIntegrity;
 }
 
-export const AiLedgerView: React.FC<AiLedgerViewProps> = ({ ledgerEvents, projectTitle = "Scholarly Investigation" }) => {
+export const AiLedgerView: React.FC<AiLedgerViewProps> = ({ ledgerEvents, projectTitle = "Scholarly Investigation", integrity }) => {
   const [copied, setCopied] = useState(false);
 
-  const disclosureStatement = generateLedgerDisclosureStatement(ledgerEvents, projectTitle);
+  const disclosureStatement = generateLedgerDisclosureStatement(ledgerEvents, projectTitle, integrity);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(disclosureStatement);
@@ -32,13 +33,13 @@ export const AiLedgerView: React.FC<AiLedgerViewProps> = ({ ledgerEvents, projec
             AI Assistance Audit Ledger & Journal Disclosure Generator
           </h2>
           <p className="text-xs text-zinc-400 mt-1">
-            Every material AI action (prompt version, model, source IDs, user, timestamp, disposition) is immutably logged.
+            Recorded AI actions include prompt version, model, sources, user, timestamp, and disposition. Completeness is shown separately.
           </p>
         </div>
 
         <div className="flex items-center space-x-2 bg-zinc-950 p-2.5 rounded-2xl border border-zinc-800 text-xs font-mono text-amber-400">
           <Lock className="w-4 h-4 text-emerald-400" />
-          <span>Append-Only Immutable Ledger</span>
+          <span>Integrity: {integrity?.status || "Unknown"}</span>
         </div>
       </div>
 
@@ -64,7 +65,7 @@ export const AiLedgerView: React.FC<AiLedgerViewProps> = ({ ledgerEvents, projec
         </div>
 
         <div className="text-[11px] text-zinc-400 flex items-center justify-between">
-          <span>Compliant with ICMJE, Nature, Elsevier, Springer &amp; IEEE journal AI disclosure policies.</span>
+          <span>Researcher verification is required against the selected outlet policy before submission.</span>
           <span className="font-mono text-indigo-400 font-bold">Matching Events: {ledgerEvents.length}</span>
         </div>
       </div>
@@ -81,7 +82,7 @@ export const AiLedgerView: React.FC<AiLedgerViewProps> = ({ ledgerEvents, projec
 
         {ledgerEvents.length === 0 ? (
           <div className="p-8 text-center text-zinc-500 text-xs">
-            No material AI actions logged yet. Perform section drafting, peer review, or canvas suggestions to populate the ledger.
+            No AI actions are recorded. History is Unknown/Incomplete unless an attributable researcher assessment establishes otherwise.
           </div>
         ) : (
           <div className="overflow-x-auto">

@@ -1,5 +1,5 @@
-import { storage, db } from "./firebase";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { firebaseStatus, getFirebaseServices } from "./firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, setDoc } from "firebase/firestore";
 
 export interface UploadedFileMeta {
@@ -20,9 +20,13 @@ export async function uploadProjectFile(
 ): Promise<UploadedFileMeta> {
   const fileId = `file-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
   const storagePath = `projects/${projectId}/files/${fileId}_${file.name}`;
-  const storageRef = ref(storage, storagePath);
+  if (firebaseStatus === "Not Configured") {
+    throw new Error("Firebase Not Configured: cloud file upload is unavailable.");
+  }
 
   try {
+    const { storage, db } = getFirebaseServices();
+    const storageRef = ref(storage, storagePath);
     const snapshot = await uploadBytes(storageRef, file);
     const downloadUrl = await getDownloadURL(snapshot.ref);
 
@@ -71,4 +75,3 @@ export function loadProjectFromLocalStorage(projectId: string): any | null {
   }
   return null;
 }
-

@@ -924,7 +924,7 @@ export function generateAnalysisFiguresAndTables(
       ],
       xAxisLabel: "Experimental Condition",
       yAxisLabel: "Outcome Measure Score",
-      isApproved: true,
+      isApproved: false,
     },
     {
       id: `fig-box-${output.id}`,
@@ -937,7 +937,7 @@ export function generateAnalysisFiguresAndTables(
       ],
       xAxisLabel: "Paired Differences (Condition B - Condition A)",
       yAxisLabel: "Difference Score",
-      isApproved: true,
+      isApproved: false,
     },
   ];
 
@@ -962,7 +962,7 @@ export function generateAnalysisFiguresAndTables(
       ],
       footnotes: `Note: Computed from dataset '${dataset.filename}' (SHA-256: ${dataset.fileHash}). Carryover assessment limitation applies.`,
       analysisRunId: output.id,
-      isApproved: true,
+      isApproved: false,
     },
   ];
 
