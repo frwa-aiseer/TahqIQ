@@ -44,6 +44,11 @@ service cloud.firestore {
         request.resource.data.organizationId == resource.data.organizationId;
     }
 
+    function trustedTransitionFieldsUnchanged() {
+      return request.resource.data.get('trustedTransitionIntegrity', null) == resource.data.get('trustedTransitionIntegrity', null) &&
+        request.resource.data.get('submissionState', 'Draft') == resource.data.get('submissionState', 'Draft');
+    }
+
     match /users/{userId} {
       allow read, create, update, delete: if isSignedIn() && request.auth.uid == userId;
     }
@@ -58,6 +63,7 @@ service cloud.firestore {
       allow update: if canWriteProject(resource.data) &&
         request.resource.data.ownerUid == resource.data.ownerUid &&
         hasValidOwnerMembership(request.resource.data) &&
+        trustedTransitionFieldsUnchanged() &&
         (isOwner(resource.data) || protectedMembershipFieldsUnchanged());
       
       allow delete: if isSignedIn() && isOwner(resource.data);
@@ -73,6 +79,12 @@ service cloud.firestore {
         allow read: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data);
         // High-integrity history is written only by the trusted Admin SDK path,
         // which bypasses client rules after verifying actor, membership and role.
+        allow create, update, delete: if false;
+      }
+
+      match /stateTransitions/{transitionId} {
+        allow read: if isMember(get(/databases/$(database)/documents/projects/$(projectId)).data);
+        // Immutable records are created only by the authenticated Admin SDK transition service.
         allow create, update, delete: if false;
       }
       

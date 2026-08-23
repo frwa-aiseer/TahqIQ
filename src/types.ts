@@ -314,7 +314,7 @@ export type SectionState =
 
 export interface StateTransitionRecord {
   id: string;
-  entityType: "Source" | "Claim" | "Dataset" | "Analysis" | "ManuscriptSection";
+  entityType: "Source" | "Claim" | "Dataset" | "Analysis" | "ManuscriptSection" | "Ethics" | "Author" | "Submission";
   entityId: string;
   fromState: string;
   toState: string;
@@ -323,6 +323,38 @@ export interface StateTransitionRecord {
   timestamp: string;
   reason: string;
   evidenceRecordIds?: string[];
+  projectId?: string;
+  trustedServerCreated?: true;
+  immutable?: true;
+  beforeHash?: string;
+  afterHash?: string;
+}
+
+export type SensitiveTransitionType =
+  | "SOURCE_VERIFIED"
+  | "CLAIM_VERIFIED"
+  | "DATASET_APPROVED"
+  | "ANALYSIS_APPROVED_FOR_MANUSCRIPT"
+  | "MANUSCRIPT_LOCKED"
+  | "ETHICS_APPROVED"
+  | "AUTHOR_SIGNED_OFF"
+  | "SUBMISSION_READY";
+
+export interface TrustedStateTransitionRecord extends StateTransitionRecord {
+  projectId: string;
+  transitionType: SensitiveTransitionType;
+  trustedServerCreated: true;
+  immutable: true;
+  beforeHash: string;
+  afterHash: string;
+}
+
+export interface TrustedTransitionIntegrity {
+  revision: number;
+  digest: string;
+  lastTransitionId: string;
+  updatedAt: string;
+  trustedServerCreated: true;
 }
 
 export interface FieldProvenance {
@@ -336,6 +368,64 @@ export interface ProvenanceMetadata {
   retrievedAt: string;
   fieldProvenance?: Record<string, FieldProvenance>;
   disclaimer?: string;
+}
+
+export type ResearchArtifactType =
+  | "Uploaded Document"
+  | "Source"
+  | "Evidence"
+  | "Protocol"
+  | "Dataset"
+  | "Analysis Plan"
+  | "Analysis Output"
+  | "Table"
+  | "Figure"
+  | "Manuscript Section"
+  | "Review"
+  | "Export";
+
+export type ArtifactVerificationState =
+  | "Unverified"
+  | "Verified"
+  | "Needs Review"
+  | "Not Applicable"
+  | "Rejected";
+
+export type ArtifactApprovalState =
+  | "Not Approved"
+  | "Pending Review"
+  | "Approved"
+  | "Rejected"
+  | "Not Applicable";
+
+export interface ResearchArtifactProvenance {
+  origin: "Researcher Upload" | "Researcher Entry" | "Imported Source" | "Analysis Engine" | "AI Proposal" | "Legacy Project Adapter";
+  provider?: string;
+  recordedAt: string;
+  actorUid?: string;
+  legacyCollection?: string;
+  legacyRecordId?: string;
+  notes?: string;
+}
+
+/** Canonical provenance envelope. Legacy domain records remain intact and are adapted into this shape. */
+export interface ResearchArtifact {
+  id: string;
+  projectId: string;
+  artifactType: ResearchArtifactType;
+  title: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  sourceArtifactIds: string[];
+  provenance: ResearchArtifactProvenance;
+  verificationState: ArtifactVerificationState;
+  approvalState: ArtifactApprovalState;
+  version: number;
+  contentHash?: string;
+  isDemo: boolean;
+  isSynthetic: boolean;
+  locked: boolean;
 }
 
 export interface SourceRecord {
@@ -355,6 +445,8 @@ export interface SourceRecord {
   url?: string;
   abstract?: string;
   fullTextContent?: string; // Actual uploaded or retrieved content ONLY
+  documentVersion?: string;
+  documentHash?: string;
   keywords?: string[];
   documentType: string;
   studyDesign?: string;
@@ -387,6 +479,68 @@ export interface ExtractedPassage {
   isVerifiedByHuman: boolean;
 }
 
+export type EvidenceExtractionMethod = "Researcher Selected" | "AI Extracted" | "Imported" | "OCR";
+export type EvidenceVerificationState = "Needs Review" | "Researcher Verified" | "Rejected";
+
+export interface EvidenceResearcherReview {
+  status: "Pending" | "Verified" | "Rejected";
+  reviewedBy?: string;
+  reviewedAt?: string;
+  notes?: string;
+}
+
+/** Passage-level evidence, distinct from bibliographic SourceRecord metadata. */
+export interface EvidenceRecord {
+  evidenceId: string;
+  sourceId: string;
+  documentVersion: string;
+  documentHash: string;
+  exactPassage: string;
+  page?: string;
+  section?: string;
+  paragraphOrChunkRef?: string;
+  extractionMethod: EvidenceExtractionMethod;
+  extractedBy: string;
+  confidence: number;
+  verification: EvidenceVerificationState;
+  researcherReview: EvidenceResearcherReview;
+  linkedClaimIds: string[];
+  createdAt: string;
+  updatedAt: string;
+  isDemo?: boolean;
+  isSynthetic?: boolean;
+}
+
+export type ClaimEvidenceRelationship = "Supports" | "Partially Supports" | "Contextual" | "Contradicts";
+
+export interface ClaimEvidenceLink {
+  id: string;
+  claimId: string;
+  evidenceId: string;
+  relationship: ClaimEvidenceRelationship;
+  confidence: number;
+  verificationState: "Unverified" | "Verified" | "Rejected";
+  approvalState: "Pending Review" | "Approved" | "Rejected";
+  manuscriptSentenceIds: string[];
+  createdBy: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewRationale?: string;
+  createdAt: string;
+  updatedAt: string;
+  isDemo?: boolean;
+  isSynthetic?: boolean;
+}
+
+export interface ManuscriptSentenceClaimLink {
+  sentenceId: string;
+  sectionId: string;
+  exactSentence: string;
+  claimId: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export type ClaimType =
   | "Background fact"
   | "Theoretical claim"
@@ -412,6 +566,8 @@ export interface LinkedEvidenceItem {
   notes?: string;
   createdAt: string;
   relationship?: EvidenceRelationship;
+  /** Canonical passage-level record link. Legacy inline evidence remains readable. */
+  evidenceRecordId?: string;
 }
 
 export interface ClaimItem {
@@ -983,12 +1139,16 @@ export interface ProjectState {
     consentObtained: boolean;
     trialRegistrationNumber?: string;
     notes?: string;
+    approvalState?: "Not Required" | "Pending" | "Approved" | "Rejected";
   };
   methodologyWorkspace?: MethodologyWorkspace;
   datasets: DatasetRecord[];
   analysisPlans: AnalysisPlan[];
   analysisOutputs: AnalysisOutput[];
   numericEvidenceRecords?: NumericEvidence[];
+  evidenceRecords?: EvidenceRecord[];
+  claimEvidenceLinks?: ClaimEvidenceLink[];
+  manuscriptSentenceClaimLinks?: ManuscriptSentenceClaimLink[];
   figures: GeneratedFigure[];
   tables: GeneratedTable[];
   sections: ManuscriptSection[];
@@ -999,6 +1159,10 @@ export interface ProjectState {
   aiLedger: AiLedgerEvent[];
   aiLedgerIntegrity?: AiLedgerIntegrity;
   exportHistory?: ExportJobRecord[];
+  /** Canonical projection populated by backward-compatible artifact adapters. */
+  researchArtifacts?: ResearchArtifact[];
+  submissionState?: "Draft" | "Submission Ready";
+  trustedTransitionIntegrity?: TrustedTransitionIntegrity;
   pipelineStages: PipelineStage[];
   readinessScore: {
     overall: number; // 0 to 100

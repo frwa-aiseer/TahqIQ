@@ -1,4 +1,5 @@
 import { ProjectState } from "../types";
+import { hydrateProjectResearchArtifacts } from "../lib/researchArtifacts";
 
 export function createEmptyPipelineStages() {
   return [
@@ -140,7 +141,7 @@ export function createDemoProject(): ProjectState {
   demoState.tables = demoState.tables.map(t => ({ ...t, isDemo: true, isSynthetic: true }));
   demoState.sections = demoState.sections.map(s => ({ ...s, isDemo: true, isSynthetic: true }));
 
-  return demoState;
+  return hydrateProjectResearchArtifacts(demoState);
 }
 
 export const DEMO_PROJECT_STATE: ProjectState = {

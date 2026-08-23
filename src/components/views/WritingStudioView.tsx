@@ -6,6 +6,7 @@ import { AiProposalModal } from "../AiProposalModal";
 import { validateAiGeneratedProse, AIValidationResult, isAnalysisOutputApproved } from "../../lib/aiValidationService";
 import { useAuth } from "../../context/AuthContext";
 import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
+import { requestTrustedTransition } from "../../lib/trustedTransitionsClient";
 import { formatInTextCitation, formatBibliographyEntry, CSL_STYLES } from "../../lib/cslStyles";
 import { applyToneAndComplexity } from "../../lib/manuscriptTone";
 import {
@@ -114,12 +115,21 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
     }
   };
 
-  const executeSectionTransition = (
+  const executeSectionTransition = async (
     sec: ManuscriptSection,
     targetState: SectionState,
     reason: string,
     evidenceRecordIds: string[]
   ) => {
+    if (targetState === "Locked") {
+      if (!onUpdateProject) return;
+      try {
+        const result = await requestTrustedTransition({ projectId: project.id, transitionType: "MANUSCRIPT_LOCKED", entityId: sec.id, rationale: reason, evidenceIds: evidenceRecordIds, expectedRevision: project.trustedTransitionIntegrity?.revision || 0 });
+        onUpdateProject(result.project);
+      } catch (error) { alert(error instanceof Error ? error.message : "Trusted manuscript lock failed."); }
+      return;
+    }
+
     const actor = {
       uid: user?.uid || "user-local",
       email: user?.email || "researcher@local",

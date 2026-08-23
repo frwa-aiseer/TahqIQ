@@ -18,6 +18,7 @@ import { hasAttributableManuscriptApproval, transitionAnalysisOutput } from "../
 import { ApprovalModal } from "../ApprovalModal";
 import { useAuth } from "../../context/AuthContext";
 import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
+import { requestTrustedTransition } from "../../lib/trustedTransitionsClient";
 import {
   FileSpreadsheet,
   Play,
@@ -213,13 +214,22 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
     }
   };
 
-  const executeDatasetTransition = (
+  const executeDatasetTransition = async (
     ds: DatasetRecord,
     targetState: DatasetState,
     reason: string,
     evidenceRecordIds: string[]
   ) => {
     if (!project || !onUpdateProject) return;
+
+    if (targetState === "Approved for Analysis" || targetState === "Locked") {
+      try {
+        const result = await requestTrustedTransition({ projectId: project.id, transitionType: "DATASET_APPROVED", entityId: ds.id, rationale: reason, evidenceIds: evidenceRecordIds, expectedRevision: project.trustedTransitionIntegrity?.revision || 0 });
+        onUpdateProject(result.project);
+        setParsedMessage(`Dataset '${ds.filename}' state transitioned to '${result.project.datasets.find((item) => item.id === ds.id)?.state}'.`);
+      } catch (error) { alert(error instanceof Error ? error.message : "Trusted dataset transition failed."); }
+      return;
+    }
 
     const actor = {
       uid: user?.uid || "user-local",
@@ -239,7 +249,7 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
     }
   };
 
-  const persistAnalysisTransition = (
+  const persistAnalysisTransition = async (
     output: AnalysisOutput,
     targetState: AnalysisState,
     rationale: string,
@@ -248,6 +258,16 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
     if (!project || !onUpdateProject) return;
     if (actorType === "human" && (!user?.uid || !user.email)) {
       throw new Error("An authenticated researcher is required for review and manuscript approval.");
+    }
+    if (targetState === "Approved for Manuscript") {
+      try {
+        const result = await requestTrustedTransition({ projectId: project.id, transitionType: "ANALYSIS_APPROVED_FOR_MANUSCRIPT", entityId: output.id, rationale, evidenceIds: [output.datasetHash, output.planId || output.analysisPlanId].filter((id): id is string => Boolean(id)), expectedRevision: project.trustedTransitionIntegrity?.revision || 0 });
+        onUpdateProject(result.project);
+        const trustedOutput = result.project.analysisOutputs.find((item) => item.id === output.id);
+        if (trustedOutput) setLatestOutput(trustedOutput);
+        setParsedMessage(`Analysis output '${output.id}' transitioned to 'Approved for Manuscript'.`);
+      } catch (error) { alert(error instanceof Error ? error.message : "Trusted analysis approval failed."); }
+      return;
     }
     const actor = actorType === "human"
       ? { uid: user!.uid, email: user!.email! }

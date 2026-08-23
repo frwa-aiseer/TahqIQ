@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { SourceRecord, SourceState, FieldProvenance } from "../../types";
+import { ProjectState, SourceRecord, SourceState, FieldProvenance } from "../../types";
 import { performStateTransition, SOURCE_TRANSITIONS } from "../../lib/stateMachines";
 import { useAuth } from "../../context/AuthContext";
 import { parseBibTeX, parseRIS, parseCSLJSON } from "../../lib/referenceParsers";
@@ -21,6 +21,7 @@ import {
   Database
 } from "lucide-react";
 import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
+import { requestTrustedTransition } from "../../lib/trustedTransitionsClient";
 
 interface SourceLibraryViewProps {
   sources: SourceRecord[];
@@ -28,6 +29,8 @@ interface SourceLibraryViewProps {
   onOpenReaderModal: (source: SourceRecord) => void;
   onUpdateSource?: (source: SourceRecord) => void;
   projectId?: string;
+  trustedTransitionRevision?: number;
+  onTrustedProjectUpdate?: (project: ProjectState) => void;
 }
 
 export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
@@ -36,6 +39,8 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
   onOpenReaderModal,
   onUpdateSource,
   projectId,
+  trustedTransitionRevision = 0,
+  onTrustedProjectUpdate,
 }) => {
   const { user } = useAuth();
   const [doiInput, setDoiInput] = useState("");
@@ -200,7 +205,7 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
     setShowCandidateSearchModal(false);
   };
 
-  const handleTransitionState = (source: SourceRecord, targetState: SourceState) => {
+  const handleTransitionState = async (source: SourceRecord, targetState: SourceState) => {
     if (!onUpdateSource) return;
 
     const actor = {
@@ -210,6 +215,18 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
 
     const reason = `Transitioned source state to ${targetState}`;
     const evidenceRecordIds = source.doi ? [`doi:${source.doi}`] : [];
+
+    if (targetState === "Metadata Verified") {
+      if (!projectId) return alert("A persisted project is required for trusted source verification.");
+      try {
+        const result = await requestTrustedTransition({ projectId, transitionType: "SOURCE_VERIFIED", entityId: source.id, rationale: reason, evidenceIds: evidenceRecordIds, expectedRevision: trustedTransitionRevision });
+        const updated = result.project.sources.find((item) => item.id === source.id);
+        if (onTrustedProjectUpdate) onTrustedProjectUpdate(result.project);
+        else if (updated) onUpdateSource(updated);
+        setNotice(`Source '${source.title.substring(0, 30)}...' verified by the trusted transition service.`);
+      } catch (error) { alert(error instanceof Error ? error.message : "Trusted source verification failed."); }
+      return;
+    }
 
     const result = performStateTransition("Source", source, targetState, actor, reason, evidenceRecordIds);
 

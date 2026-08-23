@@ -104,6 +104,14 @@ TQ-VSC-016 adds a shared Firebase Admin authorization boundary to every sensitiv
 
 TQ-VSC-017 adds deterministic runtime contracts in `src/server/apiSchemas.ts` for agent, section-drafting, peer-review, methodology, DOI, and analysis requests. Structured AI outputs are JSON-parsed and then validated for exact fields, types, bounds, finite numbers, and required arrays/objects before any success response. Missing methodology fields are no longer filled after the model call. The generic agent now uses an SDK response schema and returns a validated structured `result`; malformed AI JSON returns a 502 validation failure. External analysis-service success payloads are also validated before they can be returned, otherwise execution falls back to the typed native engine.
 
+TQ-VSC-018 introduces the universal `ResearchArtifact` provenance envelope and a non-destructive adapter layer. Uploaded documents, sources, numeric evidence, methodology protocols, datasets, analysis plans and outputs, tables, figures, manuscript sections, reviews, and exports now have a common metadata representation with provenance, verification/approval, version, source links, checksums where available, demo/synthetic flags, and locking. Firestore/local reads and create/save paths hydrate the projection while legacy collections remain authoritative. Missing legacy creator or timestamp facts stay explicitly `Not available`.
+
+TQ-VSC-019 adds passage-level `EvidenceRecord` objects separate from `SourceRecord` metadata. Each record requires exact passage text and a concrete page, section, or paragraph/chunk coordinate, carries document version/hash state, extraction actor/method/confidence, linked claims, timestamps, and human-review disposition. AI extraction starts Needs Review. The claim linker no longer falls back to abstracts or placeholder evidence, and the document reader displays provenance plus attributable researcher review controls. Traceable legacy passages adapt non-destructively; unlocated legacy text is not promoted.
+
+TQ-VSC-020 upgrades claims and evidence into a many-to-many graph. Explicit edges record supporting, partial, contextual, or contradictory relationships, confidence, independent verification/approval, sentence IDs, and attributable review. Integrity checks detect orphans, duplicates, invalid confidence, broken sentence links, reciprocal-backlink failures, and demo contamination. Claim Matrix supports deliberate creation or reuse of passage evidence, relationship review, and “Why is this sentence supported?” traversal through claim, evidence, source, and exact location. Legacy inline links adapt as pending rather than verified.
+
+TQ-VSC-021 moves eight privileged state changes to a Firebase Admin transaction service. Source/claim verification, dataset approval/lock, analysis manuscript approval, manuscript lock, ethics approval, author sign-off, and Submission Ready now produce immutable server-created transition records with actor, rationale, evidence IDs, before/after SHA-256 hashes, and optimistic revision control. Firestore denies client transition-history writes and direct changes to integrity/submission controls. Once a baseline exists, direct privileged changes or locked-content rewrites produce a digest mismatch and block further trusted transitions. Legacy projects establish their baseline on first trusted use; earlier history is not retrospectively attested.
+
 ## Firebase, authentication, Firestore, and Storage
 
 ### Client initialization and auth
@@ -207,7 +215,7 @@ The Firestore rule tests inspect rule source and simulate helper behavior; no Fi
 
 These are source observations, not work completed under later prompts:
 
-1. Four direct Gemini integrations are not centralized; the generic agent response is unstructured at the application boundary.
+1. Four direct Gemini integrations are not centralized; TQ-VSC-017 validates their structured server responses, but no universal model gateway exists.
 2. Some deeply nested research entity fields are validated at their server-use boundary rather than exhaustively re-declaring the full persisted project schema; schema versioning remains a future compatibility consideration.
 3. Several implemented views are unreachable, while legacy route labels misleadingly land on other step content.
 4. Step 9 is labeled References but renders Claim Matrix rather than a dedicated reference-list view.
@@ -220,7 +228,7 @@ These are source observations, not work completed under later prompts:
 
 ## Data migration and backward compatibility
 
-TQ-VSC-000 introduces documentation only. It does not alter `ProjectState`, Firestore documents, browser storage keys, lifecycle states, API payloads, or persisted data. No migration is required.
+TQ-VSC-018 adds an optional canonical artifact projection without rewriting legacy domain collections. Existing project documents remain loadable; adapters populate the projection at read/create/save boundaries and retain explicit missing metadata states.
 
 ## Release state
 

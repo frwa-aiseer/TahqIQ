@@ -1,16 +1,23 @@
 import React, { useEffect } from "react";
-import { SourceRecord, FieldProvenance } from "../../types";
+import { SourceRecord, FieldProvenance, EvidenceRecord } from "../../types";
 import { X, CheckCircle2, FileText, Info } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { reviewEvidenceRecord } from "../../lib/evidenceRecords";
 
 interface DocumentReaderModalProps {
   source: SourceRecord | null;
+  evidenceRecords?: EvidenceRecord[];
+  onUpdateEvidenceRecord?: (record: EvidenceRecord) => void;
   onClose: () => void;
 }
 
 export const DocumentReaderModal: React.FC<DocumentReaderModalProps> = ({
   source,
+  evidenceRecords = [],
+  onUpdateEvidenceRecord,
   onClose,
 }) => {
+  const { user } = useAuth();
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && source) {
@@ -25,7 +32,7 @@ export const DocumentReaderModal: React.FC<DocumentReaderModalProps> = ({
 
   const hasFullText = Boolean(source.fullTextContent && source.fullTextContent.trim());
   const hasAbstract = Boolean(source.abstract && source.abstract.trim());
-  const hasPassages = Boolean(source.extractedPassages && source.extractedPassages.length > 0);
+  const hasPassages = evidenceRecords.length > 0;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -119,21 +126,65 @@ export const DocumentReaderModal: React.FC<DocumentReaderModalProps> = ({
           {/* Right Panel: Structured Extraction Fields */}
           <div className="p-6 overflow-y-auto bg-zinc-900 space-y-4">
             <h4 className="font-bold text-sm text-white border-b border-zinc-800 pb-3 flex items-center justify-between">
-              <span>Verified Evidence Passages</span>
+              <span>Passage Evidence & Provenance</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             </h4>
 
             {hasPassages ? (
               <div className="space-y-3 text-xs">
-                {source.extractedPassages?.map((p, idx) => (
-                  <div key={p.id || idx} className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800 space-y-1.5">
+                {evidenceRecords.map((record) => (
+                  <div key={record.evidenceId} className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] bg-indigo-500/10 text-indigo-400 font-bold px-2 py-0.5 rounded border border-indigo-500/20 uppercase tracking-wider">
-                        {p.category}
+                        {record.verification}
                       </span>
-                      {p.pageNumber && <span className="text-[10px] text-zinc-400">Page {p.pageNumber}</span>}
+                      <span className="text-[10px] text-zinc-400">
+                        {[record.page ? `Page ${record.page}` : "", record.section, record.paragraphOrChunkRef].filter(Boolean).join(" · ")}
+                      </span>
                     </div>
-                    <p className="font-mono text-zinc-200 text-xs italic">"{p.text}"</p>
+                    <p className="font-mono text-zinc-200 text-xs italic">"{record.exactPassage}"</p>
+                    <div className="grid grid-cols-2 gap-1 text-[10px] text-zinc-500 border-t border-zinc-800 pt-2">
+                      <span>Evidence ID: {record.evidenceId}</span>
+                      <span>Extraction: {record.extractionMethod}</span>
+                      <span>Document version: {record.documentVersion}</span>
+                      <span>Document hash: {record.documentHash}</span>
+                      <span>Extracted by: {record.extractedBy}</span>
+                      <span>Confidence: {Math.round(record.confidence * 100)}%</span>
+                    </div>
+                    {record.verification === "Needs Review" && onUpdateEvidenceRecord && (
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const notes = window.prompt("Record researcher verification notes:");
+                            if (!notes) return;
+                            try {
+                              onUpdateEvidenceRecord?.(reviewEvidenceRecord(record, "Verified", user?.uid || "", notes));
+                            } catch (error) {
+                              window.alert(error instanceof Error ? error.message : "Evidence review failed.");
+                            }
+                          }}
+                          className="text-[10px] font-semibold px-2 py-1 rounded bg-emerald-700 text-white"
+                        >
+                          Researcher Verify
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const notes = window.prompt("Record rejection rationale:");
+                            if (!notes) return;
+                            try {
+                              onUpdateEvidenceRecord?.(reviewEvidenceRecord(record, "Rejected", user?.uid || "", notes));
+                            } catch (error) {
+                              window.alert(error instanceof Error ? error.message : "Evidence review failed.");
+                            }
+                          }}
+                          className="text-[10px] font-semibold px-2 py-1 rounded bg-rose-800 text-white"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

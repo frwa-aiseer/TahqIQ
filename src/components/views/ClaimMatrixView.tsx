@@ -1,5 +1,8 @@
 import React, { useState } from "react";
-import { ClaimItem, SourceRecord, ClaimState, LinkedEvidenceItem } from "../../types";
+import { ClaimItem, SourceRecord, ClaimState, LinkedEvidenceItem, EvidenceRecord, ClaimEvidenceLink, ClaimEvidenceRelationship, ManuscriptSentenceClaimLink, ProjectState } from "../../types";
+import { createEvidenceRecord } from "../../lib/evidenceRecords";
+import { createClaimEvidenceLink, reviewClaimEvidenceLink, upsertClaimEvidenceLink } from "../../lib/claimEvidenceGraph";
+import { requestTrustedTransition } from "../../lib/trustedTransitionsClient";
 import { performStateTransition, CLAIM_TRANSITIONS } from "../../lib/stateMachines";
 import { ApprovalModal } from "../ApprovalModal";
 import { useAuth } from "../../context/AuthContext";
@@ -19,13 +22,29 @@ import {
 interface ClaimMatrixViewProps {
   claims: ClaimItem[];
   sources: SourceRecord[];
+  evidenceRecords: EvidenceRecord[];
+  claimEvidenceLinks: ClaimEvidenceLink[];
+  manuscriptSentenceClaimLinks: ManuscriptSentenceClaimLink[];
   onUpdateClaims: (claims: ClaimItem[]) => void;
+  onUpdateEvidenceRecords: (evidenceRecords: EvidenceRecord[]) => void;
+  onUpdateClaimEvidenceLinks: (links: ClaimEvidenceLink[]) => void;
+  projectId: string;
+  trustedTransitionRevision: number;
+  onTrustedProjectUpdate: (project: ProjectState) => void;
 }
 
 export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
   claims,
   sources,
+  evidenceRecords,
+  claimEvidenceLinks,
+  manuscriptSentenceClaimLinks,
   onUpdateClaims,
+  onUpdateEvidenceRecords,
+  onUpdateClaimEvidenceLinks,
+  projectId,
+  trustedTransitionRevision,
+  onTrustedProjectUpdate,
 }) => {
   const { user } = useAuth();
   const [newClaimText, setNewClaimText] = useState("");
@@ -35,8 +54,13 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
   const [activeLinkingClaim, setActiveLinkingClaim] = useState<ClaimItem | null>(null);
   const [selectedSourceId, setSelectedSourceId] = useState("");
   const [evidenceLocation, setEvidenceLocation] = useState("");
+  const [paragraphOrChunkRef, setParagraphOrChunkRef] = useState("");
   const [pageNumber, setPageNumber] = useState("");
   const [quotePassage, setQuotePassage] = useState("");
+  const [selectedExistingEvidenceId, setSelectedExistingEvidenceId] = useState("");
+  const [evidenceRelationship, setEvidenceRelationship] = useState<ClaimEvidenceRelationship>("Supports");
+  const [linkConfidence, setLinkConfidence] = useState("1");
+  const [expandedSentenceId, setExpandedSentenceId] = useState<string | null>(null);
 
   const [approvalModalConfig, setApprovalModalConfig] = useState<{
     isOpen: boolean;
@@ -89,23 +113,48 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
 
   const handleSaveEvidenceLink = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeLinkingClaim || !selectedSourceId) return;
-
-    const sourceObj = sources.find((s) => s.id === selectedSourceId);
+    if (!activeLinkingClaim) return;
+    const existingEvidence = evidenceRecords.find((item) => item.evidenceId === selectedExistingEvidenceId);
+    const effectiveSourceId = existingEvidence?.sourceId || selectedSourceId;
+    const sourceObj = sources.find((s) => s.id === effectiveSourceId);
     if (!sourceObj) return;
 
+    const evidenceId = existingEvidence?.evidenceId || `ev-${Date.now()}`;
+    const createdAt = new Date().toISOString();
+    let evidenceRecord: EvidenceRecord;
+    try {
+      evidenceRecord = existingEvidence || createEvidenceRecord({
+        evidenceId,
+        source: sourceObj,
+        exactPassage: quotePassage,
+        page: pageNumber,
+        section: evidenceLocation,
+        paragraphOrChunkRef,
+        extractionMethod: "Researcher Selected",
+        extractedBy: user?.uid || user?.email || "Researcher input required",
+        confidence: 1,
+        linkedClaimIds: [activeLinkingClaim.id],
+        createdAt,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Evidence record validation failed.");
+      return;
+    }
+
     const newEvidence: LinkedEvidenceItem = {
-      id: `ev-${Date.now()}`,
-      sourceId: selectedSourceId,
+      id: evidenceId,
+      evidenceRecordId: evidenceId,
+      sourceId: effectiveSourceId,
       sourceTitle: sourceObj.title,
-      pageNumber: pageNumber || undefined,
-      sectionName: evidenceLocation || "Section 3.2",
-      passageQuote: quotePassage || sourceObj.abstract || "Verified source passage",
-      createdAt: new Date().toISOString(),
+      pageNumber: existingEvidence?.page || pageNumber || undefined,
+      sectionName: existingEvidence?.section || evidenceLocation || undefined,
+      paragraphNumber: existingEvidence?.paragraphOrChunkRef || paragraphOrChunkRef || undefined,
+      passageQuote: existingEvidence?.exactPassage || quotePassage.trim(),
+      createdAt,
     };
 
-    const updatedLinkedSourceIds = Array.from(new Set([...(activeLinkingClaim.linkedSourceIds || []), selectedSourceId]));
-    const updatedLinkedEvidence = [...(activeLinkingClaim.linkedEvidence || []), newEvidence];
+    const updatedLinkedSourceIds = Array.from(new Set([...(activeLinkingClaim.linkedSourceIds || []), effectiveSourceId]));
+    const updatedLinkedEvidence = [...(activeLinkingClaim.linkedEvidence || []).filter((item) => (item.evidenceRecordId || item.id) !== evidenceId), newEvidence];
 
     const updatedClaim: ClaimItem = {
       ...activeLinkingClaim,
@@ -115,23 +164,53 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
       state: activeLinkingClaim.state === "Draft" || activeLinkingClaim.state === "Unlinked" ? "Evidence Linked" : activeLinkingClaim.state,
     };
 
+    const updatedEvidenceRecord = {
+      ...evidenceRecord,
+      linkedClaimIds: Array.from(new Set([...evidenceRecord.linkedClaimIds, activeLinkingClaim.id])),
+      updatedAt: createdAt,
+    };
+    let graphLink: ClaimEvidenceLink;
+    try {
+      graphLink = createClaimEvidenceLink({
+        id: `edge-${Date.now()}`,
+        claim: activeLinkingClaim,
+        evidence: updatedEvidenceRecord,
+        relationship: evidenceRelationship,
+        confidence: Number(linkConfidence),
+        createdBy: user?.uid || user?.email || "Researcher input required",
+        createdAt,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Claim–evidence link validation failed.");
+      return;
+    }
     const updatedClaims = claims.map((c) => (c.id === activeLinkingClaim.id ? updatedClaim : c));
     onUpdateClaims(updatedClaims);
+    onUpdateEvidenceRecords([...evidenceRecords.filter((item) => item.evidenceId !== evidenceId), updatedEvidenceRecord]);
+    onUpdateClaimEvidenceLinks(upsertClaimEvidenceLink(claimEvidenceLinks, graphLink));
 
     // Reset drawer state
     setActiveLinkingClaim(null);
     setSelectedSourceId("");
     setEvidenceLocation("");
     setPageNumber("");
+    setParagraphOrChunkRef("");
     setQuotePassage("");
+    setSelectedExistingEvidenceId("");
+    setEvidenceRelationship("Supports");
+    setLinkConfidence("1");
   };
 
   const handleInitiateTransition = (claim: ClaimItem, targetState: ClaimState) => {
     if (targetState === "Verified") {
-      // Check if evidence is linked
-      const hasEvidence = (claim.linkedSourceIds && claim.linkedSourceIds.length > 0) || (claim.linkedEvidence && claim.linkedEvidence.length > 0);
-      if (!hasEvidence) {
-        alert("Prohibited transition: A claim cannot become Verified without linked evidence and researcher review.");
+      const eligibleSupportingLink = claimEvidenceLinks.find((link) => {
+        const evidence = evidenceRecords.find((record) => record.evidenceId === link.evidenceId);
+        return link.claimId === claim.id && link.relationship !== "Contradicts" &&
+          link.verificationState === "Verified" && link.approvalState === "Approved" &&
+          evidence?.verification === "Researcher Verified" && evidence.researcherReview.status === "Verified";
+      });
+      if (!eligibleSupportingLink) {
+        alert("Prohibited transition: A claim requires researcher-verified passage evidence and an approved supporting graph edge.");
         return;
       }
 
@@ -143,15 +222,23 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
       return;
     }
 
-    executeTransition(claim, targetState, `Transitioned claim state to ${targetState}`, claim.linkedSourceIds);
+    executeTransition(claim, targetState, `Transitioned claim state to ${targetState}`, claimEvidenceLinks.filter((link) => link.claimId === claim.id).map((link) => link.evidenceId));
   };
 
-  const executeTransition = (
+  const executeTransition = async (
     claim: ClaimItem,
     targetState: ClaimState,
     reason: string,
     evidenceRecordIds: string[]
   ) => {
+    if (targetState === "Verified") {
+      try {
+        const result = await requestTrustedTransition({ projectId, transitionType: "CLAIM_VERIFIED", entityId: claim.id, rationale: reason, evidenceIds: evidenceRecordIds, expectedRevision: trustedTransitionRevision });
+        onTrustedProjectUpdate(result.project);
+      } catch (error) { alert(error instanceof Error ? error.message : "Trusted claim verification failed."); }
+      return;
+    }
+
     const actor = {
       uid: user?.uid || "user-local",
       email: user?.email || "researcher@local",
@@ -227,6 +314,8 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
           const currentState: ClaimState = clm.state || "Draft";
           const allowedTransitions = CLAIM_TRANSITIONS[currentState] || [];
           const evidenceList = clm.linkedEvidence || [];
+          const graphLinks = claimEvidenceLinks.filter((link) => link.claimId === clm.id);
+          const sentenceLinks = manuscriptSentenceClaimLinks.filter((link) => link.claimId === clm.id);
 
           return (
             <div key={clm.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
@@ -291,12 +380,22 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
                         <div className="flex items-center justify-between text-[11px]">
                           <strong className="text-[#102A43]">{ev.sourceTitle}</strong>
                           <span className="text-slate-500 font-mono">
-                            {ev.pageNumber ? `Page ${ev.pageNumber}` : ""} {ev.sectionName || ""}
+                            {ev.pageNumber ? `Page ${ev.pageNumber}` : ""} {ev.sectionName || ""} {ev.paragraphNumber || ""}
                           </span>
                         </div>
                         <p className="font-mono text-slate-700 bg-[#F8F5EC] p-2 rounded text-[11px] italic">
                           "{ev.passageQuote}"
                         </p>
+                        {(() => {
+                          const record = evidenceRecords.find((item) => item.evidenceId === (ev.evidenceRecordId || ev.id));
+                          return record ? (
+                            <div className="text-[10px] text-slate-500 flex flex-wrap gap-x-3">
+                              <span>Document: {record.documentVersion}</span>
+                              <span>Hash: {record.documentHash}</span>
+                              <span className="font-semibold text-amber-700">{record.verification}</span>
+                            </div>
+                          ) : null;
+                        })()}
                       </div>
                     ))}
                   </div>
@@ -307,6 +406,62 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
                   <span>Requirement: A claim must have at least one passage-linked evidence quote before transitioning to 'Verified'.</span>
                 </div>
               )}
+
+              {graphLinks.length > 0 && (
+                <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-200 space-y-2 text-xs">
+                  <span className="font-bold text-indigo-900">Claim–Evidence Graph ({graphLinks.length} edges)</span>
+                  {graphLinks.map((link) => {
+                    const record = evidenceRecords.find((item) => item.evidenceId === link.evidenceId);
+                    return (
+                      <div key={link.id} className="flex flex-wrap gap-x-3 gap-y-1 bg-white border border-indigo-100 rounded p-2 text-[11px]">
+                        <span className={link.relationship === "Contradicts" ? "font-bold text-rose-700" : "font-bold text-emerald-700"}>{link.relationship}</span>
+                        <span>Evidence: {link.evidenceId}</span>
+                        <span>Confidence: {Math.round(link.confidence * 100)}%</span>
+                        <span>{link.verificationState} / {link.approvalState}</span>
+                        <span>{record?.page ? `Page ${record.page}` : record?.section || record?.paragraphOrChunkRef || "Location missing"}</span>
+                        {link.approvalState === "Pending Review" && (
+                          <span className="flex gap-1">
+                            <button type="button" onClick={() => {
+                              const rationale = window.prompt("Record relationship approval rationale:");
+                              if (!rationale) return;
+                              try {
+                                const reviewed = reviewClaimEvidenceLink(link, "Approved", user?.uid || "", rationale);
+                                onUpdateClaimEvidenceLinks(claimEvidenceLinks.map((item) => item.id === link.id ? reviewed : item));
+                              } catch (error) { window.alert(error instanceof Error ? error.message : "Link review failed."); }
+                            }} className="text-emerald-700 font-bold underline">Approve edge</button>
+                            <button type="button" onClick={() => {
+                              const rationale = window.prompt("Record relationship rejection rationale:");
+                              if (!rationale) return;
+                              try {
+                                const reviewed = reviewClaimEvidenceLink(link, "Rejected", user?.uid || "", rationale);
+                                onUpdateClaimEvidenceLinks(claimEvidenceLinks.map((item) => item.id === link.id ? reviewed : item));
+                              } catch (error) { window.alert(error instanceof Error ? error.message : "Link review failed."); }
+                            }} className="text-rose-700 font-bold underline">Reject edge</button>
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {sentenceLinks.map((sentence) => (
+                <div key={sentence.sentenceId} className="bg-stone-50 border border-stone-200 rounded-lg p-3 text-xs space-y-2">
+                  <p className="font-serif text-stone-800">“{sentence.exactSentence}”</p>
+                  <button type="button" onClick={() => setExpandedSentenceId(expandedSentenceId === sentence.sentenceId ? null : sentence.sentenceId)} className="text-[#0B5D4B] font-bold underline">
+                    Why is this sentence supported?
+                  </button>
+                  {expandedSentenceId === sentence.sentenceId && (
+                    <div className="space-y-2 text-[11px]">
+                      {graphLinks.filter((link) => link.manuscriptSentenceIds.includes(sentence.sentenceId)).map((link) => {
+                        const record = evidenceRecords.find((item) => item.evidenceId === link.evidenceId);
+                        const source = sources.find((item) => item.id === record?.sourceId);
+                        return <div key={link.id} className="bg-white border rounded p-2">Sentence → Claim “{clm.claimText}” → {link.relationship} → “{record?.exactPassage || "Missing"}” → {source?.title || "Missing"} → {record?.page ? `Page ${record.page}` : record?.section || record?.paragraphOrChunkRef || "Missing location"}</div>;
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
 
               {/* Transition Toolbar */}
               <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between text-xs gap-2">
@@ -356,11 +511,19 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
+                <label className="block font-bold text-slate-700 mb-1">Reuse Existing Passage Evidence (optional)</label>
+                <select value={selectedExistingEvidenceId} onChange={(e) => setSelectedExistingEvidenceId(e.target.value)} className="w-full bg-[#F8F5EC] border border-slate-300 rounded-lg p-2 text-slate-800">
+                  <option value="">Create a new passage record</option>
+                  {evidenceRecords.map((record) => <option key={record.evidenceId} value={record.evidenceId}>{record.evidenceId}: {record.exactPassage.slice(0, 70)}</option>)}
+                </select>
+              </div>
+              <div>
                 <label className="block font-bold text-slate-700 mb-1">Select Source Record</label>
                 <select
                   value={selectedSourceId}
                   onChange={(e) => setSelectedSourceId(e.target.value)}
-                  required
+                  required={!selectedExistingEvidenceId}
+                  disabled={Boolean(selectedExistingEvidenceId)}
                   className="w-full bg-[#F8F5EC] border border-slate-300 rounded-lg p-2 text-slate-800"
                 >
                   <option value="">-- Choose verified source from library --</option>
@@ -372,7 +535,7 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {!selectedExistingEvidenceId && <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Page Number (if available)</label>
                   <input
@@ -384,18 +547,32 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Section / Paragraph</label>
+                  <label className="block font-bold text-slate-700 mb-1">Section</label>
                   <input
                     type="text"
-                    placeholder="e.g. Discussion, Para 3"
+                    placeholder="e.g. Discussion"
                     value={evidenceLocation}
                     onChange={(e) => setEvidenceLocation(e.target.value)}
                     className="w-full bg-[#F8F5EC] border border-slate-300 rounded-lg p-2"
                   />
                 </div>
-              </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Paragraph / Chunk</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Para 3"
+                    value={paragraphOrChunkRef}
+                    onChange={(e) => setParagraphOrChunkRef(e.target.value)}
+                    className="w-full bg-[#F8F5EC] border border-slate-300 rounded-lg p-2"
+                  />
+                </div>
+              </div>}
 
-              <div>
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                Record at least one concrete location: page, section, or paragraph/chunk. New evidence remains Needs Review until a researcher verifies it.
+              </p>
+
+              {!selectedExistingEvidenceId && <div>
                 <label className="block font-bold text-slate-700 mb-1">Exact Quoted Passage / Evidence Text</label>
                 <textarea
                   rows={4}
@@ -405,6 +582,19 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
                   onChange={(e) => setQuotePassage(e.target.value)}
                   className="w-full bg-[#F8F5EC] border border-slate-300 rounded-lg p-2 font-mono"
                 />
+              </div>}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Graph Relationship</label>
+                  <select value={evidenceRelationship} onChange={(e) => setEvidenceRelationship(e.target.value as ClaimEvidenceRelationship)} className="w-full bg-[#F8F5EC] border border-slate-300 rounded-lg p-2">
+                    <option>Supports</option><option>Partially Supports</option><option>Contextual</option><option>Contradicts</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Link Confidence (0–1)</label>
+                  <input type="number" min="0" max="1" step="0.01" value={linkConfidence} onChange={(e) => setLinkConfidence(e.target.value)} required className="w-full bg-[#F8F5EC] border border-slate-300 rounded-lg p-2" />
+                </div>
               </div>
             </div>
 
@@ -437,7 +627,7 @@ export const ClaimMatrixView: React.FC<ClaimMatrixViewProps> = ({
           entityTitle={approvalModalConfig.claim.claimText}
           currentState={approvalModalConfig.claim.state || "Draft"}
           targetState={approvalModalConfig.targetState}
-          evidenceRecordIds={approvalModalConfig.claim.linkedSourceIds}
+          evidenceRecordIds={claimEvidenceLinks.filter((link) => link.claimId === approvalModalConfig.claim?.id).map((link) => link.evidenceId)}
           onConfirmApproval={(reason, evidenceRecordIds) => {
             if (approvalModalConfig.claim) {
               executeTransition(

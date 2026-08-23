@@ -41,6 +41,12 @@ describe('Firebase Security Rules Verification Tests', () => {
       expect(rulesContent).toContain("request.resource.data.members == resource.data.members");
     });
 
+    it('prevents clients from changing trusted transition integrity and submission state', () => {
+      expect(rulesContent).toContain("trustedTransitionFieldsUnchanged()");
+      expect(rulesContent).toContain("request.resource.data.get('trustedTransitionIntegrity', null)");
+      expect(rulesContent).toContain("request.resource.data.get('submissionState', 'Draft')");
+    });
+
     it('restricts project deletion strictly to the Owner', () => {
       expect(rulesContent).toContain("allow delete: if isSignedIn() && isOwner(resource.data);");
     });
@@ -53,6 +59,10 @@ describe('Firebase Security Rules Verification Tests', () => {
 
     it('enforces immutability on auditEvents (allow update, delete: if false)', () => {
       expect(rulesContent).toMatch(/match \/auditEvents\/\{eventId\}[\s\S]*?allow create,\s*update,\s*delete:\s*if false;/);
+    });
+
+    it('denies every client write to immutable stateTransitions', () => {
+      expect(rulesContent).toMatch(/match \/stateTransitions\/\{transitionId\}[\s\S]*?allow create,\s*update,\s*delete:\s*if false;/);
     });
 
     it('restricts file deletion to project Owner only', () => {

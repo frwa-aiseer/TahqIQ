@@ -2,6 +2,7 @@ import { getFirebaseServices } from "./firebase";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where, addDoc } from "firebase/firestore";
 import { ProjectState, ProjectRole, ProjectMember, ProjectVersionSnapshot } from "../types";
 import { createEmptyProject, isDemoRecord } from "../data/demoProject";
+import { hydrateProjectResearchArtifacts } from "./researchArtifacts";
 
 const firestore = () => getFirebaseServices().db;
 
@@ -23,7 +24,7 @@ export async function getUserProjects(uid: string): Promise<ProjectState[]> {
     snap.forEach((docSnap) => {
       const data = docSnap.data() as ProjectState;
       if (!data.isDeleted) {
-        projects.push(data);
+        projects.push(hydrateProjectResearchArtifacts(data));
       }
     });
     return projects;
@@ -38,7 +39,7 @@ export async function getProjectById(projectId: string): Promise<ProjectState | 
     const docRef = doc(firestore(), "projects", projectId);
     const snap = await getDoc(docRef);
     if (snap.exists()) {
-      return snap.data() as ProjectState;
+      return hydrateProjectResearchArtifacts(snap.data() as ProjectState);
     }
     return null;
   } catch (err) {
@@ -57,7 +58,7 @@ export async function createProjectInFirestore(
   const base = createEmptyProject(projectData);
   const now = new Date().toISOString();
   
-  const newProject: ProjectState = {
+  const newProject = hydrateProjectResearchArtifacts({
     ...base,
     id: `proj-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     isDemoProject: false,
@@ -81,7 +82,7 @@ export async function createProjectInFirestore(
     createdAt: now,
     updatedAt: now,
     userRole: "Owner",
-  };
+  });
 
   if (!newProject.isDemoProject) {
     const docRef = doc(firestore(), "projects", newProject.id);
@@ -111,11 +112,11 @@ export async function saveProjectToFirestore(
     const now = new Date().toISOString();
     const newVersion = (project.version || 1) + 1;
 
-    const updatedProject: ProjectState = {
+    const updatedProject = hydrateProjectResearchArtifacts({
       ...project,
       version: newVersion,
       updatedAt: now,
-    };
+    });
 
     const docRef = doc(firestore(), "projects", project.id);
     await setDoc(docRef, updatedProject, { merge: true });

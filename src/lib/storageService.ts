@@ -1,11 +1,11 @@
 import { firebaseStatus, getFirebaseServices } from "./firebase";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { doc, setDoc } from "firebase/firestore";
+import type { ResearchArtifact } from "../types";
+import { hydrateProjectResearchArtifacts } from "./researchArtifacts";
 
-export interface UploadedFileMeta {
-  id: string;
+export interface UploadedFileMeta extends Omit<ResearchArtifact, "provenance"> {
   filename: string;
-  projectId: string;
   storagePath: string;
   downloadUrl: string;
   sha256: string;
@@ -15,6 +15,9 @@ export interface UploadedFileMeta {
   uploadedAt: string;
   persistenceStatus: "Persisted";
   provenance: {
+    origin: "Researcher Upload";
+    recordedAt: string;
+    actorUid: string;
     source: "Researcher Upload";
     storageProvider: "Firebase Cloud Storage";
     originalFilename: string;
@@ -89,6 +92,19 @@ export async function uploadProjectFile(
 
     const meta: UploadedFileMeta = {
       id: fileId,
+      artifactType: "Uploaded Document",
+      title: file.name,
+      createdBy: uploaderUid,
+      createdAt: uploadedAt,
+      updatedAt: uploadedAt,
+      sourceArtifactIds: [],
+      verificationState: "Unverified",
+      approvalState: "Not Approved",
+      version: 1,
+      contentHash: sha256,
+      isDemo: false,
+      isSynthetic: false,
+      locked: false,
       filename: file.name,
       projectId,
       storagePath,
@@ -100,6 +116,9 @@ export async function uploadProjectFile(
       uploadedAt,
       persistenceStatus: "Persisted",
       provenance: {
+        origin: "Researcher Upload",
+        recordedAt: uploadedAt,
+        actorUid: uploaderUid,
         source: "Researcher Upload",
         storageProvider: "Firebase Cloud Storage",
         originalFilename: file.name,
@@ -136,7 +155,7 @@ export function saveProjectToLocalStorage(project: any) {
 export function loadProjectFromLocalStorage(projectId: string): any | null {
   if (typeof window !== "undefined" && window.localStorage) {
     const raw = window.localStorage.getItem(`tehqiq_project_${projectId}`);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? hydrateProjectResearchArtifacts(JSON.parse(raw)) : null;
   }
   return null;
 }

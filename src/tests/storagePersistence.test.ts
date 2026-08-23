@@ -49,6 +49,16 @@ describe("research file persistence", () => {
     const result = await uploadProjectFile("project-1", file, "researcher-1");
 
     expect(result).toMatchObject({
+      artifactType: "Uploaded Document",
+      title: "observations.csv",
+      createdBy: "researcher-1",
+      sourceArtifactIds: [],
+      verificationState: "Unverified",
+      approvalState: "Not Approved",
+      version: 1,
+      isDemo: false,
+      isSynthetic: false,
+      locked: false,
       filename: "observations.csv",
       projectId: "project-1",
       storagePath: "projects/project-1/files/persisted_observations.csv",
@@ -58,6 +68,8 @@ describe("research file persistence", () => {
       uploadedByUid: "researcher-1",
       persistenceStatus: "Persisted",
       provenance: {
+        origin: "Researcher Upload",
+        actorUid: "researcher-1",
         source: "Researcher Upload",
         storageProvider: "Firebase Cloud Storage",
         originalFilename: "observations.csv",
@@ -65,6 +77,7 @@ describe("research file persistence", () => {
       },
     });
     expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.contentHash).toBe(result.sha256);
     expect(result.uploadedAt).toEqual(expect.any(String));
     expect(storageMocks.uploadBytes).toHaveBeenCalledWith(
       { fullPath: "requested-path" },

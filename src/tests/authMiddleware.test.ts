@@ -113,6 +113,7 @@ describe("reusable authenticated project middleware", () => {
     const server = readFileSync(resolve(process.cwd(), "server.ts"), "utf8");
     const protectedRoutes = [
       "/api/projects/:projectId/audit-events",
+      "/api/projects/:projectId/transitions",
       "/api/gemini/agent",
       "/api/gemini/draft-section",
       "/api/gemini/peer-review",

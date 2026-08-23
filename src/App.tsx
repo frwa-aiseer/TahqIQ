@@ -284,10 +284,11 @@ function MainAppContent() {
                 <SourceLibraryView
                   sources={project.sources}
                   onAddSource={handleAddSource}
-                  onOpenReader={(src) => setReaderSource(src)}
-                  isDemoProject={project.isDemoProject}
-                  activeCslStyle={activeCslStyle}
+                  onOpenReaderModal={(src) => setReaderSource(src)}
+                  onUpdateSource={(source) => setProject((prev) => ({ ...prev, sources: prev.sources.map((item) => item.id === source.id ? source : item) }))}
                   projectId={project.id}
+                  trustedTransitionRevision={project.trustedTransitionIntegrity?.revision || 0}
+                  onTrustedProjectUpdate={setProject}
                 />
                 <GapMapView gaps={project.gaps || []} />
               </div>
@@ -394,7 +395,15 @@ function MainAppContent() {
               <ClaimMatrixView
                 claims={project.claims}
                 sources={project.sources}
+                evidenceRecords={project.evidenceRecords || []}
+                claimEvidenceLinks={project.claimEvidenceLinks || []}
+                manuscriptSentenceClaimLinks={project.manuscriptSentenceClaimLinks || []}
                 onUpdateClaims={handleUpdateClaims}
+                onUpdateEvidenceRecords={(evidenceRecords) => setProject((prev) => ({ ...prev, evidenceRecords }))}
+                onUpdateClaimEvidenceLinks={(claimEvidenceLinks) => setProject((prev) => ({ ...prev, claimEvidenceLinks }))}
+                projectId={project.id}
+                trustedTransitionRevision={project.trustedTransitionIntegrity?.revision || 0}
+                onTrustedProjectUpdate={setProject}
               />
             )}
 
@@ -428,6 +437,11 @@ function MainAppContent() {
       {/* Modals */}
       <DocumentReaderModal
         source={readerSource}
+        evidenceRecords={(project.evidenceRecords || []).filter((record) => record.sourceId === readerSource?.id)}
+        onUpdateEvidenceRecord={(record) => setProject((prev) => ({
+          ...prev,
+          evidenceRecords: (prev.evidenceRecords || []).map((item) => item.evidenceId === record.evidenceId ? record : item),
+        }))}
         onClose={() => setReaderSource(null)}
       />
 

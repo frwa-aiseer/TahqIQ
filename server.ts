@@ -11,6 +11,8 @@ import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import { createTrustedAuditEvent, validateTrustedAuditRequest } from "./src/server/trustedAudit";
 import type { ProjectRole, TrustedAuditEntityType } from "./src/types";
+import type { ProjectState } from "./src/types";
+import { applyTrustedTransition, validateTrustedTransitionRequest } from "./src/server/trustedTransitions";
 import {
   ALL_PROJECT_ROLES,
   AuthenticatedProjectRequest,
@@ -157,6 +159,53 @@ async function startServer() {
       console.error("Trusted audit append error:", error);
       const unavailable = String(error?.message || "").includes("Not Configured");
       return res.status(unavailable ? 503 : 500).json({ status: "failed", error: unavailable ? error.message : "Trusted audit append failed." });
+    }
+  });
+
+  // Privileged project state is changed only inside this Admin SDK transaction.
+  app.post("/api/projects/:projectId/transitions", protectedProjectRoute(PROJECT_WRITER_ROLES, 64 * 1024, true), async (request, res) => {
+    const req = request as AuthenticatedProjectRequest;
+    try {
+      const auth = req.projectAuth!;
+      const validation = validateTrustedTransitionRequest(req.body, auth.role);
+      if (!validation.valid || !validation.request) return res.status(400).json({ status: "failed", errors: validation.errors });
+      const projectRef = auth.projectRef as any;
+      const transitionRef = projectRef.collection("stateTransitions").doc();
+      const { adminDb } = getTrustedFirebaseAdmin();
+      const result = await adminDb.runTransaction(async (transaction: any) => {
+        const snapshot = await transaction.get(projectRef);
+        if (!snapshot.exists) throw new Error("Project not found.");
+        const applied = applyTrustedTransition(
+          snapshot.data() as ProjectState,
+          validation.request!,
+          { uid: auth.actor.uid, email: auth.actor.email!, role: auth.role },
+          new Date().toISOString(),
+          transitionRef.id
+        );
+        transaction.update(projectRef, {
+          sources: applied.project.sources,
+          claims: applied.project.claims,
+          datasets: applied.project.datasets,
+          analysisOutputs: applied.project.analysisOutputs,
+          figures: applied.project.figures,
+          tables: applied.project.tables,
+          sections: applied.project.sections,
+          ethicsInfo: applied.project.ethicsInfo,
+          authors: applied.project.authors,
+          submissionState: applied.project.submissionState || "Draft",
+          trustedTransitionIntegrity: applied.project.trustedTransitionIntegrity,
+          updatedAt: applied.project.updatedAt,
+        });
+        transaction.create(transitionRef, applied.record);
+        return applied;
+      });
+      return res.status(201).json({ status: "transitioned", project: result.project, transition: result.record });
+    } catch (error: any) {
+      console.error("Trusted transition error:", error);
+      const message = String(error?.message || "");
+      const conflict = /revision conflict|digest mismatch|already locked/i.test(message);
+      const unavailable = message.includes("Not Configured");
+      return res.status(unavailable ? 503 : conflict ? 409 : 400).json({ status: "failed", error: unavailable ? message : message || "Trusted transition failed." });
     }
   });
 

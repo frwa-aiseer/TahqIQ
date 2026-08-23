@@ -31,6 +31,10 @@ This tracker records remediation work verified against the live repository. Stat
 | TQ-VSC-015 | PASS | Built on committed TQ-VSC-014 checkpoint `aabd971`; working-tree checkpoint pending commit | `storage.rules`; `firebase.json`; `package.json`; `src/tests/storageRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No stored-object or Firestore document migration. Existing objects become private and may require policy-compliant metadata before overwrite. Locked objects cannot be changed or deleted through client rules. | `npm run lint`: PASS. Firestore + Storage Emulator: PASS, 8/8. `npm test`: 28/30 executed files passed, 228/230 executed tests passed, with 2 emulator-only files/16 tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Authenticated project membership is required to read. Only designated writer roles can create/update, only owners can delete, paths/metadata are project-bound, overwrites cannot use create grants, locked objects are protected, and all unscoped paths are denied. No malware-scanning claim is made. TQ-VSC-016 and later were not executed. |
 | TQ-VSC-016 | PASS | Built on committed TQ-VSC-015 checkpoint `40a2b25`; working-tree checkpoint pending commit | `server.ts`; `src/server/authMiddleware.ts`; `src/lib/authenticatedFetch.ts`; `src/App.tsx`; `src/components/views/ResearchCanvasView.tsx`; `src/components/views/ProtocolBuilderView.tsx`; `src/components/views/SourceLibraryView.tsx`; `src/components/views/WritingStudioView.tsx`; `src/components/views/PeerReviewView.tsx`; `src/components/views/DataLabView.tsx`; `src/tests/authMiddleware.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No stored-data migration. Sensitive API clients now require a configured signed-in Firebase user and project ID; deployments require working Firebase Admin credentials for server authorization. | `npm run lint`: PASS. Focused security Vitest: PASS, 19/19. `npm test`: 29/31 executed files passed, 235/237 executed tests passed, with 2 emulator-only files/16 tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,994 modules. `git diff --check`: PASS. | Seven sensitive endpoints use reusable ID-token verification, Firestore-derived membership/RBAC, bounded bodies, safe errors, audit hooks and per-actor/project/route rate limiting. Health remains public. Frontend identity/role claims are ignored. TQ-VSC-017 and later were not executed. |
 | TQ-VSC-017 | PASS | Built on the uncommitted TQ-VSC-016 working tree | `server.ts`; `src/server/apiSchemas.ts`; `src/tests/apiSchemas.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No stored-data migration. Generic agent success changes from unvalidated `text` to validated structured `result`; malformed model output now fails with 502 instead of being accepted or filled. | `npm run lint`: PASS. Focused schema/security Vitest: PASS, 22/22. `npm test`: 30/32 executed files passed, 243/245 executed tests passed, with 2 emulator-only files/16 tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,994 modules. `git diff --check`: PASS. | Every non-audit server request has deterministic runtime validation; audit retains its strict validator. Structured agent, draft, peer-review and methodology model output is parsed and validated before use. External analysis responses are validated before return. TQ-VSC-018 and later were not executed. |
+| TQ-VSC-018 | PASS | Built on committed TQ-VSC-017 checkpoint `1c611e2`; working-tree checkpoint pending commit | `src/types.ts`; `src/lib/researchArtifacts.ts`; `src/lib/projectService.ts`; `src/lib/storageService.ts`; `src/data/demoProject.ts`; `src/tests/researchArtifacts.test.ts`; `src/tests/storagePersistence.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Backward-compatible optional `researchArtifacts` projection; no destructive rewrite. Existing domain collections remain authoritative and load unchanged. Load/create/save adapters populate canonical metadata, including explicit `Not available` for absent legacy facts. | `npm run lint`: PASS. Focused artifact/storage Vitest: PASS, 11/11. `npm test`: 31/33 executed files passed, 249/251 executed tests passed, with 2 emulator-only files/16 tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,995 modules. `git diff --check`: PASS. | Canonical metadata covers uploaded documents, sources, evidence, protocols, datasets, analysis plans/outputs, tables, figures, manuscript sections, reviews and exports. Existing and older sparse projects remain loadable. TQ-VSC-019 and later were not executed. |
+| TQ-VSC-019 | PASS | Built on the uncommitted TQ-VSC-018 working tree | `src/types.ts`; `src/lib/evidenceRecords.ts`; `src/lib/researchArtifacts.ts`; `src/App.tsx`; `src/components/views/ClaimMatrixView.tsx`; `src/components/views/DocumentReaderModal.tsx`; `src/tests/evidenceRecords.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Added optional `evidenceRecords` with non-destructive adapters for traceable legacy extracted/linked passages. Unlocated legacy text is not promoted. Existing inline claim/source passage fields remain readable. | `npm run lint`: PASS. Focused provenance/regression/accessibility Vitest: PASS, 33/33. `npm test`: 32/34 executed files passed, 255/257 executed tests passed, with 2 emulator-only files/16 tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,996 modules. `git diff --check`: PASS. | Evidence is separate from source metadata and requires exact text plus page, section, or paragraph/chunk. AI starts Needs Review; attributable researcher review is required. Reader displays document provenance. TQ-VSC-020 and later were not executed. |
+| TQ-VSC-020 | PASS | Built on the uncommitted TQ-VSC-018/019 working tree | `src/types.ts`; `src/lib/claimEvidenceGraph.ts`; `src/lib/researchArtifacts.ts`; `src/lib/writingEvidence.ts`; `src/App.tsx`; `src/components/views/ClaimMatrixView.tsx`; `src/tests/claimEvidenceGraph.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Added optional graph-edge and manuscript-sentence link collections. Traceable legacy inline links adapt as Unverified/Pending Review; no legacy status is silently elevated. Existing claim/source fields remain readable. | `npm run lint`: PASS. Focused graph/provenance/state/writing/accessibility Vitest: PASS, 63/63. `npm test`: 33/35 executed files passed, 261/263 executed tests passed, with 2 emulator-only files/16 tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,997 modules. `git diff --check`: PASS. | Many-to-many and contradiction integrity tests pass. Sentence traversal resolves sentence → claim → edge → exact evidence → source/location. Linking never auto-selects a source or verifies/approves an edge. TQ-VSC-021 and later were not executed. |
+| TQ-VSC-021 | PASS | Built on the uncommitted TQ-VSC-018–020 working tree | `src/types.ts`; `src/server/trustedTransitions.ts`; `src/lib/trustedTransitionsClient.ts`; `server.ts`; `firestore.rules`; `src/App.tsx`; `src/components/views/SourceLibraryView.tsx`; `src/components/views/ClaimMatrixView.tsx`; `src/components/views/DataLabView.tsx`; `src/components/views/WritingStudioView.tsx`; `src/tests/trustedTransitions.test.ts`; `src/tests/firebaseSecurityRules.test.ts`; `src/tests/firestoreRules.emulator.test.ts`; `src/tests/authMiddleware.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No bulk rewrite. Optional trusted integrity metadata is established on the first trusted transition; immutable records use a new denied-to-clients subcollection. Existing projects remain readable. | `npm run lint`: PASS. Focused transition/security/regression Vitest: PASS, 69/69. Firestore Emulator: PASS, 10/10. `npm test`: 34/36 executed files passed, 271/273 executed tests passed, with 2 emulator-only files/18 tests skipped; only established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,998 modules. `git diff --check`: PASS. | Eight sensitive transitions are server-transactional. Forged integrity/submission/history writes are denied; direct privileged or locked-content mutation after integrity baseline is digest-detectable and blocks further trusted transitions. TQ-VSC-022 and later were not executed. |
 
 ## TQ-VSC-000 verification details
 
@@ -749,3 +753,148 @@ None. The harness is test-only and imports existing types without changing them.
 - The generic agent success payload intentionally changes from `{ text }` to `{ result }`; the current caller only uses success/failure state and remains compatible.
 - SDK response schemas constrain generation but are not trusted as validation; server runtime validation remains authoritative.
 - TQ-VSC-018 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-018 verification details
+
+### Implementation
+
+- Added a required-field `ResearchArtifact` contract with project/type/title identity, creator/timestamps, source links, structured provenance, verification and approval states, version, optional content hash, demo/synthetic isolation, and lock state.
+- Added deterministic backward-compatible adapters for sources, numeric evidence, methodology protocols, datasets, analysis plans, analysis outputs, tables, figures, manuscript sections, reviewer comments, and exports. Original domain records are neither deleted nor reshaped.
+- Uploaded research-file metadata now implements the canonical uploaded-document envelope and uses the already calculated SHA-256 checksum as `contentHash`.
+- Project Firestore reads, creates, and saves hydrate the canonical projection. Local-storage reads and the demo-project factory use the same adapter.
+- Legacy metadata that does not exist is represented as `Not available`; no creator, timestamp, verification, approval, or provenance fact is invented.
+- Canonical-only records such as uploaded documents are preserved when legacy projections refresh, and project-level demo status propagates to every adapted artifact.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/researchArtifacts.test.ts src/tests/storagePersistence.test.ts` — exit `0`; PASS, 2/2 files and 11/11 tests.
+3. `npm test` — exit `1`; 31/33 executed files passed and 249/251 executed tests passed, with 2 emulator-only files and 16 tests skipped. The only failures are pre-existing: offline Crossref returns network-failure wording instead of the test's registry-not-found wording, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 1,995 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+
+### Acceptance coverage
+
+- Every artifact category named by TQ-VSC-018 has a canonical representation; uploaded documents use the same contract at persistence time.
+- Tests prove required canonical metadata, source relationships, checksums, provenance, approval/verification state, and demo/synthetic propagation.
+- Existing domain arrays retain their identities during hydration and remain the authoritative application structures.
+- Older sparse project documents with absent artifact collections hydrate successfully to an empty canonical projection.
+- Existing canonical-only artifacts survive refresh instead of being discarded by legacy adapters.
+
+### Compatibility, blockers, and prompt boundary
+
+- No bulk Firestore migration or destructive data rewrite is required. `ProjectState.researchArtifacts` is optional for stored legacy records and populated at application boundaries.
+- The canonical collection is currently a metadata projection; legacy domain collections remain authoritative until future prompts explicitly migrate individual workflows.
+- The full-suite failures are unchanged environmental baseline failures and were not introduced by this prompt.
+- TQ-VSC-019 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-019 verification details
+
+### Implementation
+
+- Added a project-level `EvidenceRecord` distinct from bibliographic source metadata. It records evidence/source identity, document version/hash, exact passage, page/section/paragraph-or-chunk location, extraction method and actor, bounded confidence, verification, researcher review, linked claims, timestamps, and demo/synthetic flags.
+- Added deterministic creation validation: blank passages, unlocated evidence, absent extractor identity, and confidence outside 0–1 are rejected. Missing legacy document version/hash is explicitly `Not available`.
+- AI-extracted evidence always begins `Needs Review` with pending researcher review. It cannot self-certify. Verification/rejection requires an authenticated researcher UID and non-empty review notes.
+- Replaced the claim linker's abstract/placeholder fallback with exact required passage input. At least one concrete location field is mandatory, and the claim links to the new canonical evidence ID.
+- Added non-destructive adapters for legacy `extractedPassages` and inline `linkedEvidence`. Only legacy passages with exact text and a concrete location are promoted; unlocated text is deliberately left inline.
+- Added document-reader provenance UI for location, evidence ID, extraction method, document version/hash, extractor, confidence, and review state, with researcher verify/reject controls.
+- Passage evidence also projects into the TQ-VSC-018 universal artifact collection and preserves source/claim relationships.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/evidenceRecords.test.ts src/tests/researchArtifacts.test.ts src/tests/storagePersistence.test.ts src/tests/writingEvidenceIntegrity.test.ts src/tests/accessibility.test.tsx` — exit `0`; PASS, 5/5 files and 33/33 tests.
+3. Source scan for removed `Verified source passage`, `quotePassage ||`, and `Section 3.2` fallbacks — no matches.
+4. `npm test` — exit `1`; 32/34 executed files passed and 255/257 executed tests passed, with 2 emulator-only files and 16 tests skipped. The only failures are pre-existing: offline Crossref returns network-failure wording instead of registry-not-found wording, and jsdom localStorage lacks `setItem` under the current Node option.
+5. `npm run build` — exit `0`; PASS, 1,996 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+6. `git diff --check` — exit `0`; PASS.
+
+### Acceptance coverage
+
+- Every new evidence record traces to a source ID, document version/hash state, exact passage, and at least one concrete location coordinate.
+- Source metadata and passage evidence are separate records.
+- AI extraction is never accepted as verified evidence without attributable researcher review.
+- The reader exposes the provenance necessary to audit an evidence passage against its document.
+- Backward-compatible adapters preserve traceable legacy passage evidence without inventing locations for untraceable text.
+
+### Compatibility, blockers, and prompt boundary
+
+- No destructive Firestore migration is required. `ProjectState.evidenceRecords` is optional and hydrated from traceable legacy data at existing read/create/save boundaries.
+- Inline `SourceRecord.extractedPassages` and `ClaimItem.linkedEvidence` remain readable for existing projects. New claim links include a canonical `evidenceRecordId`.
+- Claim-level graph cardinality and claim-verification gating remain existing behavior; those changes belong to TQ-VSC-020 and were not implemented here.
+- The full-suite failures are unchanged baseline/environment failures and were not introduced by this prompt.
+- TQ-VSC-020 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-020 verification details
+
+### Implementation
+
+- Added explicit `ClaimEvidenceLink` graph edges with claim/evidence IDs, Supports/Partially Supports/Contextual/Contradicts relationship, bounded confidence, independent verification and approval states, manuscript sentence IDs, attributable creation/review metadata, and demo/synthetic flags.
+- Added `ManuscriptSentenceClaimLink` and deterministic sentence traversal resolving sentence → claim → graph edge → exact evidence passage → source → page/section/chunk.
+- Added graph creation, idempotent pair upsert, attributable approve/reject review, integrity validation, sentence-link validation, and backward-compatible legacy-edge adaptation.
+- Graph integrity detects orphan claims/evidence/sources, duplicate edges, invalid confidence, broken sentence links, missing evidence-to-claim backlinks, and demo contamination.
+- Claim Matrix lets the researcher deliberately create new passage evidence or reuse a selected existing record, choose a supporting/contradicting relationship and confidence, review the graph edge, and inspect sentence-support traversal. It never selects the first source automatically.
+- New edges always start `Unverified` / `Pending Review`; link review requires an authenticated researcher UID and rationale. Existing legacy links adapt to the same pending state instead of inheriting implied approval.
+- Claim verification in the UI now requires a non-contradictory, researcher-verified evidence record and a verified/approved graph edge. Source IDs alone are no longer supplied as evidence IDs from this UI.
+- Writing evidence accepts canonical graph evidence only when the claim is researcher reviewed, the passage is researcher verified, the edge is verified/approved, the relationship is not contradictory, and source provenance is verified. Legacy reviewed evidence remains backward-compatible.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/claimEvidenceGraph.test.ts src/tests/evidenceRecords.test.ts src/tests/researchArtifacts.test.ts src/tests/writingEvidenceIntegrity.test.ts src/tests/unit.test.ts src/tests/dataIntegrityRegression.test.ts src/tests/accessibility.test.tsx` — exit `0`; PASS, 7/7 files and 63/63 tests.
+3. `npm test` — exit `1`; 33/35 executed files passed and 261/263 executed tests passed, with 2 emulator-only files and 16 tests skipped. The only failures are pre-existing: offline Crossref returns network-failure wording instead of registry-not-found wording, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 1,997 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+
+### Acceptance coverage
+
+- A claim can link to multiple evidence records, and one evidence record can link to multiple claims with reciprocal backlinks.
+- Contradiction is a first-class graph relationship and retains its direction through researcher review.
+- Duplicate/orphan/broken/backlink integrity failures are deterministic and test-covered.
+- “Why is this sentence supported?” traversal exposes exact passage and source location rather than stopping at source metadata.
+- Graph creation and legacy adaptation never auto-verify or auto-approve links.
+
+### Compatibility, blockers, and prompt boundary
+
+- No destructive data migration is required. `claimEvidenceLinks` and `manuscriptSentenceClaimLinks` are optional stored collections hydrated alongside existing evidence/artifact adapters.
+- Existing inline `linkedEvidence` remains readable. Traceable legacy entries receive graph edges only when their canonical passage record exists, and those edges start pending human review.
+- The generic lower-level claim state machine retains backward-compatible call signatures; the Claim Matrix applies the new graph eligibility gate. Server-authoritative transition hardening belongs to TQ-VSC-021 and was not implemented.
+- The full-suite failures are unchanged baseline/environment failures and were not introduced by this prompt.
+- TQ-VSC-021 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-021 verification details
+
+### Implementation
+
+- Added a Firebase Admin transaction endpoint for eight sensitive transitions: Source Verified, Claim Verified, Dataset Approved/Locked, Analysis Approved for Manuscript, Manuscript Locked, Ethics Approved, Author Signed Off, and Submission Ready.
+- The server derives actor identity/role from verified authentication and stored project membership, rejects unsupported/client-forged fields, enforces bounded rationale/evidence IDs, and uses optimistic integrity revisions.
+- Transition-specific prerequisites require source provenance, approved graph evidence, dataset anonymization/review, analysis dataset/plan provenance, prior manuscript approval, researcher-supplied ethics identifiers when required, attributable author authority, and complete submission prerequisites.
+- Each successful transaction atomically updates the current Firestore project, creates an immutable trusted `StateTransitionRecord` in `/stateTransitions`, and advances a SHA-256 digest/revision covering privileged states and locked content.
+- Existing integrity digests are checked before every transition. A direct privileged mutation, stale revision, locked manuscript rewrite, or locked dataset identity change blocks the next trusted operation with a conflict.
+- Firestore rules deny all client create/update/delete operations on transition history and prevent clients from changing trusted integrity metadata or `submissionState`, including Owner clients.
+- Source verification, claim verification, dataset approval/lock, analysis manuscript approval, and manuscript lock UI paths now request the trusted server transition and replace local state only with the returned trusted project.
+- Ethics approval, author sign-off, and Submission Ready are supported by the trusted service even though the current inspected UI exposes no direct privileged mutation control for those states.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/trustedTransitions.test.ts src/tests/firebaseSecurityRules.test.ts src/tests/authMiddleware.test.ts src/tests/unit.test.ts src/tests/dataIntegrityRegression.test.ts src/tests/claimEvidenceGraph.test.ts src/tests/lifecycle.test.ts` — exit `0`; PASS, 7/7 files and 69/69 tests.
+3. `PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" XDG_CONFIG_HOME=/private/tmp/tehqiq-firebase-config npm run test:firestore-rules` — sandbox attempt could not bind emulator ports; rerun with approved local-port access exited `0`, PASS, 1/1 file and 10/10 real emulator tests.
+4. `npm test` — exit `1`; 34/36 executed files passed and 271/273 executed tests passed, with 2 emulator-only files and 18 tests skipped. The only failures are pre-existing: offline Crossref returns network-failure wording instead of registry-not-found wording, and jsdom localStorage lacks `setItem` under the current Node option.
+5. `npm run build` — exit `0`; PASS, 1,998 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+6. `git diff --check` — exit `0`; PASS.
+
+### Acceptance coverage
+
+- Direct client writes cannot forge trusted integrity, Submission Ready state, or immutable transition records, including as project Owner.
+- Server validation rejects unsupported fields, insufficient roles, missing prerequisites, stale revisions, repeated locks/sign-offs, and integrity mismatches.
+- Tests exercise all eight named sensitive transitions and verify immutable server provenance/hashes.
+- Direct privileged-state mutation and direct rewriting of locked manuscript content are deterministically detected after the integrity baseline exists.
+
+### Compatibility, blockers, and prompt boundary
+
+- Existing projects require no bulk migration. Their first trusted transition establishes revision 1 and a privileged-state digest from the current record.
+- The system cannot retrospectively prove whether a legacy project was manipulated before its first integrity baseline; it preserves that state as pre-baseline legacy data rather than fabricating attestation.
+- Admin transitions require configured Firebase Admin credentials. Offline/local-only projects cannot claim trusted sensitive transitions.
+- The two full-suite failures are unchanged baseline/environment failures and were not introduced by this prompt.
+- TQ-VSC-022 and all later prompts remain `NOT STARTED`.

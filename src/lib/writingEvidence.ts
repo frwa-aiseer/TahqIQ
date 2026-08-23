@@ -49,6 +49,35 @@ export function getInsertableLiteratureEvidence(project: ProjectState): Insertab
   const result: InsertableLiteratureEvidence[] = [];
   const seen = new Set<string>();
 
+  for (const link of project.claimEvidenceLinks || []) {
+    if (link.relationship === "Contradicts" || link.verificationState !== "Verified" || link.approvalState !== "Approved") continue;
+    const claim = (project.claims || []).find((item) => item.id === link.claimId);
+    const evidence = (project.evidenceRecords || []).find((item) => item.evidenceId === link.evidenceId);
+    const source = evidence && sources.find((item) => item.id === evidence.sourceId);
+    const claimReviewed = claim && (claim.isResearcherApproved || claim.state === "Researcher Reviewed" || claim.state === "Verified");
+    if (!claimReviewed || !evidence || !source || evidence.verification !== "Researcher Verified" || evidence.researcherReview.status !== "Verified") continue;
+    if (!sourceAllowedForProject(project, source) || !evidence.exactPassage.trim()) continue;
+    const key = `${source.id}:${evidence.evidenceId}:${evidence.exactPassage.trim()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({
+      id: evidence.evidenceId,
+      sourceId: source.id,
+      sourceTitle: source.title || "Missing",
+      sourceAuthors: source.authors || [],
+      sourceYear: source.year || 0,
+      passageText: evidence.exactPassage.trim(),
+      location: [evidence.section, evidence.page ? `Page ${evidence.page}` : undefined, evidence.paragraphOrChunkRef].filter(Boolean).join(" · "),
+      category: `Approved ${link.relationship} Evidence`,
+      verificationBadge: "Researcher Reviewed Evidence",
+      provenance: {
+        provider: source.provenance!.provider,
+        retrievedAt: source.provenance!.retrievedAt,
+        rawRecordUrl: source.provenance?.fieldProvenance?.title?.rawRecordUrl,
+      },
+    });
+  }
+
   for (const source of sources) {
     if (!sourceAllowedForProject(project, source)) continue;
 

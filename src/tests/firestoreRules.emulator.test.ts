@@ -114,4 +114,21 @@ emulatorDescribe("Firestore RBAC rules against the emulator", () => {
       trustedServerCreated: true,
     }));
   });
+
+  it("prevents an Owner client from forging trusted integrity or Submission Ready state", async () => {
+    const firestore = environment.authenticatedContext("owner-a").firestore();
+    const projectRef = doc(firestore, "projects/project-a");
+    await assertFails(updateDoc(projectRef, { submissionState: "Submission Ready" }));
+    await assertFails(updateDoc(projectRef, { trustedTransitionIntegrity: { revision: 99, digest: "forged", trustedServerCreated: true } }));
+  });
+
+  it("prevents every client from creating, updating, or deleting trusted transition history", async () => {
+    const admin = environment.withSecurityRulesDisabled((context) => setDoc(doc(context.firestore(), "projects/project-a/stateTransitions/transition-1"), { immutable: true }));
+    await admin;
+    const firestore = environment.authenticatedContext("owner-a").firestore();
+    const transition = doc(firestore, "projects/project-a/stateTransitions/transition-1");
+    await assertFails(setDoc(doc(firestore, "projects/project-a/stateTransitions/forged"), { trustedServerCreated: true }));
+    await assertFails(updateDoc(transition, { immutable: false }));
+    await assertFails(deleteDoc(transition));
+  });
 });
