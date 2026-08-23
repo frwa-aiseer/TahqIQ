@@ -27,6 +27,7 @@ This tracker records remediation work verified against the live repository. Stat
 | TQ-VSC-011 | PASS | Built on the uncommitted TQ-VSC-006–010 working tree | `.env.example`; `src/lib/firebaseConfig.ts`; `src/lib/firebase.ts`; `src/context/AuthContext.tsx`; `src/components/AuthModal.tsx`; `src/lib/projectService.ts`; `src/lib/storageService.ts`; `src/tests/firebaseConfiguration.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No stored-data migration. Deployments must provide six validated `VITE_FIREBASE_*` public client variables; missing/invalid values now enter an explicit Not Configured state instead of using a built-in project. | `npm run lint`: PASS. Focused Vitest: PASS, 17/17. `npm test`: baseline remains FAIL—24/28 files passed, 198/199 executed tests passed; same Crossref assertion and three Firebase import failures. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Removed hard-coded Firebase project configuration and fallback initialization. No Admin SDK/service-account/private-key variable enters client configuration. TQ-VSC-012 and later were not executed. |
 | TQ-VSC-012 | PASS | Built on the uncommitted TQ-VSC-006–011 working tree | `firestore.rules`; `firebase.json`; `package.json`; `package-lock.json`; `src/tests/firebaseSecurityRules.test.ts`; `src/tests/firestoreRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | No document rewrite. Existing owner records remain directly readable by `ownerUid`; owner updates can repair a missing owner-membership entry. New project creation requires the owner to be mapped as Owner. | `npm run lint`: PASS. Static focused Vitest: PASS, 16/16. Firestore Emulator: PASS, 7/7. `npm test`: 26/29 files passed, 216/218 executed tests passed, 7 emulator-only tests skipped outside emulator; Crossref and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Private profiles are owner-only; project reads require membership; Viewer writes and Co-author membership/ownership changes are denied; owner/member integrity and cross-project isolation are enforced; version snapshots are immutable. TQ-VSC-013 and later were not executed. |
 | TQ-VSC-013 | PASS | Committed TQ-VSC-012 checkpoint `2364ab2`; working-tree checkpoint pending commit | `.env.example`; `package.json`; `package-lock.json`; `server.ts`; `firestore.rules`; `src/types.ts`; `src/server/trustedAudit.ts`; `src/lib/projectService.ts`; `src/tests/trustedAudit.test.ts`; `src/tests/firebaseSecurityRules.test.ts`; `src/tests/firebaseConfiguration.test.ts`; `src/tests/firestoreRules.emulator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Expanded audit records with optional legacy aliases. Existing client-created records remain readable but fail `isTrustedAuditEvent`; no destructive rewrite. | `npm run lint`: PASS. Focused Vitest: PASS, 23/23. Firestore Emulator: PASS, 8/8. `npm test`: 27/30 files passed, 223/225 executed tests passed, 8 emulator-only tests skipped; Crossref and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Client create/update/delete on audit events is denied for every role. Trusted append requires verified Firebase actor, membership/RBAC, action/entity validation, existing entity, server-derived snapshots/timestamp, rationale and evidence IDs. TQ-VSC-014 and later were not executed. |
+| TQ-VSC-014 | PASS | Built on committed TQ-VSC-013 checkpoint `3c10717`; working-tree checkpoint pending commit | `src/lib/storageService.ts`; `src/tests/storagePersistence.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`; `docs/CURRENT_IMPLEMENTATION_REGISTER.md` | Extended newly created file metadata with project, SHA-256, persistence, and provenance fields. No existing records are rewritten; legacy metadata remains readable. Failed attempts create no metadata record. | `npm run lint`: PASS. Focused storage Vitest: PASS, 5/5. Combined focused/regression Vitest: 2/3 files and 13/14 tests passed; only the pre-existing jsdom localStorage failure remains. `npm test`: 28/30 executed files passed, 228/230 executed tests passed, 1 file/8 emulator tests skipped; only the established Crossref-network and localStorage-environment failures remain. `npm run build`: PASS, 1,993 modules. `git diff --check`: PASS. | Object URLs are never returned by the research upload path. Only a completed Cloud Storage upload plus download-reference resolution and Firestore metadata write returns success; partial uploads are cleanup-attempted and all failures throw an explicit Local / Unpersisted error. TQ-VSC-015 and later were not executed. |
 
 ## TQ-VSC-000 verification details
 
@@ -593,3 +594,37 @@ None. The harness is test-only and imports existing types without changing them.
 - Firebase Admin installation reports thirteen dependency audit findings (twelve moderate, one high); no breaking blanket audit fix was run.
 - Full-suite Crossref and localStorage-environment failures remain outside this prompt.
 - TQ-VSC-014 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-014 verification details
+
+### Implementation
+
+- Removed the `URL.createObjectURL(file)` fallback from the research upload path. `uploadProjectFile` now either returns verified persistent metadata or rejects; it never returns a transient browser URL as upload success.
+- Added deterministic SHA-256 calculation over the selected file bytes before upload.
+- Cloud Storage object metadata carries project ID, uploader UID, SHA-256, MIME type, and researcher-upload provenance.
+- Successful Firestore research-file metadata records carry the actual path returned by Cloud Storage, download URL, SHA-256, MIME type, size, project ID, uploader UID, timestamp, explicit `Persisted` state, and structured provenance.
+- Firestore metadata is written only after object upload and durable download-reference resolution succeed. If that write fails, deletion of the incomplete uploaded object is attempted.
+- Every failure throws `ProjectFileUploadError`, which exposes `Local / Unpersisted` and `researchFileRecordCreated: false` and states that no research-file record was created.
+- Object filename path separators are neutralized before constructing the project-scoped object path.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/storagePersistence.test.ts` — exit `0`; PASS, 1/1 file and 5/5 tests.
+3. `npx vitest run src/tests/storagePersistence.test.ts src/tests/firebaseConfiguration.test.ts src/tests/integration.test.ts` — exit `1`; the new storage suite and Firebase configuration suite passed. Combined result: 2/3 files and 13/14 tests passed. The only failure is the established integration environment issue where `window.localStorage.setItem` is not a function.
+4. `npm test` — exit `1`; 28/30 executed files passed, 228/230 executed tests passed, with 1 emulator-only file and 8 tests skipped. The two failures are pre-existing: offline Crossref returns a network-failure message instead of the test's registry-not-found wording, and the jsdom localStorage implementation lacks `setItem` under the current Node option.
+5. `npm run build` — exit `0`; PASS, 1,993 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+6. `git diff --check` — exit `0`; PASS.
+
+### Tests and compatibility
+
+- Added `src/tests/storagePersistence.test.ts` with deterministic checksum, complete successful metadata, object-upload failure, metadata-write cleanup, and no-object-URL regression coverage.
+- No destructive migration is required. Existing file metadata documents remain readable. New successful records add required persistence/provenance fields; failed attempts never create a record.
+- The upload function's intentional error contract is stricter: callers that previously received a misleading blob URL now receive an explicit failure and must keep the selected file local or ask the researcher to retry.
+
+### Remaining blockers and prompt boundary
+
+- Cloud Storage access rules remain absent and are explicitly assigned to TQ-VSC-015; they were not implemented in this prompt.
+- Cleanup after a metadata-write failure is best effort. A provider failure during deletion may leave an unreferenced Storage object, but it still cannot create or return a successful research-file record.
+- Full-suite Crossref and localStorage-environment failures remain outside this prompt.
+- TQ-VSC-015 and all later prompts remain `NOT STARTED`.

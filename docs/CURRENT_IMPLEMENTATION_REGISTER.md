@@ -117,8 +117,9 @@ TQ-VSC-013 moves privileged audit appends to a Firebase Admin server path. Clien
 
 ### Storage
 
-- `src/lib/storageService.ts` uploads to `projects/{projectId}/files/...` and writes metadata beneath the project document.
-- Failed uploads return a browser object URL. That URL is session-local and is not durable cloud persistence.
+- `src/lib/storageService.ts` calculates SHA-256 from the selected bytes, uploads to `projects/{projectId}/files/...`, resolves the durable object reference, and only then writes project-scoped metadata beneath the project document.
+- Successful metadata records include project ID, actual Storage path, SHA-256, MIME type, size, uploader UID, timestamp, persistence state, and researcher-upload provenance.
+- Failed uploads throw an explicit `Local / Unpersisted` error and create no research-file metadata record. If metadata persistence fails after object upload, cleanup of the incomplete object is attempted. The research upload path has no browser object-URL fallback.
 - Local-storage save/load helpers also exist.
 - No Cloud Storage rules file is present in the inspected repository; only `firestore.rules` exists.
 
@@ -203,7 +204,7 @@ These are source observations, not work completed under later prompts:
 1. Express AI, DOI, and analysis routes have no authentication, project-membership check, or server-side RBAC.
 2. Firebase client configuration is hard-coded rather than environment validated.
 3. Client code can create high-integrity audit and version records; audit actor/details are not established by a trusted server.
-4. Failed Storage uploads return non-durable object URLs, potentially presenting a transient file as uploaded state.
+4. Cloud Storage object authorization is not yet backed by a repository Storage rules file; TQ-VSC-014 corrected upload success/failure semantics, while project-scoped Storage rules remain separately scoped.
 5. No Cloud Storage rules are present.
 6. Four direct Gemini integrations are not centralized; the generic agent response is unstructured at the application boundary.
 7. API request bodies are not validated with deterministic schemas.
