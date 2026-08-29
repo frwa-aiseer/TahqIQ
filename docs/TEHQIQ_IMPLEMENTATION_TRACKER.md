@@ -898,3 +898,41 @@ None. The harness is test-only and imports existing types without changing them.
 - Admin transitions require configured Firebase Admin credentials. Offline/local-only projects cannot claim trusted sensitive transitions.
 - The two full-suite failures are unchanged baseline/environment failures and were not introduced by this prompt.
 - TQ-VSC-022 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-022 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Normalized Crossref, OpenAlex, DataCite, Europe PMC, and PubMed/NCBI E-utilities adapters behind one result contract with stable provider IDs, provider record IDs, identifier maps, one `retrievedAt` value, and field-level provenance.
+- Removed invented fallback titles, authors, publication years, venues, and publishers from provider lookup and Crossref candidate search. Missing provider fields remain absent.
+- Added deterministic `not_found`, `rate_limited`, `provider_error`, `network_error`, `invalid_request`, and `invalid_response` classifications, including HTTP status and numeric `Retry-After` preservation where available.
+- Implemented direct PMID lookup and DOI-to-PMID resolution with NCBI ESearch/ESummary. PubMed is available without a key at the normal three-request-per-second allowance and accepts an optional server-side API key for the higher ten-request-per-second allowance.
+- The protected DOI proxy supplies optional `NCBI_API_KEY`/`NCBI_EMAIL`, preserves DOI/PMID/PMCID and provider identity, and reuses the adapter retrieval timestamp instead of generating inconsistent provenance timestamps.
+
+### Files changed and migrations
+
+- `src/lib/metadataProviders.ts`
+- `src/types.ts`
+- `server.ts`
+- `src/tests/metadataProviderAdapters.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No destructive data migration is required. Optional `providerId` fields are backward-compatible with existing provenance records; previously stored records remain readable.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/metadataProviderAdapters.test.ts` — exit `0`; PASS, 1/1 file and 27/27 tests.
+3. `npm test` — exit `1`; 35/37 executed files passed and 298/300 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures are unchanged pre-existing failures: the network-dependent Phase 3 Crossref assertion expects not-found wording while the environment returns a truthful network error, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 1,998 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. Provider fallback scan for `Untitled`, `Unknown Author`, `Unspecified`, current-year fallbacks, and the obsolete private-key requirement — no matches.
+6. `git diff --check` — exit `0`; PASS before the tracker update and rerun after documentation completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Mocked success, not-found, rate-limit, provider HTTP error, and network error behavior passes for all five adapters.
+- Tests cover no-key PubMed operation, optional-key query propagation, DOI ESearch resolution, identifier preservation, consistent timestamps/provenance, and absent-field behavior.
+- `NCBI_API_KEY` and `NCBI_EMAIL` are optional server configuration; their absence does not disable PubMed.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-022.
+- TQ-VSC-023 and all later prompts remain `NOT STARTED`.

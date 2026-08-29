@@ -358,12 +358,14 @@ export interface TrustedTransitionIntegrity {
 }
 
 export interface FieldProvenance {
+  providerId?: string;
   provider: string; // e.g., "Crossref", "OpenAlex", "DataCite", "Europe PMC", "BibTeX", "RIS", "CSL JSON", "Manual Input"
   timestamp: string;
   rawRecordUrl?: string;
 }
 
 export interface ProvenanceMetadata {
+  providerId?: string;
   provider: string;
   retrievedAt: string;
   fieldProvenance?: Record<string, FieldProvenance>;

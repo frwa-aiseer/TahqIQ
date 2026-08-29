@@ -3,7 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
-import { lookupDoiMetadata, CrossrefDisclaimer } from "./src/lib/metadataProviders";
+import { lookupDoiMetadata } from "./src/lib/metadataProviders";
 import { executePairedCrossoverAnalysis, generateAnalysisFiguresAndTables } from "./src/lib/statsEngine";
 import { hasAttributableManuscriptApproval } from "./src/lib/analysisLifecycle";
 import { applicationDefault, getApps as getAdminApps, initializeApp as initializeAdminApp } from "firebase-admin/app";
@@ -471,7 +471,13 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
       if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
       const { doi } = requestValidation.value;
 
-      const lookup = await lookupDoiMetadata(doi);
+      const lookup = await lookupDoiMetadata(doi, {
+        pubMed: {
+          apiKey: process.env.NCBI_API_KEY,
+          email: process.env.NCBI_EMAIL,
+          tool: "tehqiq",
+        },
+      });
       if (!lookup.success) {
         return res.status(404).json({
           error: lookup.error || "DOI not found in authoritative registries.",
@@ -481,24 +487,30 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
 
       res.json({
         doi: lookup.doi,
+        pmid: lookup.pmid,
+        pmcid: lookup.pmcid,
         title: lookup.title,
         authors: lookup.authors,
         year: lookup.year,
         journalOrVenue: lookup.journalOrVenue,
-        volume: lookup.volume || "",
-        issue: lookup.issue || "",
-        pages: lookup.pages || "",
-        publisher: lookup.publisher || "",
+        volume: lookup.volume,
+        issue: lookup.issue,
+        pages: lookup.pages,
+        publisher: lookup.publisher,
         verificationState: "Verified",
         metadataProvider: lookup.providerName,
-        verificationDate: new Date().toISOString(),
-        disclaimer: lookup.disclaimer || CrossrefDisclaimer.MESSAGE,
+        metadataProviderId: lookup.providerId,
+        providerRecordId: lookup.providerRecordId,
+        identifiers: lookup.identifiers,
+        verificationDate: lookup.retrievedAt,
+        disclaimer: lookup.disclaimer,
         fieldProvenance: lookup.fieldProvenance,
         provenance: {
+          providerId: lookup.providerId,
           provider: lookup.providerName,
-          retrievedAt: new Date().toISOString(),
+          retrievedAt: lookup.retrievedAt,
           fieldProvenance: lookup.fieldProvenance,
-          disclaimer: lookup.disclaimer || CrossrefDisclaimer.MESSAGE,
+          disclaimer: lookup.disclaimer,
         },
       });
     } catch (error: any) {

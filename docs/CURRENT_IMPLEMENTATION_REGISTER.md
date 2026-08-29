@@ -179,8 +179,10 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 
 ## Literature and reference providers
 
-- DOI provider adapters in `src/lib/metadataProviders.ts`: Crossref, OpenAlex, DataCite, and Europe PMC.
-- `lookupDoiMetadata` runs the registered providers; `searchMissingCitationCandidates` queries Crossref candidate search.
+- Normalized DOI provider adapters in `src/lib/metadataProviders.ts`: Crossref, OpenAlex, DataCite, Europe PMC, and PubMed/NCBI E-utilities.
+- Provider results preserve provider/record identifiers, DOI/PMID/PMCID where supplied, one retrieval timestamp, and field-level provenance. Missing metadata remains absent rather than receiving synthetic fallback values.
+- PubMed operates without an API key at its normal request allowance; the server can supply optional `NCBI_API_KEY` and `NCBI_EMAIL` values for identified/higher-throughput E-utilities use.
+- `lookupDoiMetadata` runs the registered provider cascade; `searchMissingCitationCandidates` queries Crossref candidate search with the same no-fabrication normalization.
 - Client DOI lookup is routed through `/api/sources/doi`.
 - `src/lib/referenceParsers.ts` parses BibTeX, RIS, CSL JSON, and plain reference text.
 - `src/lib/cslStyles.ts` and `src/lib/journalStyleConfig.ts` format citations and bibliography entries.
