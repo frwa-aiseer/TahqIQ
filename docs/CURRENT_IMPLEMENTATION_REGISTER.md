@@ -183,11 +183,12 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 - Provider results preserve provider/record identifiers, DOI/PMID/PMCID where supplied, one retrieval timestamp, and field-level provenance. Missing metadata remains absent rather than receiving synthetic fallback values.
 - PubMed operates without an API key at its normal request allowance; the server can supply optional `NCBI_API_KEY` and `NCBI_EMAIL` values for identified/higher-throughput E-utilities use.
 - `lookupDoiMetadata` runs the registered provider cascade; `searchMissingCitationCandidates` queries Crossref candidate search with the same no-fabrication normalization.
+- `src/lib/specialistDiscoveryProviders.ts` declares and implements Unpaywall-compatible DOI OA discovery, arXiv ID lookup/search, and DOAJ DOI/record lookup/search. It preserves provider errors/provenance and accepts only provider-returned access links; it does not scrape or infer full-text URLs.
 - Client DOI lookup is routed through `/api/sources/doi`.
 - `src/lib/referenceParsers.ts` parses BibTeX, RIS, CSL JSON, and plain reference text.
 - `src/lib/cslStyles.ts` and `src/lib/journalStyleConfig.ts` format citations and bibliography entries.
 - `src/data/baselineOutlets.ts` contains static journal/conference records, live/user-added record factories, provenance/integrity validation, and style mapping.
-- No general multi-provider search execution object, screening workbench integration, lawful full-text retrieval pipeline, or agent tool registry was found in the mounted application.
+- No general multi-provider search execution object, screening workbench integration, full-text download pipeline, or agent tool registry was found in the mounted application. The specialist adapters expose lawful provider-supplied access-location metadata but do not download content.
 
 ## Export implementation
 

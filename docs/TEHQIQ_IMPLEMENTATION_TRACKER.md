@@ -936,3 +936,41 @@ None. The harness is test-only and imports existing types without changing them.
 - `NCBI_API_KEY` and `NCBI_EMAIL` are optional server configuration; their absence does not disable PubMed.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-022.
 - TQ-VSC-023 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-023 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a standalone specialist-provider layer for Unpaywall-compatible DOI OA discovery, arXiv metadata lookup/search, and DOAJ metadata lookup/search without implementing TQ-VSC-024's multi-provider `SearchExecution` orchestration.
+- Declared each provider's capabilities, supported identifiers, required/optional configuration, rate-handling contract, and provider-supplied-links-only full-text policy.
+- Unpaywall requires a configured contact email and otherwise returns `not_configured` without making a request. Its OA state and access/PDF URLs are preserved only when returned by the API.
+- arXiv supports modern/legacy/versioned arXiv IDs and query search, parses official Atom metadata, and declares the provider-requested three-second inter-request interval.
+- DOAJ supports DOI and DOAJ record lookup plus bounded article metadata search. Full-text links and licenses are retained only when present in the DOAJ response.
+- All adapters preserve stable provider/record IDs, supplied DOI/arXiv/DOAJ identifiers, one retrieval timestamp, field-level provenance, HTTP status, numeric `Retry-After`, and truthful not-found/rate/provider/network states.
+
+### Files changed and migrations
+
+- `src/lib/specialistDiscoveryProviders.ts` (created)
+- `src/tests/specialistDiscoveryProviders.test.ts` (created)
+- `src/lib/metadataProviders.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. The shared provider identifier/error unions were extended additively; persisted schemas were not rewritten.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/specialistDiscoveryProviders.test.ts` — exit `0`; PASS, 1/1 file and 22/22 tests.
+3. `npx vitest run src/tests/metadataProviderAdapters.test.ts src/tests/specialistDiscoveryProviders.test.ts` — exit `0`; PASS, 2/2 files and 49/49 tests.
+4. `npm test` — exit `1`; 36/38 executed files passed and 320/322 executed tests passed, with 2 emulator-only files and 18 tests skipped. The only failures are the unchanged baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+5. `npm run build` — exit `0`; PASS, 1,998 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+6. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Mocked tests cover success, not configured, not found, rate-limited, provider error, network error, invalid identifiers, identifier normalization, provenance/timestamp preservation, declared capabilities/configuration/rate handling, bounded search, and absent access-link behavior.
+- No adapter scrapes HTML, bypasses access controls, downloads copyrighted full text, or synthesizes access/PDF URLs.
+- Configuration and access discovery are adapter-level in this prompt. Server routing and multi-provider search execution belong to TQ-VSC-024 and were not implemented.
+- The full suite remains red only for the two established baseline/environment failures; neither was introduced by TQ-VSC-023.
+- TQ-VSC-024 and all later prompts remain `NOT STARTED`.

@@ -1,8 +1,8 @@
 import { FieldProvenance } from "../types";
 
-export type MetadataProviderId = "crossref" | "openalex" | "datacite" | "europepmc" | "pubmed_ncbi" | "router";
-export type MetadataProviderErrorKind = "invalid_request" | "not_found" | "rate_limited" | "provider_error" | "network_error" | "invalid_response";
-export interface MetadataProviderIdentifiers { doi?: string; pmid?: string; pmcid?: string; openAlexId?: string; dataCiteId?: string; europePmcId?: string }
+export type MetadataProviderId = "crossref" | "openalex" | "datacite" | "europepmc" | "pubmed_ncbi" | "unpaywall" | "arxiv" | "doaj" | "router";
+export type MetadataProviderErrorKind = "invalid_request" | "not_configured" | "not_found" | "rate_limited" | "provider_error" | "network_error" | "invalid_response";
+export interface MetadataProviderIdentifiers { doi?: string; pmid?: string; pmcid?: string; openAlexId?: string; dataCiteId?: string; europePmcId?: string; arxivId?: string; doajId?: string }
 export interface MetadataProviderResult {
   success: boolean; providerId: MetadataProviderId; providerName: string; retrievedAt: string;
   providerRecordId?: string; identifiers?: MetadataProviderIdentifiers; error?: string; errorKind?: MetadataProviderErrorKind;
