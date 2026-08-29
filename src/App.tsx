@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ProjectState, SourceRecord, CSLStyleOption, ManuscriptSection, ResearchCanvas, ResearchQuestionItem, ClaimItem, TargetOutlet } from "./types";
+import { ProjectState, SourceRecord, CSLStyleOption, ManuscriptSection, ResearchCanvas, ResearchQuestionItem, ClaimItem, TargetOutlet, SearchExecution, SearchExecutionSource } from "./types";
 import { createEmptyProject, createDemoProject, canAddRecordToProject } from "./data/demoProject";
 import { mapJournalStyleToCslId } from "./data/baselineOutlets";
 import { Header } from "./components/Header";
@@ -7,6 +7,7 @@ import { Navigation, WORKFLOW_STEPS } from "./components/Navigation";
 import { ResearchCanvasView } from "./components/views/ResearchCanvasView";
 import { QuestionBuilderView } from "./components/views/QuestionBuilderView";
 import { SourceLibraryView } from "./components/views/SourceLibraryView";
+import { SearchPlannerView } from "./components/views/SearchPlannerView";
 import { DocumentReaderModal } from "./components/views/DocumentReaderModal";
 import { ClaimMatrixView } from "./components/views/ClaimMatrixView";
 import { GapMapView } from "./components/views/GapMapView";
@@ -171,6 +172,34 @@ function MainAppContent() {
     setProject((prev) => ({ ...prev, sources: [newSource, ...prev.sources] }));
   };
 
+  const handleSaveSearchExecution = (execution: SearchExecution) => {
+    setProject((prev) => ({ ...prev, searchExecutions: [execution, ...(prev.searchExecutions || []).filter((item) => item.searchId !== execution.searchId)] }));
+  };
+
+  const handleImportSearchSources = (execution: SearchExecution, sources: SearchExecutionSource[]) => {
+    const imported: SourceRecord[] = sources.filter((source) => source.title && source.year && source.journalOrVenue).map((source) => ({
+      id: source.sourceId,
+      title: source.title!,
+      authors: source.authors || [],
+      year: source.year!,
+      journalOrVenue: source.journalOrVenue!,
+      publisher: source.publisher,
+      doi: source.doi,
+      pmid: source.pmid,
+      pmcid: source.pmcid,
+      documentType: source.provider === "arXiv" ? "Preprint" : "Research Source",
+      peerReviewStatus: source.provider === "arXiv" ? "Preprint" : "Unknown",
+      verificationState: "Unverified",
+      state: "Imported",
+      stateHistory: [],
+      metadataProvider: source.provider,
+      provenance: { providerId: source.providerId, provider: source.provider, retrievedAt: source.retrievedAt, fieldProvenance: source.fieldProvenance },
+      relevanceScore: 5,
+      tags: [`Search Execution ${execution.searchId}`, source.provider],
+    }));
+    setProject((prev) => ({ ...prev, sources: [...imported.filter((source) => !prev.sources.some((existing) => existing.id === source.id)), ...prev.sources] }));
+  };
+
   const handleUpdateClaims = (updatedClaims: ClaimItem[]) => {
     const validClaims = project.isDemoProject
       ? updatedClaims
@@ -281,6 +310,12 @@ function MainAppContent() {
 
             {activeStep === 2 && (
               <div className="space-y-6">
+                <SearchPlannerView
+                  projectId={project.id}
+                  executions={project.searchExecutions || []}
+                  onSaveExecution={handleSaveSearchExecution}
+                  onImportSources={handleImportSearchSources}
+                />
                 <SourceLibraryView
                   sources={project.sources}
                   onAddSource={handleAddSource}

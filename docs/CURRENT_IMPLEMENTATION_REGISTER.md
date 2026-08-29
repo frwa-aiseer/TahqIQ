@@ -38,7 +38,7 @@ Hash navigation maps many legacy tab names to these ten steps, but it does not p
 ### Mounted views and components
 
 - Research definition: `ResearchCanvasView`, `QuestionBuilderView`, `ProjectWizardModal`.
-- Literature/evidence: `SourceLibraryView`, `DocumentReaderModal`, `GapMapView`, `ClaimMatrixView`.
+- Literature/evidence: `SearchPlannerView`, `SourceLibraryView`, `DocumentReaderModal`, `GapMapView`, `ClaimMatrixView`.
 - Method and analysis: domain-neutral `ProtocolBuilderView`, `DataLabView`.
 - Writing/output: `WritingStudioView`, `ManuscriptPreviewPane` (used by export), `ExportCentreView`.
 - Shell/governance: `Header`, `Navigation`, `QuickActionsMenu`, `StatusBadge`, `JournalSelectorDropdown`, `AiProposalModal`, `ApprovalModal`.
@@ -49,7 +49,6 @@ Hash navigation maps many legacy tab names to these ten steps, but it does not p
 The following view modules exist but have no import or render path in the application root:
 
 - `DashboardView`
-- `SearchPlannerView`
 - `JournalFinderView`
 - `EthicsWorkspaceView`
 - `ReportingChecklistView`
@@ -70,6 +69,7 @@ These components may be tested or referenced by legacy labels, but the current h
 | `POST /api/gemini/peer-review` | Requests schema-shaped reviewer comments from Gemini. | No authentication; checks only that `reviewerRole` exists. |
 | `POST /api/gemini/methodology-proposal` | Returns schema-shaped, domain-neutral methodology fields as an `AI Suggested` proposal; unsupported fields are normalized to `Researcher input required`. | No reusable server authentication middleware yet; requires `projectId` and object `projectContext`. Human approval occurs separately in the signed-in client workflow. |
 | `POST /api/sources/doi` | Proxies DOI lookup through the metadata provider chain and returns provenance fields. | No authentication; only checks that `doi` exists. |
+| `POST /api/projects/:projectId/search-executions` | Executes the exact compiled query independently against every selected supported provider and returns a reproducible `SearchExecution`. | Authenticated project writer role, project-scope match, bounded schema validation, body/rate limits. |
 | `POST /api/analysis/execute` | Uses an optional external analysis service, otherwise executes the native paired-crossover engine and creates figures/tables. | No authentication or project membership/RBAC check; input checks require only `dataset` and `plan`. |
 | `GET *` (production only) | Serves the built SPA index after static middleware. | Public static route. |
 
@@ -184,11 +184,13 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 - PubMed operates without an API key at its normal request allowance; the server can supply optional `NCBI_API_KEY` and `NCBI_EMAIL` values for identified/higher-throughput E-utilities use.
 - `lookupDoiMetadata` runs the registered provider cascade; `searchMissingCitationCandidates` queries Crossref candidate search with the same no-fabrication normalization.
 - `src/lib/specialistDiscoveryProviders.ts` declares and implements Unpaywall-compatible DOI OA discovery, arXiv ID lookup/search, and DOAJ DOI/record lookup/search. It preserves provider errors/provenance and accepts only provider-returned access links; it does not scrape or infer full-text URLs.
+- `src/lib/searchExecution.ts` compiles provider-specific syntax and executes Crossref, OpenAlex, PubMed, Europe PMC, arXiv, and DOAJ independently. Stored execution records retain design context, concepts/synonyms, filters, timestamps, exact syntax, returned source IDs, per-provider counts, warnings, and errors.
+- The mounted Search Planner implements design/edit → provider selection → protected server execution → researcher review → explicit import. Imported search results remain `Unverified` metadata and retain their execution/provider provenance.
 - Client DOI lookup is routed through `/api/sources/doi`.
 - `src/lib/referenceParsers.ts` parses BibTeX, RIS, CSL JSON, and plain reference text.
 - `src/lib/cslStyles.ts` and `src/lib/journalStyleConfig.ts` format citations and bibliography entries.
 - `src/data/baselineOutlets.ts` contains static journal/conference records, live/user-added record factories, provenance/integrity validation, and style mapping.
-- No general multi-provider search execution object, screening workbench integration, full-text download pipeline, or agent tool registry was found in the mounted application. The specialist adapters expose lawful provider-supplied access-location metadata but do not download content.
+- No screening workbench integration, full-text download pipeline, or agent tool registry was found in the mounted application. The search execution and specialist adapters expose metadata and lawful provider-supplied access locations but do not download content.
 
 ## Export implementation
 

@@ -974,3 +974,44 @@ None. The harness is test-only and imports existing types without changing them.
 - Configuration and access discovery are adapter-level in this prompt. Server routing and multi-provider search execution belong to TQ-VSC-024 and were not implemented.
 - The full suite remains red only for the two established baseline/environment failures; neither was introduced by TQ-VSC-023.
 - TQ-VSC-024 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-024 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added backward-compatible `SearchExecution`, `SearchProviderExecution`, `SearchExecutionSource`, and concept/provider lifecycle types. An execution preserves `searchId`, project scope, context, concepts/synonyms, provider-specific syntax, selected providers, filters, design/execution/review/import timestamps, returned/imported source IDs, aggregate/per-provider counts, warnings, and errors.
+- Added deterministic query compilation for Crossref, OpenAlex, PubMed, Europe PMC, arXiv, and DOAJ. A fixed design and design timestamp reproduce the same execution record and exact syntax.
+- Added six distinct executable provider adapters. Every selected provider runs through its own adapter and records its own status, timing, count, source IDs, warnings, and errors; one provider failure does not get relabeled as another provider or erase successful results.
+- Added a protected project-writer endpoint with project-scope matching, strict bounded request validation, existing authentication/RBAC/rate/body controls, and server-side provider execution.
+- Replaced the query-copy-only Search Planner with the requested design/edit → select → execute → review → import workflow and mounted it in Literature Search. Import requires explicit researcher selection and creates `Unverified` source metadata with search/provider provenance.
+- Crossref-only execution remains explicitly Crossref-only. It cannot produce provider execution records or result attribution for unexecuted providers.
+
+### Files changed and migrations
+
+- `src/lib/searchExecution.ts` (created)
+- `src/tests/searchExecution.test.ts` (created)
+- `src/types.ts`
+- `src/server/apiSchemas.ts`
+- `server.ts`
+- `src/components/views/SearchPlannerView.tsx`
+- `src/App.tsx`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. `ProjectState.searchExecutions` is optional, and legacy `searchStrategies` remains readable for backward compatibility.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/searchExecution.test.ts src/tests/metadataProviderAdapters.test.ts src/tests/specialistDiscoveryProviders.test.ts` — exit `0`; PASS, 3/3 files and 57/57 tests.
+3. `npm test` — exit `1`; 37/39 executed files passed and 328/330 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,000 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests verify reproducible design construction, distinct syntax for all six providers, one independent adapter call per selected provider, exact provider/result attribution, stable returned source IDs, per-provider errors/rate warnings, missing-adapter truthfulness, bounded project-scoped validation, and the Crossref-only mislabeling regression.
+- Search results are metadata candidates, not verified evidence. Imports stay `Unverified`; records missing title/year/venue are labeled as unavailable and require researcher input before import rather than receiving invented compatibility values.
+- Provider result limits are bounded to 100 per execution/provider. The server has existing request rate limiting, while provider-level rate responses are preserved for review; distributed scheduling/backoff is not implemented.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-024.
+- TQ-VSC-025 and all later prompts remain `NOT STARTED`.

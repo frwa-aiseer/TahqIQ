@@ -63,6 +63,21 @@ export interface MethodologyRequest {
 }
 
 export interface DoiRequest { doi: string }
+export interface SearchExecutionRequest {
+  searchId?: string;
+  projectId: string;
+  context: string;
+  concepts: Array<{ concept: string; synonyms: string[] }>;
+  providers: Array<"Crossref" | "OpenAlex" | "PubMed" | "Europe PMC" | "arXiv" | "DOAJ">;
+  filters: {
+    dateFrom?: string;
+    dateTo?: string;
+    publicationTypes?: string[];
+    languages?: string[];
+    peerReviewedOnly?: boolean;
+    maxResultsPerProvider?: number;
+  };
+}
 export interface AnalysisRequest {
   dataset: DatasetRecord;
   plan: AnalysisPlan;
@@ -176,6 +191,24 @@ export function validateDoiRequest(value: unknown): ValidationResult<DoiRequest>
   const doi = value.doi.trim().replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "");
   if (doi.length > 300 || !/^10\.\d{4,9}\/\S+$/i.test(doi)) return failure("DOI syntax is invalid.");
   return success({ doi });
+}
+
+export function validateSearchExecutionRequest(value: unknown, expectedProjectId: string): ValidationResult<SearchExecutionRequest> {
+  if (!object(value) || !hasOnlyKeys(value, ["searchId", "projectId", "context", "concepts", "providers", "filters"])) return failure("Search execution request contains unsupported fields.");
+  if (value.projectId !== expectedProjectId) return failure("Body projectId must match authenticated project scope.");
+  if (value.searchId !== undefined && !boundedString(value.searchId, 1, 200)) return failure("searchId must be a bounded string.");
+  if (!boundedString(value.context, 1, 2_000)) return failure("Search context is required and bounded.");
+  if (!Array.isArray(value.concepts) || value.concepts.length < 1 || value.concepts.length > 20 || !value.concepts.every((item) => object(item) && hasOnlyKeys(item, ["concept", "synonyms"]) && boundedString(item.concept, 1, 300) && stringArray(item.synonyms, 30, 300))) return failure("Search concepts and synonyms are malformed or out of bounds.");
+  const providers = ["Crossref", "OpenAlex", "PubMed", "Europe PMC", "arXiv", "DOAJ"];
+  if (!Array.isArray(value.providers) || value.providers.length < 1 || value.providers.length > providers.length || !value.providers.every((provider) => typeof provider === "string" && providers.includes(provider)) || new Set(value.providers).size !== value.providers.length) return failure("Search providers are missing, duplicated, or unsupported.");
+  if (!object(value.filters) || !hasOnlyKeys(value.filters, ["dateFrom", "dateTo", "publicationTypes", "languages", "peerReviewedOnly", "maxResultsPerProvider"])) return failure("Search filters are malformed.");
+  const filters = value.filters;
+  if (["dateFrom", "dateTo"].some((key) => filters[key] !== undefined && (typeof filters[key] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(filters[key] as string))) ||
+      (filters.publicationTypes !== undefined && !stringArray(filters.publicationTypes, 20, 100)) ||
+      (filters.languages !== undefined && !stringArray(filters.languages, 20, 100)) ||
+      (filters.peerReviewedOnly !== undefined && typeof filters.peerReviewedOnly !== "boolean") ||
+      (filters.maxResultsPerProvider !== undefined && (!Number.isInteger(filters.maxResultsPerProvider) || (filters.maxResultsPerProvider as number) < 1 || (filters.maxResultsPerProvider as number) > 100))) return failure("Search filter values are malformed or out of bounds.");
+  return success({ searchId: typeof value.searchId === "string" ? value.searchId.trim() : undefined, projectId: expectedProjectId, context: (value.context as string).trim(), concepts: value.concepts as SearchExecutionRequest["concepts"], providers: value.providers as SearchExecutionRequest["providers"], filters: filters as SearchExecutionRequest["filters"] });
 }
 
 export function validateAnalysisRequest(value: unknown): ValidationResult<AnalysisRequest> {

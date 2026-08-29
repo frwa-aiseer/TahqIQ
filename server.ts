@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { lookupDoiMetadata } from "./src/lib/metadataProviders";
+import { createSearchExecution, executeSearchExecution } from "./src/lib/searchExecution";
 import { executePairedCrossoverAnalysis, generateAnalysisFiguresAndTables } from "./src/lib/statsEngine";
 import { hasAttributableManuscriptApproval } from "./src/lib/analysisLifecycle";
 import { applicationDefault, getApps as getAdminApps, initializeApp as initializeAdminApp } from "firebase-admin/app";
@@ -35,6 +36,7 @@ import {
   validateMethodologyRequest,
   validatePeerReviewModelOutput,
   validatePeerReviewRequest,
+  validateSearchExecutionRequest,
 } from "./src/server/apiSchemas";
 
 dotenv.config();
@@ -516,6 +518,19 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
     } catch (error: any) {
       console.error("DOI Lookup Error:", error);
       res.status(500).json({ error: "Failed to resolve DOI metadata." });
+    }
+  });
+
+  app.post("/api/projects/:projectId/search-executions", protectedProjectRoute(PROJECT_WRITER_ROLES, 128 * 1024), async (req, res) => {
+    try {
+      const validation = validateSearchExecutionRequest(req.body, req.params.projectId);
+      if (!validation.valid) return rejectInvalidRequest(res, validation.errors);
+      const design = createSearchExecution(validation.value);
+      const execution = await executeSearchExecution(design);
+      res.json({ status: "completed", execution });
+    } catch (error: any) {
+      console.error("Search Execution Error:", error);
+      res.status(500).json({ status: "failed", error: "Search execution failed safely." });
     }
   });
 

@@ -261,6 +261,67 @@ export interface SearchStrategy {
   searchDate: string;
 }
 
+export type SearchProvider = "Crossref" | "OpenAlex" | "PubMed" | "Europe PMC" | "arXiv" | "DOAJ";
+export type SearchExecutionStatus = "Design" | "Selected" | "Executing" | "Review" | "Imported" | "Failed";
+
+export interface SearchConcept {
+  concept: string;
+  synonyms: string[];
+}
+
+export interface SearchExecutionSource {
+  sourceId: string;
+  provider: SearchProvider;
+  providerId: string;
+  providerRecordId?: string;
+  doi?: string;
+  pmid?: string;
+  pmcid?: string;
+  arxivId?: string;
+  title?: string;
+  authors?: string[];
+  year?: number;
+  journalOrVenue?: string;
+  publisher?: string;
+  retrievedAt: string;
+  rawUrl?: string;
+  fieldProvenance?: Record<string, FieldProvenance>;
+}
+
+export interface SearchProviderExecution {
+  provider: SearchProvider;
+  syntax: string;
+  startedAt: string;
+  completedAt: string;
+  status: "Completed" | "Not Found" | "Rate Limited" | "Not Configured" | "Error";
+  returnedSourceIds: string[];
+  importedSourceIds?: string[];
+  count: number;
+  warnings: string[];
+  errors: string[];
+}
+
+export interface SearchExecution {
+  searchId: string;
+  projectId: string;
+  context: string;
+  concepts: SearchConcept[];
+  providerSyntax: Partial<Record<SearchProvider, string>>;
+  providers: SearchProvider[];
+  designedAt: string;
+  executedAt?: string;
+  reviewedAt?: string;
+  importedAt?: string;
+  filters: SearchStrategy["filters"] & { maxResultsPerProvider?: number };
+  status: SearchExecutionStatus;
+  returnedSourceIds: string[];
+  counts: { total: number; byProvider: Partial<Record<SearchProvider, number>> };
+  warnings: string[];
+  errors: string[];
+  providerExecutions: SearchProviderExecution[];
+  results: SearchExecutionSource[];
+}
+
 export type VerificationState = "Unverified" | "Verified" | "Conflict" | "Retracted" | "Corrected";
 
 export type SourceState =
@@ -1129,6 +1190,7 @@ export interface ProjectState {
   canvas: ResearchCanvas;
   researchQuestions: ResearchQuestionItem[];
   searchStrategies: SearchStrategy[];
+  searchExecutions?: SearchExecution[];
   sources: SourceRecord[];
   claims: ClaimItem[];
   gaps: ResearchGap[];
