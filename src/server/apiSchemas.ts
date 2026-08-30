@@ -211,6 +211,21 @@ export function validateSearchExecutionRequest(value: unknown, expectedProjectId
   return success({ searchId: typeof value.searchId === "string" ? value.searchId.trim() : undefined, projectId: expectedProjectId, context: (value.context as string).trim(), concepts: value.concepts as SearchExecutionRequest["concepts"], providers: value.providers as SearchExecutionRequest["providers"], filters: filters as SearchExecutionRequest["filters"] });
 }
 
+export function validateLiteratureRetrievalRequest(value: unknown, expectedProjectId: string): ValidationResult<ApprovedSearchPlan> {
+  if (!object(value) || !hasOnlyKeys(value, ["plan"]) || !object(value.plan)) return failure("Literature retrieval requires only an approved plan object.");
+  const plan = value.plan;
+  if (!hasOnlyKeys(plan, ["planId", "projectId", "context", "concepts", "providerSyntax", "providers", "filters", "approval"])) return failure("Approved search plan contains unsupported fields.");
+  if (plan.projectId !== expectedProjectId || !boundedString(plan.planId, 1, 200) || !boundedString(plan.context, 1, 2_000)) return failure("Approved search plan identity or project scope is invalid.");
+  if (!Array.isArray(plan.concepts) || plan.concepts.length < 1 || plan.concepts.length > 30 || !plan.concepts.every((item) => object(item) && hasOnlyKeys(item, ["concept", "synonyms"]) && boundedString(item.concept, 1, 300) && stringArray(item.synonyms, 50, 300))) return failure("Approved concepts are malformed.");
+  const supportedProviders = ["Crossref", "OpenAlex", "PubMed", "Europe PMC", "arXiv", "DOAJ"];
+  if (!Array.isArray(plan.providers) || plan.providers.length < 1 || plan.providers.length > supportedProviders.length || !plan.providers.every((provider) => typeof provider === "string" && supportedProviders.includes(provider)) || new Set(plan.providers).size !== plan.providers.length) return failure("Approved providers are missing, duplicated, or unsupported.");
+  if (!object(plan.providerSyntax) || !hasOnlyKeys(plan.providerSyntax, supportedProviders) || !plan.providers.every((provider) => boundedString(plan.providerSyntax[provider], 1, 10_000))) return failure("Every approved provider requires bounded exact syntax.");
+  if (!object(plan.filters) || !hasOnlyKeys(plan.filters, ["dateFrom", "dateTo", "publicationTypes", "languages", "peerReviewedOnly", "maxResultsPerProvider"])) return failure("Approved search filters are malformed.");
+  if (plan.filters.maxResultsPerProvider !== undefined && (!Number.isInteger(plan.filters.maxResultsPerProvider) || (plan.filters.maxResultsPerProvider as number) < 1 || (plan.filters.maxResultsPerProvider as number) > 100)) return failure("Approved provider result limit must be between 1 and 100.");
+  if (!object(plan.approval) || !hasOnlyKeys(plan.approval, ["researcherUid", "researcherEmail", "approvedAt", "rationale"]) || !boundedString(plan.approval.researcherUid, 1, 200) || !boundedString(plan.approval.researcherEmail, 3, 500) || !boundedString(plan.approval.approvedAt, 10, 100) || !boundedString(plan.approval.rationale, 5, 2_000)) return failure("Attributable researcher approval is required.");
+  return success(plan as unknown as ApprovedSearchPlan);
+}
+
 export function validateAnalysisRequest(value: unknown): ValidationResult<AnalysisRequest> {
   if (!object(value) || !hasOnlyKeys(value, ["dataset", "plan", "options"]) || !object(value.dataset) || !object(value.plan)) return failure("Analysis request requires dataset and plan objects only.");
   const dataset = value.dataset;
@@ -252,4 +267,4 @@ export function validateExternalAnalysisResponse(value: unknown): ValidationResu
   }
   return success(value);
 }
-import type { AnalysisPlan, DatasetRecord } from "../types";
+import type { AnalysisPlan, ApprovedSearchPlan, DatasetRecord } from "../types";

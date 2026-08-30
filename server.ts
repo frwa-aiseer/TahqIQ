@@ -5,6 +5,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { lookupDoiMetadata } from "./src/lib/metadataProviders";
 import { createSearchExecution, executeSearchExecution } from "./src/lib/searchExecution";
+import { runLiteratureRetrievalAgent } from "./src/lib/literatureRetrievalAgent";
 import { executePairedCrossoverAnalysis, generateAnalysisFiguresAndTables } from "./src/lib/statsEngine";
 import { hasAttributableManuscriptApproval } from "./src/lib/analysisLifecycle";
 import { applicationDefault, getApps as getAdminApps, initializeApp as initializeAdminApp } from "firebase-admin/app";
@@ -34,6 +35,7 @@ import {
   validateExternalAnalysisResponse,
   validateMethodologyModelOutput,
   validateMethodologyRequest,
+  validateLiteratureRetrievalRequest,
   validatePeerReviewModelOutput,
   validatePeerReviewRequest,
   validateSearchExecutionRequest,
@@ -531,6 +533,19 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
     } catch (error: any) {
       console.error("Search Execution Error:", error);
       res.status(500).json({ status: "failed", error: "Search execution failed safely." });
+    }
+  });
+
+  app.post("/api/projects/:projectId/agents/literature-retrieval", protectedProjectRoute(PROJECT_WRITER_ROLES, 128 * 1024, true), async (request, res) => {
+    const req = request as AuthenticatedProjectRequest;
+    try {
+      const validation = validateLiteratureRetrievalRequest(req.body, req.projectAuth!.projectId);
+      if (!validation.valid) return rejectInvalidRequest(res, validation.errors);
+      const result = await runLiteratureRetrievalAgent(req.projectAuth!.projectId, validation.value);
+      res.status(result.status === "Failed" ? 502 : 200).json({ status: result.status, result });
+    } catch (error: any) {
+      console.error("Literature Retrieval Agent Error:", error);
+      res.status(500).json({ status: "Failed", error: "LiteratureRetrievalAgent failed safely. No sources were created." });
     }
   });
 

@@ -322,6 +322,43 @@ export interface SearchExecution {
   results: SearchExecutionSource[];
 }
 
+export interface ApprovedSearchPlan {
+  planId: string;
+  projectId: string;
+  context: string;
+  concepts: SearchConcept[];
+  providerSyntax: Partial<Record<SearchProvider, string>>;
+  providers: SearchProvider[];
+  filters: SearchExecution["filters"];
+  approval: {
+    researcherUid: string;
+    researcherEmail: string;
+    approvedAt: string;
+    rationale: string;
+  };
+}
+
+export interface LiteratureRetrievalProviderFailure {
+  provider: SearchProvider;
+  status: SearchProviderExecution["status"];
+  errors: string[];
+  warnings: string[];
+}
+
+export interface LiteratureRetrievalAgentResult {
+  agentRunId: string;
+  projectId: string;
+  planId: string;
+  status: "Completed" | "Partial" | "Failed";
+  startedAt: string;
+  completedAt: string;
+  records: SearchExecutionSource[];
+  providerFailures: LiteratureRetrievalProviderFailure[];
+  normalizationWarnings: string[];
+  searchExecution: SearchExecution;
+  createdSourceIds: [];
+}
+
 export type VerificationState = "Unverified" | "Verified" | "Conflict" | "Retracted" | "Corrected";
 
 export type SourceState =

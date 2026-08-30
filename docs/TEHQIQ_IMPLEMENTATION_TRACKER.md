@@ -1015,3 +1015,42 @@ None. The harness is test-only and imports existing types without changing them.
 - Provider result limits are bounded to 100 per execution/provider. The server has existing request rate limiting, while provider-level rate responses are preserved for review; distributed scheduling/backoff is not implemented.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-024.
 - TQ-VSC-025 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-026 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- TQ-VSC-025 is not implemented. Added only the minimum backward-compatible `ApprovedSearchPlan` contract required by this prompt: project scope, exact context/concepts/provider syntax/filters, and attributable researcher approval. No search-strategy proposal agent was implemented.
+- Added a deterministic `LiteratureRetrievalAgent` that orchestrates only the real Crossref, OpenAlex, PubMed, Europe PMC, arXiv, and DOAJ tools already implemented by TQ-VSC-024. No LLM participates in retrieval or bibliographic record creation.
+- The agent rejects missing/mismatched approval before invoking any tool, limits the callable tool map to providers named in the approved plan, and passes each provider its exact approved syntax and filters.
+- Output contains only actual successful provider records, normalized metadata/provenance, provider failures, normalization warnings, and the complete reproducible `SearchExecution` envelope.
+- Provider errors yield `Partial` or `Failed` status. The agent never creates sources (`createdSourceIds` is structurally always an empty tuple); records returned alongside a provider failure are deterministically discarded from agent records and execution provenance.
+- Added a protected, verified-email project-writer endpoint with project-scope validation, strict allowed fields, attributable approval checks, bounded syntax/result limits, and existing API rate/body controls.
+
+### Files changed and migrations
+
+- `src/lib/literatureRetrievalAgent.ts` (created)
+- `src/tests/literatureRetrievalAgent.test.ts` (created)
+- `src/types.ts`
+- `src/server/apiSchemas.ts`
+- `server.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. The approved-plan and retrieval-result types are additive and no new persisted collection is required.
+
+### Verification and tests
+
+1. Clean-boundary check after superseding TQ-VSC-025: `git status --short --branch && npm run lint` — clean `main` at TQ-VSC-024 checkpoint; typecheck PASS.
+2. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+3. `npx vitest run src/tests/literatureRetrievalAgent.test.ts src/tests/searchExecution.test.ts src/tests/metadataProviderAdapters.test.ts src/tests/specialistDiscoveryProviders.test.ts` — exit `0`; PASS, 4/4 files and 64/64 tests.
+4. `npm test` — exit `1`; 38/40 executed files passed and 335/337 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+5. `npm run build` — exit `0`; PASS, 2,000 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+6. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests cover approved-plan schema/project scope, attributable approval, exact provider syntax, allowed-tool isolation, actual record/provenance preservation, total failure, partial success, adversarial records returned alongside failure, and pre-tool rejection of unapproved plans.
+- A provider failure cannot generate a source: total/partial/adversarial failure paths all retain `createdSourceIds: []`, and failed-provider records are absent from both agent records and normalized `SearchExecution` results/source IDs.
+- This prompt exposes a controlled server agent endpoint but does not add automatic source persistence or a retrieval UI; researcher review/import remains the existing TQ-VSC-024 boundary.
+- TQ-VSC-025 remains `NOT STARTED`; only its minimum approved-plan input contract was added as permitted prerequisite compatibility. TQ-VSC-027 and all later prompts remain `NOT STARTED`.
