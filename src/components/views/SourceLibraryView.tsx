@@ -80,16 +80,9 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
       if (res.ok) {
         const data = await res.json();
 
-        // Check if duplicate DOI already exists
-        const existing = sources.find((s) => s.doi?.toLowerCase() === data.doi?.toLowerCase());
-        if (existing) {
-          setNotice(`Notice: Source with DOI '${data.doi}' already exists in library: '${existing.title}'.`);
-          setIsResolving(false);
-          return;
-        }
-
+        const sourceId = `src-${Date.now()}`;
         const newSource: SourceRecord = {
-          id: `src-${Date.now()}`,
+          id: sourceId,
           title: data.title,
           authors: data.authors,
           year: data.year,
@@ -99,6 +92,9 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
           pages: data.pages,
           publisher: data.publisher,
           doi: data.doi,
+          pmid: data.pmid,
+          pmcid: data.pmcid,
+          providerRecordId: data.providerRecordId,
           documentType: "Journal Article",
           peerReviewStatus: "Peer-reviewed",
           verificationState: "Verified",
@@ -113,7 +109,7 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
             {
               id: `tr-${Date.now()}`,
               entityType: "Source",
-              entityId: `src-${Date.now()}`,
+              entityId: sourceId,
               fromState: "Imported",
               toState: "Imported",
               actorUid: user?.uid || "system",
@@ -124,7 +120,7 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
             },
           ],
           metadataProvider: data.metadataProvider || "Crossref Official Registry",
-          verificationDate: new Date().toISOString(),
+          verificationDate: data.verificationDate,
           relevanceScore: 9,
           tags: ["DOI Import"],
           researcherNotes: "Imported with authoritative registry metadata."

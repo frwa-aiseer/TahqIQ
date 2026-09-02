@@ -23,6 +23,7 @@ import { QuickActionsMenu } from "./components/QuickActionsMenu";
 import { useAutosave } from "./hooks/useAutosave";
 import { createProjectInFirestore } from "./lib/projectService";
 import { AlertTriangle } from "lucide-react";
+import { upsertDeduplicatedSource } from "./lib/sourceDeduplication";
 
 function MainAppContent() {
   const { user, userProfile } = useAuth();
@@ -169,7 +170,7 @@ function MainAppContent() {
       alert("Guard error: Demo records cannot be added to a real project.");
       return;
     }
-    setProject((prev) => ({ ...prev, sources: [newSource, ...prev.sources] }));
+    setProject((prev) => ({ ...prev, sources: upsertDeduplicatedSource(prev.sources, newSource).sources }));
   };
 
   const handleSaveSearchExecution = (execution: SearchExecution) => {
@@ -193,11 +194,15 @@ function MainAppContent() {
       state: "Imported",
       stateHistory: [],
       metadataProvider: source.provider,
+      providerRecordId: source.providerRecordId,
       provenance: { providerId: source.providerId, provider: source.provider, retrievedAt: source.retrievedAt, fieldProvenance: source.fieldProvenance },
       relevanceScore: 5,
       tags: [`Search Execution ${execution.searchId}`, source.provider],
     }));
-    setProject((prev) => ({ ...prev, sources: [...imported.filter((source) => !prev.sources.some((existing) => existing.id === source.id)), ...prev.sources] }));
+    setProject((prev) => {
+      const deduplicated = imported.reduce((result, source) => upsertDeduplicatedSource(result.sources, source), { sources: prev.sources, duplicateGroups: [] });
+      return { ...prev, sources: deduplicated.sources };
+    });
   };
 
   const handleUpdateClaims = (updatedClaims: ClaimItem[]) => {

@@ -470,6 +470,29 @@ export interface ProvenanceMetadata {
   disclaimer?: string;
 }
 
+export interface SourceProviderAlias {
+  sourceId: string;
+  provider: string;
+  providerId?: string;
+  providerRecordId?: string;
+  identifiers: Record<string, string>;
+  retrievedAt?: string;
+}
+
+export interface SourceFieldConflictValue {
+  sourceId: string;
+  provider: string;
+  value: unknown;
+  provenance?: FieldProvenance;
+}
+
+export interface SourceFieldConflict {
+  field: string;
+  values: SourceFieldConflictValue[];
+  preferredSourceId: string;
+  resolution: "Unresolved" | "Researcher Resolved";
+}
+
 export type ResearchArtifactType =
   | "Uploaded Document"
   | "Source"
@@ -530,6 +553,7 @@ export interface ResearchArtifact {
 
 export interface SourceRecord {
   id: string;
+  canonicalSourceId?: string;
   title: string;
   authors: string[];
   year: number;
@@ -542,6 +566,8 @@ export interface SourceRecord {
   doi?: string;
   pmid?: string;
   pmcid?: string;
+  arxivId?: string;
+  otherStableIds?: Array<{ scheme: string; value: string }>;
   url?: string;
   abstract?: string;
   fullTextContent?: string; // Actual uploaded or retrieved content ONLY
@@ -557,6 +583,10 @@ export interface SourceRecord {
   stateHistory?: StateTransitionRecord[];
   metadataProvider?: string;
   provenance?: ProvenanceMetadata; // Field-level provenance & metadata provider details
+  providerAliases?: SourceProviderAlias[];
+  providerRecordId?: string;
+  fieldConflicts?: SourceFieldConflict[];
+  preferredFieldSources?: Record<string, string>;
   verificationDate?: string;
   retractionWarning?: boolean;
   correctionNotice?: string;

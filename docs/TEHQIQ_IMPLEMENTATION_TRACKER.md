@@ -1054,3 +1054,43 @@ None. The harness is test-only and imports existing types without changing them.
 - A provider failure cannot generate a source: total/partial/adversarial failure paths all retain `createdSourceIds: []`, and failed-provider records are absent from both agent records and normalized `SearchExecution` results/source IDs.
 - This prompt exposes a controlled server agent endpoint but does not add automatic source persistence or a retrieval UI; researcher review/import remains the existing TQ-VSC-024 boundary.
 - TQ-VSC-025 remains `NOT STARTED`; only its minimum approved-plan input contract was added as permitted prerequisite compatibility. TQ-VSC-027 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-027 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS. Built on the completed, uncommitted TQ-VSC-026 working tree without modifying its behavior.
+- Added deterministic source deduplication with identifier priority: canonicalized DOI, PMID, PMCID, arXiv ID, then named other stable identifiers and retained provider aliases.
+- When stable identifiers are absent and non-conflicting, bibliographic matching requires exact punctuation/diacritic-insensitive normalized title plus the same publication year and exact normalized first author. Partial/vague title similarity, different years/authors, or conflicting same-scheme stable IDs do not merge.
+- Merged records retain a stable canonical source ID, every provider/source alias and identifier, per-field preferred source IDs, chosen field-level provenance, and all differing field values as `Unresolved` conflicts. No conflicting value is silently treated as verified.
+- Canonical preference is deterministic: an already-established canonical record, then verified metadata, then metadata completeness, then lexical source ID. The upsert boundary preserves an existing library ID so evidence/source relationships are not orphaned by later imports.
+- Routed direct DOI, BibTeX/RIS/CSL, candidate, and multi-provider search imports through the central application upsert boundary. DOI imports now preserve returned PMID/PMCID/provider record ID and use one source ID consistently in transition history.
+
+### Files changed and migrations
+
+- `src/lib/sourceDeduplication.ts` (created)
+- `src/tests/sourceDeduplication.test.ts` (created)
+- `src/types.ts`
+- `src/App.tsx`
+- `src/components/views/SourceLibraryView.tsx`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. Canonical ID, arXiv/other stable IDs, provider aliases, preferred field sources, and conflict collections are optional fields populated on new duplicate merges. Legacy sources remain readable unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/sourceDeduplication.test.ts src/tests/literatureRetrievalAgent.test.ts src/tests/searchExecution.test.ts` — exit `0`; PASS, 3/3 files and 25/25 tests.
+3. `npm test` — exit `1`; 39/41 executed files passed and 345/347 executed tests passed, with 2 emulator-only files and 18 tests skipped. The only failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,002 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Duplicate fixtures cover DOI variants, PMID, PMCID, modern/versioned arXiv IDs, other stable identifier schemes, and conservative exact bibliographic matching.
+- Conflict fixtures verify PMID-linked records with disagreeing DOI/title values merge under one canonical source while retaining both provider values, their provenance, an explicit preferred source, and `Unresolved` conflict state.
+- Negative fixtures verify vague title similarity, changed year/author, and conflicting DOI-only records never merge.
+- Determinism and incremental-upsert fixtures verify input order stability and preservation of the existing canonical library ID while accepting missing fields from a richer alias.
+- Existing evidence records that reference a previously imported source ID remain stable because incremental imports prefer the established canonical ID. No global rewrite of historical source IDs was performed.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-027.
+- TQ-VSC-028 and all later prompts remain `NOT STARTED`.
