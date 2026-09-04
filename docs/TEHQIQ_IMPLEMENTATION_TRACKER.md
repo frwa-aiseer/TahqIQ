@@ -1132,3 +1132,42 @@ None. The harness is test-only and imports existing types without changing them.
 - Decision audit events are persisted with the project record but are not yet trusted-server immutable events; server-side screening transition hardening was not required by this prompt and remains a risk for later architecture work.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-028.
 - TQ-VSC-029 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-029 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a unified deterministic router recognizing PDF, DOCX, PPTX, XLS/XLSX, CSV/TSV, JSON, TXT, Markdown, TeX, common image formats, common audio formats, and common video formats by extension with MIME fallback. Unknown inputs are explicitly `Unsupported`.
+- Added the complete `DocumentIngestionJob` lifecycle vocabulary: `Uploaded`, `Queued`, `Processing`, `Parsed`, `Requires Review`, `Failed`, and `Unsupported`, with timestamped status history and truthful diagnostics.
+- Every routed job preserves project/file identity, byte size, content SHA-256, category, actor, demo/synthetic isolation, parser provenance, extracted blocks, warnings, and errors.
+- Connected XLS/XLSX, CSV/TSV, and JSON routes directly to the existing `parseAndProfileDataset` implementation. The job retains the resulting dataset, matching dataset/job hash, parser provenance, and a bounded extracted table preview. Parsing or PII warnings produce `Requires Review` rather than silent acceptance.
+- Added deterministic paragraph-block parsing for TXT, Markdown, and TeX. Empty text requires review. Rich-document, image/OCR, and audio/video inputs are recognized and remain `Queued` with explicit `Not Configured` warnings because TQ-VSC-030/031 parsers were not implemented.
+- Added a typed adapter seam so later parsers can return structured blocks, provenance, warnings, and either `Parsed` or `Requires Review`; thrown adapter errors become `Failed` without fabricated output.
+
+### Files changed and migrations
+
+- `src/lib/documentIngestionRouter.ts` (created)
+- `src/tests/documentIngestionRouter.test.ts` (created)
+- `src/types.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. `ProjectState.documentIngestionJobs` is optional, and all new job, status, block, and parser-provenance types are additive. Existing stored projects remain readable unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/documentIngestionRouter.test.ts src/tests/storagePersistence.test.ts` — exit `0`; PASS, 2/2 files and 38/38 tests.
+3. `npm test` — exit `1`; 41/43 executed files passed and 383/385 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Parameterized fixtures verify routing for every requested category, including both XLS/XLSX and CSV/TSV variants, plus MIME fallback and unknown-format rejection.
+- Lifecycle fixtures cover `Uploaded`, `Queued`, `Processing`, `Parsed`, `Requires Review`, `Failed`, and `Unsupported`; no recognized-but-unconfigured parser claims to have parsed content.
+- Fixtures verify SHA-256 preservation, dataset/job hash consistency, dataset connection, bounded extracted blocks, parser provenance, warnings, failures, and status history.
+- TQ-VSC-030 rich-document parsing and TQ-VSC-031 media transcription remain intentionally unimplemented. Their categories queue at a typed adapter boundary with explicit `Not Configured` warnings.
+- Jobs are modeled for backward-compatible project persistence, but no new upload UI or server queue was required by this prompt; callers must persist returned jobs through an authorized project path.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-029.
+- TQ-VSC-030 and all later prompts remain `NOT STARTED`.

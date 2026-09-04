@@ -888,6 +888,75 @@ export interface DatasetRecord {
   isSynthetic?: boolean;
 }
 
+export type DocumentIngestionStatus =
+  | "Uploaded"
+  | "Queued"
+  | "Processing"
+  | "Parsed"
+  | "Requires Review"
+  | "Failed"
+  | "Unsupported";
+
+export type DocumentFormatCategory =
+  | "PDF"
+  | "DOCX"
+  | "PPTX"
+  | "Spreadsheet"
+  | "Delimited Data"
+  | "JSON"
+  | "Plain Text"
+  | "Markdown"
+  | "TeX"
+  | "Image"
+  | "Audio"
+  | "Video"
+  | "Unsupported";
+
+export interface DocumentIngestionStatusEvent {
+  status: DocumentIngestionStatus;
+  timestamp: string;
+  message: string;
+}
+
+export interface DocumentParserProvenance {
+  parserId: string;
+  parserVersion: string;
+  executedAt: string;
+  deterministic: boolean;
+}
+
+export interface DocumentExtractedBlock {
+  blockId: string;
+  blockType: "Text" | "Table" | "Metadata";
+  text?: string;
+  rows?: Record<string, unknown>[];
+  sourceLocation: string;
+  parserId: string;
+}
+
+export interface DocumentIngestionJob {
+  jobId: string;
+  projectId: string;
+  artifactId?: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256: string;
+  formatCategory: DocumentFormatCategory;
+  status: DocumentIngestionStatus;
+  statusHistory: DocumentIngestionStatusEvent[];
+  parserProvenance?: DocumentParserProvenance;
+  extractedBlocks: DocumentExtractedBlock[];
+  warnings: string[];
+  errors: string[];
+  dataset?: DatasetRecord;
+  createdAt: string;
+  updatedAt: string;
+  createdByUid: string;
+  isDemo: boolean;
+  isSynthetic: boolean;
+}
+
 export interface AnalysisPlan {
   id: string;
   title: string;
@@ -1341,6 +1410,7 @@ export interface ProjectState {
   };
   methodologyWorkspace?: MethodologyWorkspace;
   datasets: DatasetRecord[];
+  documentIngestionJobs?: DocumentIngestionJob[];
   analysisPlans: AnalysisPlan[];
   analysisOutputs: AnalysisOutput[];
   numericEvidenceRecords?: NumericEvidence[];
