@@ -1171,3 +1171,43 @@ None. The harness is test-only and imports existing types without changing them.
 - Jobs are modeled for backward-compatible project persistence, but no new upload UI or server queue was required by this prompt; callers must persist returned jobs through an authorized project path.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-029.
 - TQ-VSC-030 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-030 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Confirmed that Python/Docling is not present in the repository/runtime and did not fabricate a local parser. Added a configurable self-hosted/Cloud Run Docling-compatible provider using the server-side `DOCUMENT_PARSER_SERVICE_URL` environment variable.
+- Added a typed rich-document provider interface and adapter factory for PDF, DOCX, and PPTX routes. The adapter posts bounded structured JSON containing project/artifact identity, filename, MIME type, format, and base64 file bytes to the configured `/parse` service endpoint.
+- Added strict runtime validation for parser identity/version, review state, warnings, block IDs/types, table rows, page numbers, section names, table references, and image references. Malformed, provenance-free, oversized, non-JSON, or HTTP-error responses fail closed through the ingestion router.
+- Extended extracted blocks additively with `Image` block type plus page, section, table, and image reference fields. Normalization preserves those references both as typed fields and a deterministic source-location string.
+- Missing/invalid service configuration returns `Requires Review`, no blocks, and `DOCUMENT_PARSER_SERVICE_URL Not Configured`; it can never report `Parsed`. A configured service that returns no blocks also resolves to `Requires Review` regardless of its claimed state.
+- Added bounded request timeouts and response-size enforcement. Parser-returned warnings and `requiresReview` are preserved rather than silently upgraded.
+
+### Files changed and migrations
+
+- `.env.example`
+- `src/lib/richDocumentParser.ts` (created)
+- `src/tests/richDocumentParser.test.ts` (created)
+- `src/types.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. New extracted-block reference fields and the `Image` block type are additive. Existing ingestion jobs and stored projects remain readable unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/richDocumentParser.test.ts src/tests/documentIngestionRouter.test.ts` — exit `0`; PASS, 2/2 files and 40/40 tests.
+3. `npm test` — exit `1`; 42/44 executed files passed and 390/392 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Mocked integration fixtures exercise PDF, DOCX, and PPTX through the real TQ-VSC-029 router and confirm the outbound request contract and `Parsed` lifecycle.
+- Fixtures verify exact preservation of page/section/table/image references, provider ID/version, service warnings, `Requires Review`, malformed-response failure, and the no-block fail-closed rule.
+- Both direct-provider and full-router fixtures prove an absent `DOCUMENT_PARSER_SERVICE_URL` never reports `Parsed`.
+- Deployment must provide a reachable trusted parser service and apply its own authentication/network policy. This prompt does not claim Docling availability or parsing quality without that service.
+- TQ-VSC-031 media transcription remains intentionally unimplemented; image/audio/video routes remain at the TQ-VSC-029 Not Configured boundary.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-030.
+- TQ-VSC-031 and all later prompts remain `NOT STARTED`.

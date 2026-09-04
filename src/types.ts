@@ -927,11 +927,15 @@ export interface DocumentParserProvenance {
 
 export interface DocumentExtractedBlock {
   blockId: string;
-  blockType: "Text" | "Table" | "Metadata";
+  blockType: "Text" | "Table" | "Image" | "Metadata";
   text?: string;
   rows?: Record<string, unknown>[];
   sourceLocation: string;
   parserId: string;
+  pageNumber?: number;
+  section?: string;
+  tableReference?: string;
+  imageReference?: string;
 }
 
 export interface DocumentIngestionJob {
