@@ -8,6 +8,7 @@ import { ResearchCanvasView } from "./components/views/ResearchCanvasView";
 import { QuestionBuilderView } from "./components/views/QuestionBuilderView";
 import { SourceLibraryView } from "./components/views/SourceLibraryView";
 import { SearchPlannerView } from "./components/views/SearchPlannerView";
+import { LiteratureScreeningWorkbench } from "./components/views/LiteratureScreeningWorkbench";
 import { DocumentReaderModal } from "./components/views/DocumentReaderModal";
 import { ClaimMatrixView } from "./components/views/ClaimMatrixView";
 import { GapMapView } from "./components/views/GapMapView";
@@ -320,6 +321,15 @@ function MainAppContent() {
                   executions={project.searchExecutions || []}
                   onSaveExecution={handleSaveSearchExecution}
                   onImportSources={handleImportSearchSources}
+                />
+                <LiteratureScreeningWorkbench
+                  projectId={project.id}
+                  sources={project.sources}
+                  criteria={project.screeningCriteria || []}
+                  records={project.literatureScreening || []}
+                  actor={{ uid: user?.uid || "user-local", email: user?.email || "researcher@local" }}
+                  onChangeCriteria={(screeningCriteria) => setProject((prev) => ({ ...prev, screeningCriteria }))}
+                  onChangeRecords={(literatureScreening) => setProject((prev) => ({ ...prev, literatureScreening }))}
                 />
                 <SourceLibraryView
                   sources={project.sources}

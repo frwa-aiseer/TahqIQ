@@ -359,6 +359,71 @@ export interface LiteratureRetrievalAgentResult {
   createdSourceIds: [];
 }
 
+export type ScreeningCriterionKind = "Include" | "Exclude";
+export type ScreeningOutcome = "Suggested Include" | "Suggested Exclude" | "Uncertain";
+export type ResearcherScreeningDecision = "Included" | "Excluded" | "Uncertain";
+
+export interface ScreeningCriterion {
+  criterionId: string;
+  projectId: string;
+  kind: ScreeningCriterionKind;
+  description: string;
+  keywords: string[];
+  keywordMatch: "Any" | "All";
+  approval: {
+    status: "Approved";
+    approvedByUid: string;
+    approvedByEmail: string;
+    approvedAt: string;
+  };
+}
+
+export interface ScreeningCriterionAssessment {
+  criterionId: string;
+  kind: ScreeningCriterionKind;
+  result: "Matched" | "Not Matched" | "Unable to Determine";
+  reason: string;
+}
+
+export interface LiteratureScreeningSuggestion {
+  suggestionId: string;
+  projectId: string;
+  sourceId: string;
+  outcome: ScreeningOutcome;
+  reasons: string[];
+  criterionIds: string[];
+  confidence: number;
+  assessments: ScreeningCriterionAssessment[];
+  createdAt: string;
+  status: "AI Proposal — Researcher Review Required";
+}
+
+export interface ScreeningDecisionAuditEvent {
+  eventId: string;
+  sourceId: string;
+  timestamp: string;
+  actorUid: string;
+  actorEmail: string;
+  previousDecision: ResearcherScreeningDecision | null;
+  decision: ResearcherScreeningDecision;
+  suggestionOutcome: ScreeningOutcome;
+  isOverride: boolean;
+  rationale: string;
+}
+
+export interface LiteratureScreeningRecord {
+  sourceId: string;
+  suggestion: LiteratureScreeningSuggestion;
+  researcherDecision?: {
+    decision: ResearcherScreeningDecision;
+    decidedByUid: string;
+    decidedByEmail: string;
+    decidedAt: string;
+    rationale: string;
+  };
+  decisionAudit: ScreeningDecisionAuditEvent[];
+}
+
 export type VerificationState = "Unverified" | "Verified" | "Conflict" | "Retracted" | "Corrected";
 
 export type SourceState =
@@ -1258,6 +1323,8 @@ export interface ProjectState {
   researchQuestions: ResearchQuestionItem[];
   searchStrategies: SearchStrategy[];
   searchExecutions?: SearchExecution[];
+  screeningCriteria?: ScreeningCriterion[];
+  literatureScreening?: LiteratureScreeningRecord[];
   sources: SourceRecord[];
   claims: ClaimItem[];
   gaps: ResearchGap[];

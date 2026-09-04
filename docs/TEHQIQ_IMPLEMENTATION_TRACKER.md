@@ -1094,3 +1094,41 @@ None. The harness is test-only and imports existing types without changing them.
 - Existing evidence records that reference a previously imported source ID remain stable because incremental imports prefer the established canonical ID. No global rewrite of historical source IDs was performed.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-027.
 - TQ-VSC-028 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-028 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a project-scoped, additive eligibility-criteria contract. Each criterion is explicitly approved by an attributable researcher and contains deterministic title/abstract terms plus its Include/Exclude role.
+- Added a deterministic `LiteratureScreeningAgent` that returns only `Suggested Include`, `Suggested Exclude`, or `Uncertain`, with criterion IDs, per-criterion reasons, confidence, and the immutable proposal label `AI Proposal — Researcher Review Required`.
+- Exclusion matches take precedence. An Include suggestion requires every approved inclusion criterion to match and no exclusion to match. Missing criteria or non-deterministic criteria fail safely to `Uncertain`; missing abstracts remain explicitly disclosed as title-only screening.
+- Added the mounted Literature Screening Workbench in the existing Literature & Gap step. It supports explicit criterion approval, per-source suggestion runs, separate researcher decisions, required rationale, attributable actor metadata, and append-only-in-record decision/override audit events.
+- A suggestion never populates a researcher decision. The workbench displays `Not decided` until a researcher explicitly records Included, Excluded, or Uncertain.
+
+### Files changed and migrations
+
+- `src/lib/literatureScreeningAgent.ts` (created)
+- `src/components/views/LiteratureScreeningWorkbench.tsx` (created)
+- `src/tests/literatureScreeningAgent.test.ts` (created)
+- `src/types.ts`
+- `src/App.tsx`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. `ProjectState.screeningCriteria` and `ProjectState.literatureScreening` are optional, so existing stored projects load unchanged and hydrate to empty workbench collections at render time.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/literatureScreeningAgent.test.ts src/tests/sourceDeduplication.test.ts src/tests/literatureRetrievalAgent.test.ts` — exit `0`; PASS, 3/3 files and 22/22 tests.
+3. `npm test` — exit `1`; 40/42 executed files passed and 350/352 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests cover include, exclude, uncertain/missing-input, title-only abstract absence, proposal/researcher-decision separation, required rationale, actor attribution, suggestion preservation, and explicit override auditing.
+- Screening is intentionally deterministic and limited to literal approved terms; nuanced semantic assessment remains `Uncertain` unless a future validated AI evaluator is configured. This limitation is visible rather than masked with fabricated certainty.
+- Decision audit events are persisted with the project record but are not yet trusted-server immutable events; server-side screening transition hardening was not required by this prompt and remains a risk for later architecture work.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-028.
+- TQ-VSC-029 and all later prompts remain `NOT STARTED`.

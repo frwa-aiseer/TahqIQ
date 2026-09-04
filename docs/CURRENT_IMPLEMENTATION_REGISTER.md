@@ -189,11 +189,12 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 - The mounted Search Planner implements design/edit → provider selection → protected server execution → researcher review → explicit import. Imported search results remain `Unverified` metadata and retain their execution/provider provenance.
 - `src/lib/literatureRetrievalAgent.ts` is a deterministic tool orchestrator over the real TQ-VSC-024 provider adapters. It requires attributable approval and exact per-provider syntax, invokes only selected tools, preserves normalized records/failures/provenance, and returns no created source IDs. Failed-provider payload records are discarded.
 - `src/lib/sourceDeduplication.ts` provides the single application import boundary for deterministic source deduplication. DOI/PMID/PMCID/arXiv/other stable identifiers take priority; identifier-free matching requires exact normalized title, year, and first author. Merges retain a stable canonical source ID, provider aliases, preferred field sources/provenance, and explicit unresolved conflicts.
+- `src/lib/literatureScreeningAgent.ts` evaluates only project-scoped, researcher-approved deterministic criteria against retrieved title/abstract text. Its structured Include/Exclude/Uncertain suggestions remain proposals; the mounted screening workbench requires an attributable researcher rationale for decisions and preserves suggestion/override audit history separately.
 - Client DOI lookup is routed through `/api/sources/doi`.
 - `src/lib/referenceParsers.ts` parses BibTeX, RIS, CSL JSON, and plain reference text.
 - `src/lib/cslStyles.ts` and `src/lib/journalStyleConfig.ts` format citations and bibliography entries.
 - `src/data/baselineOutlets.ts` contains static journal/conference records, live/user-added record factories, provenance/integrity validation, and style mapping.
-- No screening workbench integration, full-text download pipeline, or agent tool registry was found in the mounted application. The search execution and specialist adapters expose metadata and lawful provider-supplied access locations but do not download content.
+- No full-text download pipeline or general agent tool registry was found in the mounted application. The search execution and specialist adapters expose metadata and lawful provider-supplied access locations but do not download content.
 
 ## Export implementation
 
