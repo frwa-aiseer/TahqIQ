@@ -1067,6 +1067,32 @@ export interface EvidenceExtractionProposal {
   isSynthetic: boolean;
 }
 
+export type SynthesisItemClassification = "Evidence-Grounded" | "Interpretation" | "Hypothesis";
+
+export interface LiteratureSynthesisItem {
+  itemId: string;
+  text: string;
+  classification: SynthesisItemClassification;
+  supportingEvidenceIds: string[];
+  conflictingEvidenceIds: string[];
+}
+
+export interface LiteratureSynthesisProposal {
+  synthesisId: string;
+  projectId: string;
+  researchQuestion: string;
+  themes: LiteratureSynthesisItem[];
+  methodologicalDifferences: LiteratureSynthesisItem[];
+  contextDifferences: LiteratureSynthesisItem[];
+  limitations: LiteratureSynthesisItem[];
+  unresolvedQuestions: LiteratureSynthesisItem[];
+  candidateSynthesisStatements: LiteratureSynthesisItem[];
+  sourceEvidenceIds: string[];
+  reviewState: "Needs Researcher Review";
+  createdAt: string;
+  synthesizedBy: string;
+}
+
 export interface AnalysisPlan {
   id: string;
   title: string;
@@ -1523,6 +1549,7 @@ export interface ProjectState {
   documentIngestionJobs?: DocumentIngestionJob[];
   fullTextChunks?: FullTextChunk[];
   evidenceExtractionProposals?: EvidenceExtractionProposal[];
+  literatureSynthesisProposals?: LiteratureSynthesisProposal[];
   analysisPlans: AnalysisPlan[];
   analysisOutputs: AnalysisOutput[];
   numericEvidenceRecords?: NumericEvidence[];

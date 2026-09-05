@@ -1327,3 +1327,41 @@ None. The harness is test-only and imports existing types without changing them.
 - A configured model/tool and protected persistence/API integration remain deployment concerns; this prompt implements and tests the agent/domain boundary without adding TQ-VSC-034 synthesis behavior.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-033.
 - TQ-VSC-034 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-034 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a structured `LiteratureSynthesisAgent` boundary that receives only supplied `EvidenceRecord` objects and rejects any record not both `Researcher Verified` and backed by attributable reviewer identity/timestamp before invoking the synthesis tool.
+- Output includes themes, supporting and conflicting evidence IDs, methodological differences, context differences, limitations, unresolved questions, and candidate synthesis statements. All collections use a deterministic shared item contract and stable generated item IDs.
+- Every `Evidence-Grounded` factual item must carry at least one supporting or conflicting evidence ID. Every ID must refer to the supplied researcher-verified evidence set; unknown IDs and duplicate input identities fail closed.
+- One evidence record cannot be labeled as both supporting and conflicting within the same item. Unsupported content with no evidence link is accepted only when explicitly classified `Interpretation` or `Hypothesis`, keeping it distinct from factual synthesis.
+- Schema validation rejects extra fields, invalid classifications, malformed collections, and unbounded text/arrays. Accepted synthesis remains a proposal with `Needs Researcher Review` and retains its synthesizer identity and aggregate source evidence IDs.
+
+### Files changed and migrations
+
+- `src/lib/literatureSynthesisAgent.ts` (created)
+- `src/tests/literatureSynthesisAgent.test.ts` (created)
+- `src/types.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. `ProjectState.literatureSynthesisProposals` and the synthesis proposal/item contracts are optional additive fields. Existing evidence and project records remain readable unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/literatureSynthesisAgent.test.ts src/tests/evidenceExtractionAgent.test.ts src/tests/evidenceRecords.test.ts` — exit `0`; PASS, 3/3 files and 25/25 tests.
+3. `npm test` — exit `1`; 46/48 executed files passed and 422/424 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Positive fixtures cover all required synthesis collections, support/conflict attribution, aggregate evidence identity, stable item IDs, synthesizer attribution, and initial researcher-review state.
+- Parameterized schema fixtures prove every factual item in every collection requires evidence IDs.
+- Fixtures verify unsupported items require explicit `Interpretation`/`Hypothesis` classification, and reject unknown IDs, dual support/conflict labeling, duplicate evidence identities, invalid classifications, extra fields, pending evidence, and forged/unattributed researcher verification.
+- The schema establishes evidence traceability rather than claiming deterministic semantic truth for abstractive synthesis; all accepted output remains subject to researcher review.
+- A configured synthesis model/tool and protected persistence/API integration remain deployment concerns. TQ-VSC-035 contradiction grouping and UI exposure were not implemented.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-034.
+- TQ-VSC-035 and all later prompts remain `NOT STARTED`.
