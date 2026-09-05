@@ -1365,3 +1365,43 @@ None. The harness is test-only and imports existing types without changing them.
 - A configured synthesis model/tool and protected persistence/API integration remain deployment concerns. TQ-VSC-035 contradiction grouping and UI exposure were not implemented.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-034.
 - TQ-VSC-035 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-035 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a structured `ContradictionDetectionAgent` that accepts two to 1,000 supplied `EvidenceRecord` inputs and rejects records unless they are both `Researcher Verified` and backed by attributable reviewer identity/timestamp before invoking the detector.
+- Added persistent, backward-compatible contradiction groups with separate supporting and contradictory evidence IDs, contextual reasons, methodological reasons, explicit uncertainty, detector attribution, stable generated IDs, and `Needs Researcher Review` state.
+- Every group side requires evidence IDs. Every contextual/methodological comparison and uncertainty statement also requires one or more evidence IDs, and all IDs must belong to the supplied researcher-verified set.
+- The validator rejects unknown evidence, missing comparison attribution, duplicate evidence identities, dual support/contradiction labeling within a group, malformed/extra fields, and language declaring a study “wrong” or categorically false/incorrect/invalid.
+- Extended the existing Literature & Gap UI to render stored contradiction groups with supporting/contradictory IDs, evidence-linked contextual/methodological explanations, uncertainty, and a visible reminder that differing findings do not establish that a study is wrong.
+
+### Files changed and migrations
+
+- `src/lib/contradictionDetectionAgent.ts` (created)
+- `src/tests/contradictionDetectionAgent.test.tsx` (created)
+- `src/components/views/GapMapView.tsx`
+- `src/App.tsx`
+- `src/types.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. `ProjectState.contradictionGroups` and the contradiction group/reason contracts are optional additive fields. Existing projects render the gap view with an empty group collection.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/contradictionDetectionAgent.test.tsx src/tests/literatureSynthesisAgent.test.ts src/tests/evidenceRecords.test.ts` — exit `0`; PASS, 3/3 files and 24/24 tests.
+3. `npm test` — exit `1`; 47/49 executed files passed and 428/430 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Positive fixtures verify stored review-required groups, stable IDs, detector attribution, separate support/contradiction sets, contextual/methodological reasons, uncertainty, and evidence IDs on every comparison.
+- Negative fixtures reject missing/unknown IDs in every comparison area, dual labeling, unreviewed evidence, unsupported schema fields, malformed groups, and categorical study-wrong language.
+- A component fixture confirms stored groups and evidence attribution are exposed in the mounted gap/synthesis area with the established TehqIQ visual style.
+- The detector identifies and organizes evidence differences but does not adjudicate which study is correct; all groups remain proposals requiring researcher review.
+- A configured detector model/tool and protected persistence/API call remain deployment concerns. TQ-VSC-036 gap-agent behavior was not implemented.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-035.
+- TQ-VSC-036 and all later prompts remain `NOT STARTED`.

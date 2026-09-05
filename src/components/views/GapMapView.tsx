@@ -1,12 +1,13 @@
 import React from "react";
-import { ResearchGap } from "../../types";
-import { Compass, CheckCircle2, ShieldCheck } from "lucide-react";
+import { EvidenceContradictionGroup, ResearchGap } from "../../types";
+import { Compass, CheckCircle2, GitCompareArrows } from "lucide-react";
 
 interface GapMapViewProps {
   gaps: ResearchGap[];
+  contradictionGroups?: EvidenceContradictionGroup[];
 }
 
-export const GapMapView: React.FC<GapMapViewProps> = ({ gaps }) => {
+export const GapMapView: React.FC<GapMapViewProps> = ({ gaps, contradictionGroups = [] }) => {
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -48,7 +49,34 @@ export const GapMapView: React.FC<GapMapViewProps> = ({ gaps }) => {
           </div>
         ))}
       </div>
+
+      {contradictionGroups.length > 0 && (
+        <section className="space-y-3" aria-labelledby="contradiction-groups-title">
+          <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200 flex items-start gap-3">
+            <GitCompareArrows className="w-5 h-5 text-amber-800 shrink-0" />
+            <div>
+              <h3 id="contradiction-groups-title" className="text-xs font-semibold text-stone-900">Evidence Contradiction Groups</h3>
+              <p className="text-[11px] text-stone-600">Comparisons are evidence-linked proposals awaiting researcher review. Differing findings do not establish that any study is wrong.</p>
+            </div>
+          </div>
+          {contradictionGroups.map((group) => (
+            <article key={group.groupId} className="bg-white p-4 rounded-xl border border-stone-200 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-stone-900">{group.topic}</h4>
+                <span className="text-[10px] font-semibold rounded-full bg-amber-100 text-amber-900 px-2 py-1">{group.reviewState}</span>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3 text-xs">
+                <div className="rounded-lg bg-emerald-50/60 border border-emerald-100 p-3"><strong className="text-emerald-900">Supporting evidence</strong><p className="mt-1 text-stone-600">{group.supportingEvidenceIds.join(", ")}</p></div>
+                <div className="rounded-lg bg-rose-50/60 border border-rose-100 p-3"><strong className="text-rose-900">Contradictory evidence</strong><p className="mt-1 text-stone-600">{group.contradictoryEvidenceIds.join(", ")}</p></div>
+              </div>
+              {[...group.contextualReasons.map((item) => ({ ...item, label: "Context" })), ...group.methodologicalReasons.map((item) => ({ ...item, label: "Method" }))].map((item, index) => (
+                <div key={`${item.label}-${index}`} className="text-xs text-stone-700"><strong>{item.label}:</strong> {item.text} <span className="text-stone-500">[{item.evidenceIds.join(", ")}]</span></div>
+              ))}
+              <div className="text-xs bg-stone-50 rounded-lg p-3"><strong>Uncertainty:</strong> {group.uncertainty.text} <span className="text-stone-500">[{group.uncertainty.evidenceIds.join(", ")}]</span></div>
+            </article>
+          ))}
+        </section>
+      )}
     </div>
   );
 };
-

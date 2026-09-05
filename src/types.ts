@@ -1093,6 +1093,25 @@ export interface LiteratureSynthesisProposal {
   synthesizedBy: string;
 }
 
+export interface ContradictionComparisonReason {
+  text: string;
+  evidenceIds: string[];
+}
+
+export interface EvidenceContradictionGroup {
+  groupId: string;
+  projectId: string;
+  topic: string;
+  supportingEvidenceIds: string[];
+  contradictoryEvidenceIds: string[];
+  contextualReasons: ContradictionComparisonReason[];
+  methodologicalReasons: ContradictionComparisonReason[];
+  uncertainty: ContradictionComparisonReason;
+  reviewState: "Needs Researcher Review";
+  createdAt: string;
+  detectedBy: string;
+}
+
 export interface AnalysisPlan {
   id: string;
   title: string;
@@ -1550,6 +1569,7 @@ export interface ProjectState {
   fullTextChunks?: FullTextChunk[];
   evidenceExtractionProposals?: EvidenceExtractionProposal[];
   literatureSynthesisProposals?: LiteratureSynthesisProposal[];
+  contradictionGroups?: EvidenceContradictionGroup[];
   analysisPlans: AnalysisPlan[];
   analysisOutputs: AnalysisOutput[];
   numericEvidenceRecords?: NumericEvidence[];

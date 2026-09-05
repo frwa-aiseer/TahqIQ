@@ -340,7 +340,7 @@ function MainAppContent() {
                   trustedTransitionRevision={project.trustedTransitionIntegrity?.revision || 0}
                   onTrustedProjectUpdate={setProject}
                 />
-                <GapMapView gaps={project.gaps || []} />
+                <GapMapView gaps={project.gaps || []} contradictionGroups={project.contradictionGroups || []} />
               </div>
             )}
 
