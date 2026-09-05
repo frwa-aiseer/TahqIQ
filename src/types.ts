@@ -991,6 +991,42 @@ export interface DocumentIngestionJob {
   isSynthetic: boolean;
 }
 
+export interface FullTextChunkContextReference {
+  sourceBlockId: string;
+  sourceLocation: string;
+  characterStart: number;
+  characterEnd: number;
+  previousChunkId?: string;
+  nextChunkId?: string;
+}
+
+export interface FullTextChunkProvenance {
+  ingestionJobId: string;
+  parserId: string;
+  parserVersion: string;
+  extractedBlockId: string;
+}
+
+/** Text retrieval unit whose provenance is deliberately independent of any embedding model. */
+export interface FullTextChunk {
+  chunkId: string;
+  projectId: string;
+  sourceId: string;
+  documentHash: string;
+  documentVersion: string;
+  chunkIndex: number;
+  text: string;
+  page?: number;
+  section?: string;
+  startSeconds?: number;
+  endSeconds?: number;
+  surroundingContext: FullTextChunkContextReference;
+  provenance: FullTextChunkProvenance;
+  createdAt: string;
+  isDemo: boolean;
+  isSynthetic: boolean;
+}
+
 export interface AnalysisPlan {
   id: string;
   title: string;
@@ -1445,6 +1481,7 @@ export interface ProjectState {
   methodologyWorkspace?: MethodologyWorkspace;
   datasets: DatasetRecord[];
   documentIngestionJobs?: DocumentIngestionJob[];
+  fullTextChunks?: FullTextChunk[];
   analysisPlans: AnalysisPlan[];
   analysisOutputs: AnalysisOutput[];
   numericEvidenceRecords?: NumericEvidence[];

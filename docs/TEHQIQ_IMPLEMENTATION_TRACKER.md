@@ -1251,3 +1251,40 @@ None. The harness is test-only and imports existing types without changing them.
 - Failure fixtures cover provider HTTP errors and invalid timestamps, with no partial transcript or blocks accepted.
 - Deployment must provide a reachable trusted transcription service and an application privacy router. The repository does not claim Whisper availability or transcript accuracy without these controls.
 - TQ-VSC-032 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-032 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a deterministic full-text chunk model retaining `sourceId`, project/job identity, original document SHA-256 and version, global chunk index, exact text, page/section or media timestamps, demo/synthetic flags, and parser/block provenance.
+- Added surrounding-context references containing original extracted-block ID/location, exact character start/end offsets, and previous/next chunk IDs. Chunk IDs are deterministic hashes of the document/source/version/block/index/offset/text identity and do not change with processing time.
+- Added bounded whitespace-aware chunk splitting with configurable maximum and overlap. Text blocks are chunked exactly; table rows are serialized without inference. Image/non-text blocks and text blocks without an original location are skipped with explicit warnings rather than becoming untraceable retrieval units.
+- Added `traceChunkToDocumentLocation`, which verifies project, ingestion job, document hash, parser, block, location, offsets, and reconstructed text before resolving a chunk to its original extracted block. Tampered text or provenance fails closed.
+- Kept chunk provenance independent of embeddings: no embedding provider, model, vector, or embedding-version field is part of the chunk schema or chunking function.
+
+### Files changed and migrations
+
+- `src/lib/fullTextChunks.ts` (created)
+- `src/tests/fullTextChunks.test.ts` (created)
+- `src/types.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. `ProjectState.fullTextChunks` and all chunk/context/provenance contracts are optional additive fields. Existing ingestion jobs and stored projects remain readable unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/fullTextChunks.test.ts src/tests/documentIngestionRouter.test.ts src/tests/richDocumentParser.test.ts src/tests/mediaTranscriptionProvider.test.ts` — exit `0`; PASS, 4/4 files and 53/53 tests.
+3. `npm test` — exit `1`; 44/46 executed files passed and 403/405 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Fixtures verify source/document identity, document version/hash, page/section, media timestamps, chunk index, exact text, parser/block provenance, adjacent context references, deterministic IDs, overlap splitting, and table handling.
+- Every emitted fixture chunk successfully resolves through `traceChunkToDocumentLocation`; text, location, or identity tampering returns no match.
+- Invalid document state/hash/version/parser provenance fails closed. Blocks lacking extractable content or original location generate warnings and no chunks.
+- Chunk creation is implemented as an explicit post-ingestion utility; callers must persist returned chunks through an authorized project path. Retrieval indexing/vector storage was not added because embeddings and retrieval infrastructure are outside this prompt.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-032.
+- TQ-VSC-033 and all later prompts remain `NOT STARTED`.
