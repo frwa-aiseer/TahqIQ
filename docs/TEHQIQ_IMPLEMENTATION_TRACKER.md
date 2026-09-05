@@ -1443,3 +1443,40 @@ None. The harness is test-only and imports existing types without changing them.
 - A configured gap-generation model/tool and protected persistence/API integration remain deployment concerns. TQ-VSC-037 outlet-intelligence behavior was not implemented.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-036.
 - TQ-VSC-037 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-037 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a deterministic `OutletIntelligenceService` that combines verified outlet identity, independently sourced indexing records, valid provider/year/category metrics, guidelines, article types, formatting requirements, policies, and conference deadline/template/file requirements.
+- Verified identity is exposed only when the existing outlet-integrity validator accepts its provider, source URL, retrieval date, and provenance type. Invalid or unverified identity remains explicitly `Unverified` and is not copied into a verified fact object.
+- Added independently modeled indexing records requiring index/provider identity, a real HTTPS source, retrieval timestamp, and attributable human confirmation for `Verified` state. Sourced extraction may only remain `AI Extracted—Needs Review`.
+- Requirement facts use only the latest valid field-level record with provider, real HTTPS source, and retrieval provenance. Missing facts are `Unavailable`; invalid or unsourced records are `Unverified` with a null value.
+- Legacy top-level indexing, word/abstract limits, citation/formatting fields, fees, policies, and conference deadlines are deliberately ignored by the service, preventing an unsourced claim from entering combined outlet intelligence.
+
+### Files changed and migrations
+
+- `src/lib/outletIntelligenceService.ts` (created)
+- `src/tests/outletIntelligenceService.test.ts` (created)
+- `src/types.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. `OutletIndexingRecord` and optional `TargetOutlet.indexingRecords` are additive; existing outlets remain readable. Legacy `indexing: string[]` is retained for compatibility but is not accepted as sourced intelligence.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/outletIntelligenceService.test.ts src/tests/outletRequirements.test.ts src/tests/outletMetrics.test.ts` — exit `0`; PASS, 3/3 files and 21/21 tests.
+3. `npm test` — exit `1`; 49/51 executed files passed and 445/447 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests prove all required intelligence sections can be combined while preserving each fact's source and review state.
+- Negative fixtures prove unsourced legacy indexing, requirements, policy, formatting, and deadline fields do not become outlet facts; unverified identity, metrics, and indexing are not presented as verified intelligence.
+- Sourced AI extraction remains visibly pending review, while an unsourced extraction has its value stripped and becomes `Unverified`.
+- This prompt adds the domain service and contracts, not provider retrieval adapters, an LLM extraction endpoint, persistence/RBAC integration, or a mounted outlet-intelligence UI. Those remain integration concerns; any future extractor must supply official retrieved text and preserve `Needs Review` until attributable human verification.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-037.
+- TQ-VSC-038 and all later prompts remain `NOT STARTED`.

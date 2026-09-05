@@ -1358,6 +1358,18 @@ export interface OutletMetricRecord {
   verificationState: "Verified" | "Unverified" | "Rejected";
 }
 
+export interface OutletIndexingRecord {
+  id: string;
+  indexName: string;
+  provider: string;
+  sourceUrl: string;
+  retrievedAt: string;
+  verificationState: "Verified" | "AI Extracted—Needs Review" | "Unverified" | "Rejected";
+  humanConfirmed: boolean;
+  confirmedByUid?: string;
+  confirmedAt?: string;
+}
+
 export interface VersionedClaimRecord {
   claimName: "acceptance_rate" | "apc_fee" | "submission_deadline" | "indexing" | "review_time";
   value: string;
@@ -1409,6 +1421,7 @@ export interface TargetOutlet {
   fitRisks?: string[];
   requirementsList?: VersionedRequirementRecord[];
   metrics?: OutletMetricRecord[];
+  indexingRecords?: OutletIndexingRecord[];
   datedClaims?: VersionedClaimRecord[];
   outletProvenanceType?: OutletProvenanceType;
   verificationStatus?: OutletVerificationStatus;
