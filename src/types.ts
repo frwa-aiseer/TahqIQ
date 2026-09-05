@@ -1112,6 +1112,39 @@ export interface EvidenceContradictionGroup {
   detectedBy: string;
 }
 
+export interface ResearcherReviewAttribution {
+  reviewedByUid: string;
+  reviewedAt: string;
+  rationale: string;
+}
+
+export type ReviewedLiteratureSynthesis = Omit<LiteratureSynthesisProposal, "reviewState"> & {
+  reviewState: "Researcher Reviewed";
+  researcherReview: ResearcherReviewAttribution;
+};
+
+export type ReviewedEvidenceContradictionGroup = Omit<EvidenceContradictionGroup, "reviewState"> & {
+  reviewState: "Researcher Reviewed";
+  researcherReview: ResearcherReviewAttribution;
+};
+
+export interface ResearchGapProposal {
+  gapId: string;
+  projectId: string;
+  gapStatement: string;
+  type: ResearchGap["type"];
+  supportingEvidenceIds: string[];
+  contradictingEvidenceIds: string[];
+  confidence: number;
+  caution: string;
+  newResearchAddressesIt: string;
+  status: "AI Suggested";
+  sourceSynthesisId: string;
+  sourceContradictionGroupIds: string[];
+  createdAt: string;
+  generatedBy: string;
+}
+
 export interface AnalysisPlan {
   id: string;
   title: string;
@@ -1570,6 +1603,7 @@ export interface ProjectState {
   evidenceExtractionProposals?: EvidenceExtractionProposal[];
   literatureSynthesisProposals?: LiteratureSynthesisProposal[];
   contradictionGroups?: EvidenceContradictionGroup[];
+  researchGapProposals?: ResearchGapProposal[];
   analysisPlans: AnalysisPlan[];
   analysisOutputs: AnalysisOutput[];
   numericEvidenceRecords?: NumericEvidence[];

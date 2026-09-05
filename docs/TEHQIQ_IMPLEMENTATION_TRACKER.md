@@ -1405,3 +1405,41 @@ None. The harness is test-only and imports existing types without changing them.
 - A configured detector model/tool and protected persistence/API call remain deployment concerns. TQ-VSC-036 gap-agent behavior was not implemented.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-035.
 - TQ-VSC-036 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-036 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added explicit reviewed-synthesis and reviewed-contradiction contracts requiring researcher identity, timestamp, and rationale. The gap agent rejects unreviewed, unattributed, or cross-project inputs before invoking its proposal tool.
+- Added a structured `ResearchGapAgent` that receives reviewed synthesis, reviewed contradiction groups, and limitations/context copied unchanged from the reviewed synthesis. Altered or invented input items fail closed.
+- Output includes candidate gap statement, required supported gap type, supporting and contradicting evidence IDs, bounded confidence, caution, what new research would address, source synthesis/group IDs, generator attribution, and `AI Suggested` status.
+- Every gap requires at least one supporting evidence ID from the reviewed input set. Contradicting IDs are optional but, when present, must also come from reviewed inputs and cannot duplicate supporting IDs.
+- Universal novelty language including “no study has ever,” “never been studied,” “first-ever,” “completely unexplored,” “nothing is known,” and “no studies exist” is rejected across the gap statement, caution, and proposed research. Gap statements must explicitly scope themselves to reviewed/supplied evidence.
+
+### Files changed and migrations
+
+- `src/lib/researchGapAgent.ts` (created)
+- `src/tests/researchGapAgent.test.ts` (created)
+- `src/types.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. Reviewed wrapper types, `ResearchGapProposal`, and `ProjectState.researchGapProposals` are additive. Existing legacy `ResearchGap` records and projects remain readable unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/researchGapAgent.test.ts src/tests/literatureSynthesisAgent.test.ts src/tests/contradictionDetectionAgent.test.tsx` — exit `0`; PASS, 3/3 files and 30/30 tests.
+3. `npm test` — exit `1`; 48/50 executed files passed and 440/442 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Positive fixtures verify reviewed synthesis/contradiction provenance, evidence-linked candidate output, gap type, confidence, caution, proposed research, source IDs, generator attribution, and `AI Suggested` state.
+- Six universal-claim traps reject unsupported claims, and an additional fixture requires explicit scope to the reviewed evidence.
+- Negative fixtures reject missing/unknown/dual-labeled evidence IDs, unreviewed or unattributed inputs, altered limitations/context, unsupported gap types, invalid confidence, and extra schema fields.
+- The agent proposes scoped gaps; it does not establish absolute novelty or certify that a gap exists outside the reviewed evidence corpus. Human review remains required.
+- A configured gap-generation model/tool and protected persistence/API integration remain deployment concerns. TQ-VSC-037 outlet-intelligence behavior was not implemented.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-036.
+- TQ-VSC-037 and all later prompts remain `NOT STARTED`.
