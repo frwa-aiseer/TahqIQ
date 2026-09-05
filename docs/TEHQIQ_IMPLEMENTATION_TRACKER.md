@@ -1288,3 +1288,42 @@ None. The harness is test-only and imports existing types without changing them.
 - Chunk creation is implemented as an explicit post-ingestion utility; callers must persist returned chunks through an authorized project path. Retrieval indexing/vector storage was not added because embeddings and retrieval infrastructure are outside this prompt.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-032.
 - TQ-VSC-033 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-033 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a structured `EvidenceExtractionAgent` contract that accepts only a bounded set of supplied full-text chunks plus a project-scoped question/claim. All chunks must share project, source, document hash, and document version before the extraction tool is invoked.
+- Output contains a proposition, exact passages/chunk IDs, explicit context/population/method/result/limitations fields, Supports/Contradicts/Neutral/Unclear classification, and bounded confidence.
+- Available factual fields and the proposition must be verbatim-supported by their cited supplied chunks. Exact passages must be literal substrings of their named chunk. Unknown IDs, invented text, extra fields, malformed classifications/confidence, and mixed provenance fail closed.
+- Missing fields require the exact `Not available in supplied chunks.` state and cannot cite evidence. The agent never fills absent information with plausible content.
+- Accepted output creates deterministic canonical `EvidenceRecord` IDs while preserving source ID, document hash/version, chunk reference, page/section, exact passage, extractor identity, confidence, and optional linked claim. Every proposal begins `Needs Researcher Review`; every generated evidence record begins `Needs Review` with pending human review.
+- The extraction boundary accepts an injected proposal tool but does not invoke unrestricted model knowledge or silently fall back when no extractor is configured.
+
+### Files changed and migrations
+
+- `src/lib/evidenceExtractionAgent.ts` (created)
+- `src/tests/evidenceExtractionAgent.test.ts` (created)
+- `src/types.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. `ProjectState.evidenceExtractionProposals` and the extraction proposal/field/passage contracts are optional additive fields. Existing evidence records, chunks, and stored projects remain readable unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/evidenceExtractionAgent.test.ts src/tests/fullTextChunks.test.ts src/tests/evidenceRecords.test.ts` — exit `0`; PASS, 3/3 files and 19/19 tests.
+3. `npm test` — exit `1`; 45/47 executed files passed and 410/412 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Positive fixtures verify proposition, exact passage/chunk ID, source/document provenance, explicit evidence dimensions, relationship/confidence, deterministic evidence IDs, and initial researcher-review states.
+- Hallucination traps reject invented propositions and invented context, population, method, result, or limitations even when a real chunk ID is attached.
+- Additional traps reject non-exact passages, unknown chunk IDs, fabricated missing-state text, evidence links on missing fields, unsupported output keys, invalid relationship/confidence, and mixed-source document chunks.
+- Verbatim grounding is intentionally conservative: abstractive paraphrases are rejected even when semantically reasonable because deterministic support cannot otherwise be proven at this boundary.
+- A configured model/tool and protected persistence/API integration remain deployment concerns; this prompt implements and tests the agent/domain boundary without adding TQ-VSC-034 synthesis behavior.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-033.
+- TQ-VSC-034 and all later prompts remain `NOT STARTED`.

@@ -1027,6 +1027,46 @@ export interface FullTextChunk {
   isSynthetic: boolean;
 }
 
+export type EvidenceExtractionRelationship = "Supports" | "Contradicts" | "Neutral" | "Unclear";
+
+export interface EvidenceExtractionField {
+  status: "Available" | "Not Available";
+  text: string;
+  chunkIds: string[];
+}
+
+export interface EvidenceExtractionPassage {
+  chunkId: string;
+  exactPassage: string;
+  page?: number;
+  section?: string;
+  sourceLocation: string;
+}
+
+export interface EvidenceExtractionProposal {
+  proposalId: string;
+  projectId: string;
+  sourceId: string;
+  documentHash: string;
+  documentVersion: string;
+  questionOrClaim: string;
+  proposition: string;
+  passages: EvidenceExtractionPassage[];
+  context: EvidenceExtractionField;
+  population: EvidenceExtractionField;
+  method: EvidenceExtractionField;
+  result: EvidenceExtractionField;
+  limitations: EvidenceExtractionField;
+  relationship: EvidenceExtractionRelationship;
+  confidence: number;
+  reviewState: "Needs Researcher Review";
+  evidenceRecords: EvidenceRecord[];
+  createdAt: string;
+  extractedBy: string;
+  isDemo: boolean;
+  isSynthetic: boolean;
+}
+
 export interface AnalysisPlan {
   id: string;
   title: string;
@@ -1482,6 +1522,7 @@ export interface ProjectState {
   datasets: DatasetRecord[];
   documentIngestionJobs?: DocumentIngestionJob[];
   fullTextChunks?: FullTextChunk[];
+  evidenceExtractionProposals?: EvidenceExtractionProposal[];
   analysisPlans: AnalysisPlan[];
   analysisOutputs: AnalysisOutput[];
   numericEvidenceRecords?: NumericEvidence[];
