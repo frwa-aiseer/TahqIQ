@@ -1211,3 +1211,43 @@ None. The harness is test-only and imports existing types without changing them.
 - TQ-VSC-031 media transcription remains intentionally unimplemented; image/audio/video routes remain at the TQ-VSC-029 Not Configured boundary.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-030.
 - TQ-VSC-031 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-031 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Confirmed no Whisper or transcription runtime exists in the repository and did not fabricate transcripts. Added a configurable Whisper-compatible/self-hosted provider using the server-only `TRANSCRIPTION_SERVICE_URL`.
+- Added a mandatory per-request privacy-routing hook. The hook receives project/artifact/file identity, media type, MIME type, and byte size before transmission. Missing policy or a blocked decision sends no bytes, creates no transcript, and returns `Requires Review` with an explicit diagnostic.
+- Added strict runtime validation for provider ID/version, transcript version, warnings, language/confidence, segment IDs/text, monotonic timestamps, segment confidence, and optional speaker/language metadata. HTTP, malformed JSON, schema, timestamp, and size failures fail closed through the TQ-VSC-029 ingestion lifecycle.
+- Audio/video outputs retain timestamped extracted blocks plus a structured transcript with exact segments, language metadata, confidence/speaker data when supplied, provider/version provenance, privacy route, transcript version, locally computed SHA-256, and `Needs Review` state.
+- Transcription output always requires researcher review before evidence use. Empty provider output creates no transcript and remains `Requires Review`; no missing transcript content is invented.
+
+### Files changed and migrations
+
+- `.env.example`
+- `src/lib/mediaTranscriptionProvider.ts` (created)
+- `src/tests/mediaTranscriptionProvider.test.ts` (created)
+- `src/lib/documentIngestionRouter.ts`
+- `src/types.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. `DocumentIngestionJob.transcript`, transcript/segment contracts, and timestamp/language/confidence/speaker block fields are optional additive fields. Existing jobs and stored projects remain readable unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. Initial focused run identified one overly broad test-message expectation while the implementation correctly failed closed; the expectation was aligned to the precise diagnostic.
+3. `npx vitest run src/tests/mediaTranscriptionProvider.test.ts src/tests/documentIngestionRouter.test.ts` — exit `0`; PASS, 2/2 files and 40/40 tests.
+4. `npm test` — exit `1`; 43/45 executed files passed and 397/399 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two failures remain the established baseline/environment failures: offline Crossref returns truthful network-error wording instead of the legacy not-found assertion, and jsdom localStorage lacks `setItem` under the current Node option.
+5. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+6. `git diff --check` — rerun after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Fixtures prove absent service configuration and absent privacy routing never call a provider and never create a transcript.
+- A blocked privacy decision is enforced before network transmission, while approved self-hosted routes preserve outbound privacy-route attribution.
+- Mocked audio and video integrations preserve timestamps, language, language confidence, segment confidence, speaker, version, provider provenance, locally calculated transcript hash, and `Needs Review` state.
+- Failure fixtures cover provider HTTP errors and invalid timestamps, with no partial transcript or blocks accepted.
+- Deployment must provide a reachable trusted transcription service and an application privacy router. The repository does not claim Whisper availability or transcript accuracy without these controls.
+- TQ-VSC-032 and all later prompts remain `NOT STARTED`.

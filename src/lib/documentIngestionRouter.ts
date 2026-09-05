@@ -4,6 +4,7 @@ import type {
   DocumentIngestionJob,
   DocumentIngestionStatus,
   DocumentParserProvenance,
+  DocumentTranscript,
 } from "../types";
 import { calculateSha256, parseAndProfileDataset } from "./datasetIngestion";
 
@@ -23,6 +24,7 @@ export interface DocumentParserResult {
   blocks: DocumentExtractedBlock[];
   warnings: string[];
   provenance: Omit<DocumentParserProvenance, "executedAt">;
+  transcript?: Omit<DocumentTranscript, "generatedAt">;
 }
 
 export type DocumentParserAdapter = (input: DocumentIngestionInput) => Promise<DocumentParserResult>;
@@ -142,7 +144,7 @@ export async function routeDocumentIngestion(
   try {
     const result = await adapter(input);
     const executedAt = now();
-    job = { ...job, extractedBlocks: result.blocks, warnings: result.warnings, parserProvenance: { ...result.provenance, executedAt } };
+    job = { ...job, extractedBlocks: result.blocks, warnings: result.warnings, parserProvenance: { ...result.provenance, executedAt }, transcript: result.transcript ? { ...result.transcript, generatedAt: executedAt } : undefined };
     return transition(job, result.status, executedAt, result.status === "Parsed" ? "Document parsed successfully." : "Document parsed and requires researcher review.");
   } catch (error) {
     const failedAt = now();

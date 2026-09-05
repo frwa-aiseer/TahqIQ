@@ -936,6 +936,35 @@ export interface DocumentExtractedBlock {
   section?: string;
   tableReference?: string;
   imageReference?: string;
+  startSeconds?: number;
+  endSeconds?: number;
+  language?: string;
+  confidence?: number;
+  speaker?: string;
+}
+
+export interface TranscriptSegment {
+  segmentId: string;
+  startSeconds: number;
+  endSeconds: number;
+  text: string;
+  language?: string;
+  confidence?: number;
+  speaker?: string;
+}
+
+export interface DocumentTranscript {
+  transcriptVersion: string;
+  transcriptHash: string;
+  hashAlgorithm: "SHA-256";
+  language?: string;
+  languageConfidence?: number;
+  segments: TranscriptSegment[];
+  reviewState: "Needs Review" | "Researcher Reviewed" | "Rejected";
+  providerId: string;
+  providerVersion: string;
+  generatedAt: string;
+  privacyRoute: "Self Hosted" | "Approved External";
 }
 
 export interface DocumentIngestionJob {
@@ -954,6 +983,7 @@ export interface DocumentIngestionJob {
   warnings: string[];
   errors: string[];
   dataset?: DatasetRecord;
+  transcript?: DocumentTranscript;
   createdAt: string;
   updatedAt: string;
   createdByUid: string;
