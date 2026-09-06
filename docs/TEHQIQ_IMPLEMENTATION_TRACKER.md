@@ -1480,3 +1480,43 @@ None. The harness is test-only and imports existing types without changing them.
 - This prompt adds the domain service and contracts, not provider retrieval adapters, an LLM extraction endpoint, persistence/RBAC integration, or a mounted outlet-intelligence UI. Those remain integration concerns; any future extractor must supply official retrieved text and preserve `Needs Review` until attributable human verification.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-037.
 - TQ-VSC-038 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-038 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Replaced the citation-formatting switch as the public architecture with one registry-backed citation processor that produces both in-text citations and bibliography entries from the same selected style definition.
+- Added CSL style lookup by ID and CSL XML file registration. Files must contain the CSL namespace plus info ID, title, and standard `citation-format` category before they can enter the registry.
+- Bundled and imported definitions are labeled `Available—Compatible` with `exactJournalStyle: false`; UI style names use “compatible” rather than asserting exact journal conformance.
+- Added truthful unavailable results for missing/unknown IDs, malformed CSL files, and outlet styles that cannot be resolved. Unknown legacy labels no longer silently fall back to APA.
+- Target-outlet selection now resolves only a valid, field-level, human-confirmed `referenceStyle` requirement with source provenance. The legacy top-level `citationStyle` string cannot select a style.
+- Preserved existing BibTeX, RIS, and CSL JSON parsing/export facilities and verified their regression suites.
+
+### Files changed and migrations
+
+- `src/lib/cslStyles.ts`
+- `src/tests/cslArchitecture.test.ts` (created)
+- `src/data/baselineOutlets.ts`
+- `src/App.tsx`
+- `src/components/JournalSelectorDropdown.tsx`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. Existing style IDs remain accepted, `apa-7th` is retained as a compatibility alias, and existing source/project records remain readable. Projects or outlets with unknown/unsourced styles now render the truthful `unavailable` state rather than receiving an implicit APA mapping.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after the final implementation and tracker update.
+2. `npx vitest run src/tests/cslArchitecture.test.ts src/tests/unit.test.ts src/tests/baselineOutlets.test.ts src/tests/exportValidation.test.ts src/tests/outletRequirements.test.ts` — exit `0`; PASS, 5/5 files and 54/54 tests.
+3. `npm test` — exit `1`; 50/52 executed files passed and 451/453 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion still expects legacy wording while the provider returned the truthful `not found by Crossref Official Registry` message; the established jsdom localStorage failure still reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Representative author-date tests verify multi-author in-text formatting and corresponding bibliography output through the shared processor.
+- Representative numeric tests verify stable global numbering for both in-text and bibliography output through that same processor.
+- Tests cover valid CSL-file registration, malformed files, unknown IDs, verified outlet mapping, missing outlet style, removal of implicit APA fallback, and existing BibTeX/RIS/CSL JSON behavior.
+- CSL XML registration currently parses and retains style identity/category metadata, then uses compatible family rendering. It does not execute arbitrary CSL macros/layout instructions, locales, dependent-style links, or cite grouping rules; therefore exact imported/journal style is deliberately not claimed.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-038.
+- TQ-VSC-039 and all later prompts remain `NOT STARTED`.

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ProjectState, SourceRecord, CSLStyleOption, ManuscriptSection, ResearchCanvas, ResearchQuestionItem, ClaimItem, TargetOutlet, SearchExecution, SearchExecutionSource } from "./types";
 import { createEmptyProject, createDemoProject, canAddRecordToProject } from "./data/demoProject";
-import { mapJournalStyleToCslId } from "./data/baselineOutlets";
+import { resolveOutletCslStyle } from "./lib/cslStyles";
 import { Header } from "./components/Header";
 import { Navigation, WORKFLOW_STEPS } from "./components/Navigation";
 import { ResearchCanvasView } from "./components/views/ResearchCanvasView";
@@ -221,7 +221,7 @@ function MainAppContent() {
   };
 
   const handleSelectOutlet = (outlet: TargetOutlet) => {
-    const cslId = mapJournalStyleToCslId(outlet.citationStyle);
+    const cslId = resolveOutletCslStyle(outlet).styleId || "unavailable";
     setProject((prev) => ({
       ...prev,
       selectedTargetOutlet: outlet,

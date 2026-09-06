@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { TargetOutlet } from "../types";
-import { BASELINE_JOURNALS, BASELINE_CONFERENCES, mapJournalStyleToCslId } from "../data/baselineOutlets";
+import { BASELINE_JOURNALS, BASELINE_CONFERENCES } from "../data/baselineOutlets";
 import { BookOpen, Check, Layers, Sliders, Sparkles, Filter } from "lucide-react";
 
 interface JournalSelectorDropdownProps {

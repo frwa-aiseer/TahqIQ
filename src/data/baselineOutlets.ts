@@ -928,7 +928,7 @@ export const BASELINE_CONFERENCES: TargetOutlet[] = VERIFIED_STATIC_CONFERENCES_
  * Backward-compatible helper for mapping journal citationStyle string to internal CSL ID
  */
 export function mapJournalStyleToCslId(styleStr: string): string {
-  if (!styleStr) return "apa";
+  if (!styleStr || /^(?:unverified|unavailable|not configured)$/i.test(styleStr.trim())) return "unavailable";
   const lower = styleStr.toLowerCase();
   if (lower.includes("ieee")) return "ieee";
   if (lower.includes("nature") || lower.includes("science")) return "nature";
@@ -942,5 +942,5 @@ export function mapJournalStyleToCslId(styleStr: string): string {
   if (lower.includes("harvard")) return "harvard";
   if (lower.includes("mla")) return "mla";
   if (lower.includes("cell")) return "cell";
-  return "apa";
+  return "unavailable";
 }

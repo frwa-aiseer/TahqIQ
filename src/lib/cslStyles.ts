@@ -1,159 +1,174 @@
-import { SourceRecord, CSLStyleOption } from "../types";
+import type { CSLStyleOption, SourceRecord, TargetOutlet } from "../types";
+import { getVerifiedRequirement } from "./outletRequirements";
 
-export const CSL_STYLES: CSLStyleOption[] = [
-  { id: "apa", name: "APA 7th Edition", citationFormat: "author-date" },
-  { id: "ieee", name: "IEEE Style", citationFormat: "numeric" },
-  { id: "nature", name: "Nature Journal Style", citationFormat: "superscript" },
-  { id: "vancouver", name: "Vancouver / NLM Medical Style", citationFormat: "numeric" },
-  { id: "chicago", name: "Chicago 17th Ed. (Author-Date)", citationFormat: "author-date" },
-  { id: "chicago-notes", name: "Chicago 17th Ed. (Notes & Bibliography)", citationFormat: "footnote" },
-  { id: "harvard", name: "Harvard (Cite Them Right 12th)", citationFormat: "author-date" },
-  { id: "springer", name: "Springer / BMC Journal Style", citationFormat: "numeric" },
-  { id: "elsevier", name: "Elsevier Standard Style", citationFormat: "numeric" },
-  { id: "acs", name: "ACS Style (American Chemical Society)", citationFormat: "superscript" },
-  { id: "ama", name: "AMA 11th Edition (American Medical)", citationFormat: "superscript" },
-  { id: "mla", name: "MLA 9th Edition", citationFormat: "author-date" },
-  { id: "cell", name: "Cell Press / Neuron Style", citationFormat: "author-date" },
-  { id: "oxford", name: "Oxford / OSCOLA Reference Style", citationFormat: "footnote" },
-  { id: "plos", name: "PLOS ONE Journal Style", citationFormat: "numeric" }
+export type CslStyleAvailability = "Available—Compatible" | "Unavailable";
+export type CslStyleOrigin = "bundled" | "csl-file";
+
+export interface CslStyleDefinition extends CSLStyleOption {
+  availability: CslStyleAvailability;
+  origin: CslStyleOrigin;
+  exactJournalStyle: false;
+  cslXml?: string;
+}
+
+export interface CitationProcessingResult {
+  status: CslStyleAvailability;
+  style?: CslStyleDefinition;
+  inText: string;
+  bibliography: string[];
+  message?: string;
+}
+
+export interface OutletCslResolution {
+  status: CslStyleAvailability;
+  requestedStyle: string | null;
+  styleId?: string;
+  message: string;
+  sourceRecordId?: string;
+  sourceUrl?: string;
+}
+
+const bundled: CslStyleDefinition[] = [
+  { id: "apa", name: "APA-compatible author-date", citationFormat: "author-date", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "apa-7th", name: "APA-compatible author-date", citationFormat: "author-date", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "ieee", name: "IEEE-compatible numeric", citationFormat: "numeric", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "nature", name: "Nature-compatible numeric", citationFormat: "superscript", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "vancouver", name: "Vancouver-compatible numeric", citationFormat: "numeric", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "chicago", name: "Chicago-compatible author-date", citationFormat: "author-date", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "chicago-notes", name: "Chicago-compatible notes", citationFormat: "footnote", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "harvard", name: "Harvard-compatible author-date", citationFormat: "author-date", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "springer", name: "Springer-compatible numeric", citationFormat: "numeric", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "elsevier", name: "Elsevier-compatible numeric", citationFormat: "numeric", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "acs", name: "ACS-compatible numeric", citationFormat: "superscript", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "ama", name: "AMA-compatible numeric", citationFormat: "superscript", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "mla", name: "MLA-compatible author-page", citationFormat: "author-date", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "cell", name: "Cell-compatible author-date", citationFormat: "author-date", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "oxford", name: "Oxford-compatible notes", citationFormat: "footnote", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
+  { id: "plos", name: "PLOS-compatible numeric", citationFormat: "numeric", availability: "Available—Compatible", origin: "bundled", exactJournalStyle: false },
 ];
 
-export const CSL_STYLE_DESCRIPTIONS: Record<string, string> = {
-  'apa': 'American Psychological Association 7th Edition',
-  'apa-7th': 'American Psychological Association 7th Edition',
-  'ieee': 'Institute of Electrical and Electronics Engineers',
-  'nature': 'Nature Publishing Group Standard Style',
-  'vancouver': 'Vancouver / National Library of Medicine Medical Style',
-  'chicago': 'Chicago Manual of Style 17th Edition',
-  'chicago-notes': 'Chicago Notes and Bibliography',
-  'harvard': 'Harvard Author-Date Reference System',
-  'springer': 'Springer BMC Scientific Publishing Style',
-  'elsevier': 'Elsevier Standard Journal Format',
-  'acs': 'American Chemical Society Format',
-  'ama': 'American Medical Association 11th Edition',
-  'mla': 'Modern Language Association 9th Edition',
-  'cell': 'Cell Press Journal Style',
-  'oxford': 'Oxford / OSCOLA Legal and Humanities Style',
-  'plos': 'Public Library of Science Open Access Style'
-};
+const styleRegistry = new Map<string, CslStyleDefinition>(bundled.map((style) => [style.id, style]));
+const unavailableOption: CSLStyleOption = { id: "unavailable", name: "Reference style unavailable", citationFormat: "author-date" };
+export const CSL_STYLES: CSLStyleOption[] = [...bundled, unavailableOption];
+export const CSL_STYLE_DESCRIPTIONS: Record<string, string> = Object.fromEntries(
+  bundled.map((style) => [style.id, `${style.name}; compatible rendering, not a claim of exact journal conformance`]),
+);
 
+function xmlValue(xml: string, tag: string): string | undefined {
+  return xml.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "i"))?.[1]?.replace(/<[^>]+>/g, "").trim();
+}
 
-export function formatInTextCitation(
-  sources: SourceRecord[],
-  styleId: CSLStyleOption["id"],
-  allSources?: SourceRecord[]
-): string {
-  if (!sources || sources.length === 0) return "";
+/** Registers a CSL 1.x file for compatible rendering without claiming exact conformance. */
+export function registerCslStyleFile(xml: string): CslStyleDefinition {
+  if (!/<style\b[^>]*xmlns=["']http:\/\/purl\.org\/net\/xbiblio\/csl["'][^>]*>/i.test(xml)) {
+    throw new Error("Invalid CSL file: a CSL style root and namespace are required.");
+  }
+  const id = xmlValue(xml, "id");
+  const title = xmlValue(xml, "title");
+  const citationFormat = xml.match(/<category\b[^>]*citation-format=["'](author-date|numeric|note)["']/i)?.[1];
+  if (!id || !title || !citationFormat) throw new Error("Invalid CSL file: info id, title, and citation-format category are required.");
+  const normalizedFormat: CSLStyleOption["citationFormat"] = citationFormat === "note" ? "footnote" : citationFormat as "author-date" | "numeric";
+  const definition: CslStyleDefinition = {
+    id, name: `${title} (CSL-compatible)`, citationFormat: normalizedFormat,
+    availability: "Available—Compatible", origin: "csl-file", exactJournalStyle: false, cslXml: xml,
+  };
+  styleRegistry.set(id, definition);
+  return definition;
+}
 
-  // Compute actual sequential 1-based index from global sources library if provided
-  const numbers = sources.map((src, fallbackIdx) => {
-    if (allSources && allSources.length > 0) {
-      const globalIdx = allSources.findIndex((s) => s.id === src.id);
-      return globalIdx !== -1 ? globalIdx + 1 : fallbackIdx + 1;
-    }
-    return fallbackIdx + 1;
+export function getCslStyle(styleId: string): CslStyleDefinition | undefined {
+  return styleRegistry.get(styleId);
+}
+
+const LABEL_TO_ID: Array<[RegExp, string]> = [
+  [/\bAPA(?:\s*7(?:th)?)?\b/i, "apa"], [/\bIEEE\b/i, "ieee"], [/\bVancouver\b|\bNLM\b/i, "vancouver"],
+  [/\bChicago\b/i, "chicago"], [/\bHarvard\b/i, "harvard"], [/\bNature\b/i, "nature"], [/\bACS\b/i, "acs"],
+  [/\bAMA\b/i, "ama"], [/\bMLA\b/i, "mla"], [/\bPLOS\b/i, "plos"], [/\bSpringer\b/i, "springer"],
+];
+
+export function resolveCslStyleId(labelOrId: string | null | undefined): string | undefined {
+  const value = labelOrId?.trim();
+  if (!value || /^(?:unverified|unavailable|not configured)$/i.test(value)) return undefined;
+  if (styleRegistry.has(value)) return value;
+  return LABEL_TO_ID.find(([pattern]) => pattern.test(value))?.[1];
+}
+
+/** Resolves only verified field-level outlet requirements; top-level citationStyle is not evidence. */
+export function resolveOutletCslStyle(outlet: TargetOutlet): OutletCslResolution {
+  const requirement = getVerifiedRequirement(outlet, "referenceStyle");
+  const requestedStyle = typeof requirement?.value === "string" ? requirement.value : null;
+  const styleId = resolveCslStyleId(requestedStyle);
+  if (!requirement || !requestedStyle || !styleId) {
+    return {
+      status: "Unavailable", requestedStyle,
+      message: requirement ? "Verified outlet style is not available to the citation processor." : "Verified outlet reference style is unavailable.",
+      sourceRecordId: requirement?.id, sourceUrl: requirement?.sourceUrl,
+    };
+  }
+  return {
+    status: "Available—Compatible", requestedStyle, styleId,
+    message: "Compatible CSL rendering is available; exact journal conformance is not claimed.",
+    sourceRecordId: requirement.id, sourceUrl: requirement.sourceUrl,
+  };
+}
+
+function lastName(fullName: string): string {
+  if (fullName.includes(",")) return fullName.split(",")[0]?.trim() || "Unknown";
+  return fullName.trim().split(/\s+/).filter(Boolean).pop() || "Unknown";
+}
+
+function numbersFor(sources: SourceRecord[], allSources?: SourceRecord[]): number[] {
+  return sources.map((source, index) => {
+    const globalIndex = allSources?.findIndex((candidate) => candidate.id === source.id) ?? -1;
+    return globalIndex >= 0 ? globalIndex + 1 : index + 1;
   });
-
-  switch (styleId) {
-    case "ieee":
-    case "springer":
-    case "elsevier":
-      return `[${numbers.join(", ")}]`;
-
-    case "plos":
-      return `[${numbers.join(",")}]`;
-
-    case "nature":
-    case "acs":
-    case "ama":
-      return `${numbers.map(n => `[${n}]`).join("")}`; // Clean numeric bracket sequence for nature/ama
-
-    case "vancouver":
-      return `(${numbers.join(", ")})`;
-
-    case "chicago-notes":
-    case "oxford":
-      return `[${numbers.join(",")}]`;
-
-    case "mla":
-      const mlaItems = sources.map((src) => {
-        const authorList = src.authors || [];
-        const lastName = authorList.length > 0 ? getLastName(authorList[0]) : "Unknown";
-        return `${lastName} ${src.pages || ""}`.trim();
-      });
-      return `(${mlaItems.join("; ")})`;
-
-    case "cell":
-    case "chicago":
-    case "harvard":
-    case "apa":
-    default:
-      const formattedItems = sources.map((src) => {
-        const authorList = src.authors || [];
-        let authorText = "Unknown";
-        if (authorList.length === 1) {
-          authorText = getLastName(authorList[0]);
-        } else if (authorList.length === 2) {
-          authorText = `${getLastName(authorList[0])} & ${getLastName(authorList[1])}`;
-        } else if (authorList.length > 2) {
-          authorText = `${getLastName(authorList[0])} et al.`;
-        }
-        return `${authorText}, ${src.year || "n.d."}`;
-      });
-      return `(${formattedItems.join("; ")})`;
-  }
 }
 
-export function formatBibliographyEntry(src: SourceRecord, index: number, styleId: CSLStyleOption["id"]): string {
-  const authorsStr = (src.authors || []).join(", ");
-  const year = src.year || "n.d.";
-  const title = src.title || "Untitled";
-  const venue = src.journalOrVenue || "Unspecified Source";
-  const doiStr = src.doi ? ` https://doi.org/${src.doi}` : "";
-
-  switch (styleId) {
-    case "ieee":
-      return `[${index + 1}] ${authorsStr}, "${title}," *${venue}*, vol. ${src.volume || "1"}, no. ${src.issue || "1"}, pp. ${src.pages || "1-10"}, ${year}.${doiStr}`;
-
-    case "nature":
-      return `${index + 1}. ${authorsStr}. ${title}. *${venue}* **${src.volume || "1"}**, ${src.pages || "1-10"} (${year}).${doiStr}`;
-
-    case "vancouver":
-    case "ama":
-      return `${index + 1}. ${authorsStr}. ${title}. ${venue}. ${year};${src.volume || "1"}(${src.issue || "1"}):${src.pages || "1-10"}.${doiStr}`;
-
-    case "springer":
-    case "elsevier":
-    case "plos":
-      return `[${index + 1}] ${authorsStr} (${year}). ${title}. ${venue}, ${src.volume || "1"}(${src.issue || "1"}), ${src.pages || "1-10"}.${doiStr}`;
-
-    case "acs":
-      return `${index + 1}. ${authorsStr}. ${title}. *${venue}* **${year}**, *${src.volume || "1"}*, ${src.pages || "1-10"}.${doiStr}`;
-
-    case "chicago":
-    case "chicago-notes":
-      return `${authorsStr}. "${title}." *${venue}* ${src.volume || "1"}, no. ${src.issue || "1"} (${year}): ${src.pages || "1-10"}.${doiStr}`;
-
-    case "harvard":
-      return `${authorsStr} (${year}) '${title}', *${venue}*, ${src.volume || "1"}(${src.issue || "1"}), pp. ${src.pages || "1-10"}.${doiStr}`;
-
-    case "mla":
-      return `${authorsStr}. "${title}." *${venue}*, vol. ${src.volume || "1"}, no. ${src.issue || "1"}, ${year}, pp. ${src.pages || "1-10"}.${doiStr}`;
-
-    case "cell":
-      return `${authorsStr} (${year}). ${title}. ${venue} ${src.volume || "1"}, ${src.pages || "1-10"}.${doiStr}`;
-
-    case "oxford":
-      return `${index + 1}. ${authorsStr}, '${title}', *${venue}*, ${src.volume || "1"}/${src.issue || "1"} (${year}), ${src.pages || "1-10"}.${doiStr}`;
-
-    case "apa":
-    default:
-      return `${authorsStr} (${year}). ${title}. *${venue}*, ${src.volume || "1"}(${src.issue || "1"}), ${src.pages || "1-10"}.${doiStr}`;
-  }
+function renderAuthorDate(sources: SourceRecord[]): string {
+  return `(${sources.map((source) => {
+    const authors = source.authors || [];
+    const author = authors.length === 0 ? "Unknown" : authors.length === 1 ? lastName(authors[0]) : authors.length === 2
+      ? `${lastName(authors[0])} & ${lastName(authors[1])}` : `${lastName(authors[0])} et al.`;
+    return `${author}, ${source.year || "n.d."}`;
+  }).join("; ")})`;
 }
 
-function getLastName(fullName: string): string {
-  if (!fullName) return "Unknown";
-  const parts = fullName.trim().split(" ");
-  return parts[parts.length - 1];
+function renderBibliography(source: SourceRecord, index: number, style: CslStyleDefinition): string {
+  const authors = (source.authors || []).join(", ") || "Unknown";
+  const year = source.year || "n.d.";
+  const title = source.title || "Untitled";
+  const venue = source.journalOrVenue || "Unspecified Source";
+  const details = [source.volume, source.issue ? `(${source.issue})` : undefined, source.pages].filter(Boolean).join("");
+  const doi = source.doi ? ` https://doi.org/${source.doi}` : "";
+  if (style.citationFormat === "author-date") return `${authors} (${year}). ${title}. *${venue}*${details ? `, ${details}` : ""}.${doi}`;
+  if (style.id === "ieee") return `[${index + 1}] ${authors}, "${title}," *${venue}*${details ? `, ${details}` : ""}, ${year}.${doi}`;
+  return `${index + 1}. ${authors}. ${title}. ${venue}. ${year}${details ? `;${details}` : ""}.${doi}`;
+}
+
+/** The single processor used for in-text and bibliography rendering. */
+export function processCitationStyle(sources: SourceRecord[], styleId: string, allSources?: SourceRecord[]): CitationProcessingResult {
+  const style = getCslStyle(styleId);
+  if (!style) return { status: "Unavailable", inText: "", bibliography: [], message: `CSL style '${styleId}' is unavailable.` };
+  const numbers = numbersFor(sources, allSources);
+  const inText = style.citationFormat === "author-date" ? renderAuthorDate(sources)
+    : style.citationFormat === "numeric" ? `[${numbers.join(", ")}]`
+      : style.citationFormat === "superscript" ? numbers.map((number) => `[${number}]`).join("")
+        : `[${numbers.join(",")}]`;
+  return {
+    status: "Available—Compatible", style, inText,
+    bibliography: sources.map((source, index) => {
+      const globalIndex = allSources?.findIndex((item) => item.id === source.id) ?? -1;
+      return renderBibliography(source, globalIndex >= 0 ? globalIndex : index, style);
+    }),
+    message: "Compatible rendering; exact journal conformance is not claimed.",
+  };
+}
+
+export function formatInTextCitation(sources: SourceRecord[], styleId: CSLStyleOption["id"], allSources?: SourceRecord[]): string {
+  return processCitationStyle(sources, styleId, allSources).inText;
+}
+
+export function formatBibliographyEntry(source: SourceRecord, index: number, styleId: CSLStyleOption["id"]): string {
+  const style = getCslStyle(styleId);
+  return style ? renderBibliography(source, index, style) : "Citation style unavailable.";
 }
