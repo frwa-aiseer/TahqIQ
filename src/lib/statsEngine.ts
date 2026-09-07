@@ -5,6 +5,7 @@ import {
   GeneratedFigure,
   GeneratedTable,
 } from "../types";
+import { AnalysisMethodRegistry } from "./analysisMethodRegistry";
 
 // ==========================================
 // High-Precision Statistical Distribution Helpers
@@ -251,7 +252,7 @@ export interface AnalysisExecutionOptions {
   isResearcherSuppliedLog?: boolean;
 }
 
-export function executePairedCrossoverAnalysis(
+function executePairedCrossoverMethod(
   datasetOrOptions: DatasetRecord | AnalysisExecutionOptions,
   outcomeVarOpt?: string,
   conditionVarOpt?: string,
@@ -894,6 +895,69 @@ print(w_result)
   };
 
   return output;
+}
+
+export const analysisMethodRegistry = new AnalysisMethodRegistry();
+
+analysisMethodRegistry.register<AnalysisExecutionOptions>({
+  id: "paired-crossover-comparison",
+  family: "paired-comparison",
+  label: "Paired / Crossover Comparison",
+  aliases: ["Paired Student's t-test", "paired t-test", "2x2 crossover comparison"],
+  compatibleVariableTypes: {
+    outcome: ["Numeric"],
+    condition: ["Categorical"],
+    participantId: ["ID", "Categorical"],
+    period: ["Ordinal", "Categorical", "Numeric"],
+    sequence: ["Categorical"],
+  },
+  requiredInputs: ["dataset", "approved analysis plan", "numeric paired outcome values"],
+  assumptions: [
+    "Observations are paired within participant",
+    "Paired differences are approximately normal for the paired t-test",
+    "Crossover diagnostics require period and sequence variables when interpreted",
+  ],
+  outputSchema: {
+    result: "AnalysisOutput",
+    numericResults: "paired descriptive statistics, test statistics, effect sizes, and diagnostics",
+    provenance: "dataset hash, plan ID, execution timestamp, and reproducibility hash",
+  },
+  diagnostics: [
+    { id: "paired-normality", label: "Normality of paired differences", description: "Skewness and kurtosis diagnostic for paired differences." },
+    { id: "paired-outliers", label: "Paired-difference outliers", description: "IQR and standard-deviation rules applied to paired differences." },
+    { id: "crossover-carryover", label: "Crossover carryover caution", description: "Crossover-only diagnostic with an explicit low-power limitation warning." },
+  ],
+  reproducibility: {
+    deterministic: true,
+    recordsDatasetHash: true,
+    recordsPlanId: true,
+    emitsCode: true,
+  },
+  execute: (options) => executePairedCrossoverMethod(options),
+});
+
+export function resolveAnalysisMethod(methodName: string) {
+  return analysisMethodRegistry.resolve<AnalysisExecutionOptions>(methodName);
+}
+
+export function executeRegisteredAnalysisMethod(methodName: string, options: AnalysisExecutionOptions): AnalysisOutput {
+  const method = resolveAnalysisMethod(methodName);
+  if (!method) throw new Error(`Analysis method '${methodName}' is not configured. Researcher input required.`);
+  return method.execute(options);
+}
+
+/** Backward-compatible entry point for the validated paired/crossover plugin. */
+export function executePairedCrossoverAnalysis(
+  datasetOrOptions: DatasetRecord | AnalysisExecutionOptions,
+  outcomeVarOpt?: string,
+  conditionVarOpt?: string,
+  periodVarOpt?: string,
+  sequenceVarOpt?: string
+): AnalysisOutput {
+  if ("dataset" in datasetOrOptions && "plan" in datasetOrOptions) {
+    return analysisMethodRegistry.execute("paired-crossover-comparison", datasetOrOptions);
+  }
+  return executePairedCrossoverMethod(datasetOrOptions, outcomeVarOpt, conditionVarOpt, periodVarOpt, sequenceVarOpt);
 }
 
 // Helper: Generate Figures & Tables strictly using AnalysisOutput numbers

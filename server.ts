@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import { lookupDoiMetadata } from "./src/lib/metadataProviders";
 import { createSearchExecution, executeSearchExecution } from "./src/lib/searchExecution";
 import { runLiteratureRetrievalAgent } from "./src/lib/literatureRetrievalAgent";
-import { executePairedCrossoverAnalysis, generateAnalysisFiguresAndTables } from "./src/lib/statsEngine";
+import { executeRegisteredAnalysisMethod, generateAnalysisFiguresAndTables, resolveAnalysisMethod } from "./src/lib/statsEngine";
 import { hasAttributableManuscriptApproval } from "./src/lib/analysisLifecycle";
 import { applicationDefault, getApps as getAdminApps, initializeApp as initializeAdminApp } from "firebase-admin/app";
 import { getAuth as getAdminAuth } from "firebase-admin/auth";
@@ -556,6 +556,14 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
       if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
       const { dataset, plan, options } = requestValidation.value;
 
+      if (!resolveAnalysisMethod(plan.statisticalMethod)) {
+        return res.status(422).json({
+          status: "failed",
+          executionStatus: "Failed",
+          error: `Analysis method '${plan.statisticalMethod}' is not configured. Researcher input required.`,
+        });
+      }
+
       // Check external Python Cloud Run Service Interface
       if (process.env.ANALYSIS_SERVICE_URL) {
         try {
@@ -578,7 +586,7 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
       }
 
       // Execute real statistical analysis from raw dataset records
-      const output = executePairedCrossoverAnalysis({
+      const output = executeRegisteredAnalysisMethod(plan.statisticalMethod, {
         dataset,
         plan,
         outcomeVariable: options?.outcomeVariable || plan.outcomeVariable,

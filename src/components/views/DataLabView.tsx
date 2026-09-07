@@ -12,7 +12,7 @@ import {
 } from "../../types";
 import { performStateTransition, DATASET_TRANSITIONS } from "../../lib/stateMachines";
 import { parseAndProfileDataset, updateDatasetVariableDictionary } from "../../lib/datasetIngestion";
-import { executePairedCrossoverAnalysis, generateAnalysisFiguresAndTables } from "../../lib/statsEngine";
+import { executeRegisteredAnalysisMethod, generateAnalysisFiguresAndTables } from "../../lib/statsEngine";
 import { createNumericEvidenceFromAnalysis } from "../../lib/numericEvidence";
 import { hasAttributableManuscriptApproval, transitionAnalysisOutput } from "../../lib/analysisLifecycle";
 import { ApprovalModal } from "../ApprovalModal";
@@ -391,7 +391,7 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
         }
       } catch (apiErr) {
         // Fallback to client-side engine computation
-        runOutput = executePairedCrossoverAnalysis({
+        runOutput = executeRegisteredAnalysisMethod(activePlan.statisticalMethod, {
           dataset: activeDataset,
           plan: activePlan,
           outcomeVariable: execParams.outcomeVariable,

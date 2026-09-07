@@ -1720,3 +1720,42 @@ None. The harness is test-only and imports existing types without changing them.
 - This prompt implements the domain contract only. It is not connected to the current Question Builder UI, an API route, or protected persistence. TQ-VSC-044 and later prompts were not executed.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-043.
 - TQ-VSC-044 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-044 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added an extensible `AnalysisMethodRegistry` with immutable method definitions and exact normalized alias resolution.
+- Each registered method declares an ID, family, label/aliases, compatible variable types, required inputs, assumptions, output schema, diagnostics, reproducibility capabilities, and deterministic executor.
+- Registered the existing validated paired/crossover analysis as the explicit `paired-crossover-comparison` plugin while preserving the legacy `executePairedCrossoverAnalysis` entry point for compatibility.
+- Routed native server execution and the Data Lab client fallback through registry resolution using `AnalysisPlan.statisticalMethod`.
+- Unrelated and unknown analysis names now fail explicitly as `not configured` / `Researcher input required`; they never inherit paired, period, sequence, or carryover assumptions.
+
+### Files changed and migrations
+
+- `src/lib/analysisMethodRegistry.ts` (created)
+- `src/lib/statsEngine.ts`
+- `src/components/views/DataLabView.tsx`
+- `server.ts`
+- `src/tests/analysisMethodRegistry.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. Existing analysis plans and outputs remain readable. Existing paired-plan method names resolve through registered aliases, and the legacy paired/crossover function remains available.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/analysisMethodRegistry.test.ts src/tests/phase5.test.ts src/tests/statisticalSensitivity.test.ts src/tests/dataIntegrityRegression.test.ts src/tests/apiSchemas.test.ts` — exit `0`; PASS, 5/5 files and 39/39 tests.
+3. `npx vitest run src/tests/analysisMethodRegistry.test.ts src/tests/phase5.test.ts src/tests/statisticalSensitivity.test.ts src/tests/dataIntegrityRegression.test.ts src/tests/integration.test.ts` — exit `1`; 4/5 files and 34/35 tests passed. The sole failure is the established jsdom environment issue: `window.localStorage.setItem is not a function`.
+4. `npm test` — exit `1`; 56/58 executed files passed and 510/512 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two established failures are the Crossref assertion expecting legacy wording and the jsdom localStorage environment failure.
+5. `npm run build` — exit `0`; PASS, 2,006 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests inspect every required method-definition capability and prove both legacy and registry entry points preserve the validated paired output.
+- Parameterized tests prove independent-samples, regression, chi-square, qualitative, and unconfigured methods receive no paired/crossover fallback.
+- Registry resolution is deliberately exact to registered IDs/labels/aliases. Unsupported method selection requires future explicit registration, not heuristic reassignment.
+- The current registry contains only the preserved paired/crossover plugin. Common comparison methods belong to TQ-VSC-045 and were not implemented.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-044.
+- TQ-VSC-045 and all later prompts remain `NOT STARTED`.
