@@ -7,6 +7,7 @@ import {
 } from "../types";
 import { AnalysisMethodRegistry } from "./analysisMethodRegistry";
 import { registerCommonComparisonMethods } from "./commonComparisonMethods";
+import { registerRegressionSurvivalDiagnosticMethods } from "./regressionAnalysisMethods";
 
 // ==========================================
 // High-Precision Statistical Distribution Helpers
@@ -904,6 +905,7 @@ analysisMethodRegistry.register<AnalysisExecutionOptions>({
   id: "paired-crossover-comparison",
   family: "paired-comparison",
   label: "Paired / Crossover Comparison",
+  availability: "Enabled",
   aliases: ["2x2 crossover comparison", "paired crossover analysis", "crossover analysis"],
   compatibleVariableTypes: {
     outcome: ["Numeric"],
@@ -938,6 +940,7 @@ analysisMethodRegistry.register<AnalysisExecutionOptions>({
 });
 
 registerCommonComparisonMethods(analysisMethodRegistry);
+registerRegressionSurvivalDiagnosticMethods(analysisMethodRegistry);
 
 export function resolveAnalysisMethod(methodName: string) {
   return analysisMethodRegistry.resolve<AnalysisExecutionOptions>(methodName);
@@ -946,6 +949,7 @@ export function resolveAnalysisMethod(methodName: string) {
 export function executeRegisteredAnalysisMethod(methodName: string, options: AnalysisExecutionOptions): AnalysisOutput {
   const method = resolveAnalysisMethod(methodName);
   if (!method) throw new Error(`Analysis method '${methodName}' is not configured. Researcher input required.`);
+  if (method.availability !== "Enabled" || !method.execute) throw new Error(`Analysis method '${methodName}' is ${method.availability.toLowerCase()}: ${method.availabilityReason}`);
   return method.execute(options);
 }
 

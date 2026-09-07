@@ -556,11 +556,14 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
       if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
       const { dataset, plan, options } = requestValidation.value;
 
-      if (!resolveAnalysisMethod(plan.statisticalMethod)) {
+      const selectedMethod = resolveAnalysisMethod(plan.statisticalMethod);
+      if (!selectedMethod || selectedMethod.availability !== "Enabled") {
         return res.status(422).json({
           status: "failed",
           executionStatus: "Failed",
-          error: `Analysis method '${plan.statisticalMethod}' is not configured. Researcher input required.`,
+          error: selectedMethod
+            ? `Analysis method '${plan.statisticalMethod}' is ${selectedMethod.availability.toLowerCase()}: ${selectedMethod.availabilityReason}`
+            : `Analysis method '${plan.statisticalMethod}' is not configured. Researcher input required.`,
         });
       }
 

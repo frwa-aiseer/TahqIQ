@@ -1798,3 +1798,45 @@ None. The harness is test-only and imports existing types without changing them.
 - Post-hoc comparisons and multiplicity correction are outside this prompt. Regression, survival, and diagnostic analysis remain TQ-VSC-046 work and were not implemented.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-045.
 - TQ-VSC-046 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-046 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Extended `AnalysisMethodDefinition` with enforced `Enabled`, `Planned`, and `Unavailable` states plus an availability reason. Registration rejects enabled methods without an executor, disabled methods with an executor, and disabled methods without a reason.
+- Added deterministic ordinary least-squares linear regression with one or more numeric predictors, complete-case counts, pivoted matrix inversion, singularity failure, coefficients, finite-sample standard errors/tests/confidence intervals, R-squared, adjusted R-squared, residual error, and provenance.
+- Added deterministic binary logistic regression using bounded iteratively reweighted maximum likelihood with strict numeric 0/1 outcome validation, both-class requirement, convergence/separation/singularity failure, coefficients, standard errors, Wald tests, odds ratios/confidence intervals, likelihood/deviance, event counts, and provenance.
+- Confidence intervals derive their critical value from the analysis plan alpha: Student-t for OLS and normal-theory for logistic regression.
+- Added non-executable `Planned` entries for Poisson, negative-binomial, Kaplan–Meier, and Cox methods, and `Unavailable` entries for sensitivity/specificity and ROC/AUC. Each states the missing scientific/data contract and exposes no executor.
+- The protected analysis endpoint now rejects planned/unavailable methods before external-service or native execution. No disabled method can look executable through the registry.
+
+### Files changed and migrations
+
+- `src/lib/regressionAnalysisMethods.ts` (created)
+- `src/tests/regressionAnalysisMethods.test.ts` (created)
+- `src/lib/analysisMethodRegistry.ts`
+- `src/lib/commonComparisonMethods.ts`
+- `src/lib/statsEngine.ts`
+- `src/tests/analysisMethodRegistry.test.ts`
+- `server.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. Availability is runtime registry metadata. Existing enabled comparison/crossover registrations were marked `Enabled` without changing stored plans or outputs.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after regression implementation.
+2. `npx vitest run src/tests/regressionAnalysisMethods.test.ts src/tests/analysisMethodRegistry.test.ts src/tests/commonComparisonMethods.test.ts src/tests/phase5.test.ts src/tests/apiSchemas.test.ts` — exit `0`; PASS, 5/5 files and 37/37 tests.
+3. `npm test` — exit `1`; 58/60 executed files passed and 525/527 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom localStorage test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,008 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Independently calculated golden fixtures verify OLS coefficients, standard errors, fit statistics, and counts, and binary logistic coefficients, odds ratio, likelihood, deviance, convergence, and event counts.
+- Negative fixtures prove singular OLS, separated logistic models, and non-0/1 binary outcomes fail without p-values/effect sizes or fallback estimates.
+- Registry tests inspect every registered method: all enabled methods have deterministic executors, while every planned/unavailable method has no executor, has an availability reason, and throws an availability-specific error if execution is attempted.
+- OLS supports numeric fixed-effect predictors with an intercept; categorical encoding, interactions, weights, clustered/robust errors, missing-data imputation, and nonlinear terms require future explicit architecture.
+- Logistic regression uses model-based Wald uncertainty; calibration, influence, goodness-of-fit, penalization, robust errors, and rare-event corrections are not implemented and are not claimed.
+- Survival methods remain planned because censoring/ties/risk-table/proportional-hazards contracts are absent. Diagnostic methods remain unavailable because reference-standard polarity, score direction, thresholds, indeterminate results, and uncertainty contracts are absent.
+- TQ-VSC-047 and all later prompts remain `NOT STARTED`.

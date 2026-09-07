@@ -348,7 +348,7 @@ function executeRepeatedMeasures(input: CommonComparisonInput): AnalysisOutput {
 }
 
 const base = (id: string, family: string, label: string, aliases: string[], executor: (input: CommonComparisonInput) => AnalysisOutput, pairedMethod = false): AnalysisMethodDefinition<CommonComparisonInput> => ({
-  id, family, label, aliases,
+  id, family, label, aliases, availability: "Enabled",
   compatibleVariableTypes: pairedMethod ? { outcomes: ["Numeric"], participantId: ["ID", "Categorical"] } : { outcome: ["Numeric"], group: ["Categorical", "Ordinal"] },
   requiredInputs: pairedMethod ? ["approved dataset", "approved analysis plan", "two or more numeric repeated outcome columns"] : ["approved dataset", "approved analysis plan", "numeric outcome", "group variable"],
   assumptions: pairedMethod ? ["Repeated observations belong to the same subject"] : ["Observations are independent between groups"],

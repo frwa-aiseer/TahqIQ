@@ -49,6 +49,7 @@ describe("AnalysisMethodRegistry", () => {
   it("registers the existing paired/crossover implementation as a complete method definition", () => {
     const method = analysisMethodRegistry.get("paired-crossover-comparison");
     expect(method?.family).toBe("paired-comparison");
+    expect(method?.availability).toBe("Enabled");
     expect(method?.compatibleVariableTypes.outcome).toContain("Numeric");
     expect(method?.requiredInputs).toContain("approved analysis plan");
     expect(method?.assumptions).toContain("Observations are paired within participant");
@@ -68,7 +69,6 @@ describe("AnalysisMethodRegistry", () => {
   });
 
   it.each([
-    "Linear regression",
     "Chi-square test",
     "Qualitative thematic analysis",
     "Not configured",
@@ -80,6 +80,12 @@ describe("AnalysisMethodRegistry", () => {
   it("resolves a general independent comparison without crossover assumptions", () => {
     const method = resolveAnalysisMethod("Independent samples t-test");
     expect(method?.id).toBe("independent-t");
+    expect(method?.assumptions.join(" ")).not.toMatch(/paired|crossover|carryover|period|sequence/i);
+  });
+
+  it("resolves linear regression without crossover assumptions", () => {
+    const method = resolveAnalysisMethod("Linear regression");
+    expect(method?.id).toBe("linear-regression");
     expect(method?.assumptions.join(" ")).not.toMatch(/paired|crossover|carryover|period|sequence/i);
   });
 });

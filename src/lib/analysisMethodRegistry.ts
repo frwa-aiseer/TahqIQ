@@ -12,6 +12,8 @@ export interface AnalysisMethodDefinition<TInput> {
   id: string;
   family: string;
   label: string;
+  availability: "Enabled" | "Planned" | "Unavailable";
+  availabilityReason?: string;
   aliases: readonly string[];
   compatibleVariableTypes: Readonly<Record<string, readonly AnalysisVariableType[]>>;
   requiredInputs: readonly string[];
@@ -24,7 +26,7 @@ export interface AnalysisMethodDefinition<TInput> {
     recordsPlanId: boolean;
     emitsCode: boolean;
   }>;
-  execute: (input: TInput) => AnalysisOutput;
+  execute?: (input: TInput) => AnalysisOutput;
 }
 
 const normalizeMethodName = (value: string): string => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -36,6 +38,9 @@ export class AnalysisMethodRegistry {
   register<TInput>(definition: AnalysisMethodDefinition<TInput>): void {
     const id = definition.id.trim();
     if (!id || this.methods.has(id)) throw new Error(`Analysis method '${id || "Missing"}' is already registered or invalid.`);
+    if (definition.availability === "Enabled" && typeof definition.execute !== "function") throw new Error(`Enabled analysis method '${id}' requires an executor.`);
+    if (definition.availability !== "Enabled" && typeof definition.execute === "function") throw new Error(`${definition.availability} analysis method '${id}' cannot expose an executor.`);
+    if (definition.availability !== "Enabled" && !definition.availabilityReason?.trim()) throw new Error(`${definition.availability} analysis method '${id}' requires an availability reason.`);
 
     const methodNames = [id, definition.label, ...definition.aliases].map(normalizeMethodName);
     for (const name of methodNames) {
@@ -74,6 +79,7 @@ export class AnalysisMethodRegistry {
   execute<TInput>(methodId: string, input: TInput): AnalysisOutput {
     const method = this.get<TInput>(methodId);
     if (!method) throw new Error(`Analysis method '${methodId}' is not configured.`);
+    if (method.availability !== "Enabled" || !method.execute) throw new Error(`Analysis method '${methodId}' is ${method.availability.toLowerCase()}: ${method.availabilityReason}`);
     return method.execute(input);
   }
 }
