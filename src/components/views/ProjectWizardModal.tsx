@@ -14,8 +14,8 @@ export const ProjectWizardModal: React.FC<ProjectWizardModalProps> = ({
   onCreateProject,
 }) => {
   const [title, setTitle] = useState("");
-  const [discipline, setDiscipline] = useState<string>("Sports Science & Biomechanics");
-  const [projectType, setProjectType] = useState<ResearchProjectType>("Randomized controlled trial");
+  const [discipline, setDiscipline] = useState<string>("Researcher input required");
+  const [projectType, setProjectType] = useState<ResearchProjectType>("Custom scholarly project");
   const [broadTopic, setBroadTopic] = useState("");
 
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -46,16 +46,19 @@ export const ProjectWizardModal: React.FC<ProjectWizardModalProps> = ({
       canvas: {
         id: `cnv-${Date.now()}`,
         broadTopic: broadTopic || title,
-        practicalProblem: "Problem defined during project setup wizard.",
-        scientificProblem: "Scientific gap defined during setup.",
-        population: "Target Cohort",
-        context: "Clinical / Field Setting",
-        intervention: "Experimental Protocol",
-        comparator: "Control Protocol",
-        outcome: "Primary Outcome",
-        framework: "PICO",
-        feasibilityScore: 8,
-        ethicalRiskScore: 2,
+        practicalProblem: "",
+        scientificProblem: "",
+        theoreticalProblem: "",
+        population: "",
+        context: "",
+        intervention: "",
+        exposure: "",
+        comparator: "",
+        outcome: "",
+        existingKnowledge: "",
+        suspectedGap: "",
+        proposedContribution: "",
+        framework: "Researcher input required",
       },
       isDemoProject: false,
     });
@@ -114,6 +117,7 @@ export const ProjectWizardModal: React.FC<ProjectWizardModalProps> = ({
                 onChange={(e) => setDiscipline(e.target.value)}
                 className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-xs text-stone-900 font-medium focus:bg-white focus:outline-none"
               >
+                <option value="Researcher input required">Researcher input required</option>
                 <option value="Sports Science & Biomechanics">Sports Science & Biomechanics</option>
                 <option value="Medicine & Clinical Research">Medicine & Clinical Research</option>
                 <option value="Public Health & Epidemiology">Public Health & Epidemiology</option>
@@ -133,8 +137,9 @@ export const ProjectWizardModal: React.FC<ProjectWizardModalProps> = ({
                 onChange={(e) => setProjectType(e.target.value as ResearchProjectType)}
                 className="w-full bg-stone-50 border border-stone-200 rounded-lg p-2.5 text-xs text-stone-900 font-medium focus:bg-white focus:outline-none"
               >
+                <option value="Custom scholarly project">Researcher input required</option>
                 <option value="Randomized controlled trial">Randomized Trial (CONSORT)</option>
-                <option value="Observational study">Observational Study (STROBE)</option>
+                <option value="Cohort study">Cohort Study</option>
                 <option value="Systematic review">Systematic Review (PRISMA)</option>
                 <option value="Original qualitative research">Qualitative Study (COREQ)</option>
                 <option value="Case report">Case Report (CARE)</option>

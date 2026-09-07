@@ -1558,3 +1558,43 @@ None. The harness is test-only and imports existing types without changing them.
 - This prompt implements the domain agent only; a protected persistence/API boundary and a mounted recommendations UI remain integration concerns.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-039.
 - TQ-VSC-040 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-040 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a deterministic, conservative `ResearchIntakeAgent` that outputs discipline, subdiscipline, candidate study type, research stage, manuscript type, exact available evidence/method/data summaries, missing critical information, recommended next stage, confidence, and confidence rationale.
+- Added specific classification patterns and tests for clinical research, qualitative research, electrical engineering, machine learning, economics, and systematic reviews. Clinical wording alone does not infer a randomized or crossover design; a specific clinical study type remains researcher-supplied or `Researcher input required`.
+- All intake output starts as `AI Suggested` and includes an explicit researcher-correction instruction. Confirmation requires an attributable researcher and creates a separate `Researcher Confirmed` classification with source proposal ID, confirmation timestamp, researcher identity, and corrected-field list; it does not mutate or overwrite the proposal.
+- Missing discipline, subdiscipline, study type, manuscript type, evidence, method, and data are represented explicitly as `Researcher input required` or `Not available`.
+- Removed the existing empty-project and project-wizard defaults that assigned Sports Science, randomized trial, PICO, CONSORT, clinical setting, target cohort, experimental/control protocols, outcome, and invented gap/problem statements. Neutral projects now start with researcher-input/custom/not-configured states and blank canvas facts.
+
+### Files changed and migrations
+
+- `src/lib/researchIntakeAgent.ts` (created)
+- `src/tests/researchIntakeAgent.test.ts` (created)
+- `src/types.ts`
+- `src/data/demoProject.ts`
+- `src/components/views/ProjectWizardModal.tsx`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. Intake proposal and confirmed-classification fields on `ProjectState` are optional and additive, and the `Researcher input required` framework plus `Not configured` reporting guideline extend existing unions. Existing stored projects retain their explicit classifications. Newly created non-demo projects receive neutral defaults.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after the final implementation and tracker update.
+2. `npx vitest run src/tests/researchIntakeAgent.test.ts src/tests/phase0.test.ts src/tests/phase1.test.ts src/tests/accessibility.test.tsx src/tests/e2eWorkflows.test.tsx` — exit `0`; PASS, 5/5 files and 38/38 tests.
+3. `npm test` — exit `1`; 52/54 executed files passed and 468/470 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion still expects legacy wording while the provider returned the truthful `not found by Crossref Official Registry` message; the established jsdom localStorage failure still reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Parameterized fixtures cover all six required domains/study families and assert that none receives a crossover default.
+- Additional tests cover exact availability copying, missing-state representation, stage/next-stage selection, high/medium/low confidence rationale, separate attributable confirmation, corrected-field tracking, invalid scope/actor rejection, and neutral empty-project defaults.
+- The keyword classifier is deliberately bounded and conservative; descriptions outside its supported patterns stay low-confidence and require researcher input rather than being forced into a nearby discipline.
+- This prompt implements the domain agent, optional persistence contracts, and safe creation defaults. It does not add a protected intake API or mounted proposal/confirmation UI; those remain integration concerns.
+- Reporting-guideline resolution is not implemented here; the new-project guideline remains `Not configured`. TQ-VSC-041 and later prompts were not executed.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-040.
+- TQ-VSC-041 and all later prompts remain `NOT STARTED`.

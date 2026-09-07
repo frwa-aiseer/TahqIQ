@@ -115,6 +115,55 @@ export type ResearchProjectType =
   | "Response to reviewers"
   | "Custom scholarly project";
 
+export type ResearchIntakeStage =
+  | "Idea formulation"
+  | "Evidence review"
+  | "Protocol development"
+  | "Data available"
+  | "Analysis in progress"
+  | "Manuscript preparation"
+  | "Researcher input required";
+
+export interface ResearchIntakeAvailability {
+  evidence: string | "Not available";
+  method: string | "Not available";
+  data: string | "Not available";
+}
+
+export interface ResearchIntakeClassification {
+  id: string;
+  projectId: string;
+  discipline: string;
+  subdiscipline: string;
+  candidateStudyType: ResearchProjectType | "Researcher input required";
+  researchStage: ResearchIntakeStage;
+  manuscriptType: string;
+  available: ResearchIntakeAvailability;
+  missingCriticalInformation: string[];
+  nextStage: string;
+  confidence: "High" | "Medium" | "Low";
+  confidenceRationale: string;
+}
+
+export interface ResearchIntakeProposal extends ResearchIntakeClassification {
+  status: "AI Suggested";
+  generatedAt: string;
+  researcherCorrection: {
+    allowed: true;
+    correctedFields: Array<keyof ResearchIntakeClassification>;
+    instruction: string;
+  };
+}
+
+export interface ConfirmedResearchIntakeClassification extends ResearchIntakeClassification {
+  status: "Researcher Confirmed";
+  sourceProposalId: string;
+  confirmedAt: string;
+  confirmedByUid: string;
+  confirmedByEmail: string;
+  correctedFields: string[];
+}
+
 export type StageStatus =
   | "Not started"
   | "In progress"
@@ -169,7 +218,7 @@ export interface ResearchCanvas {
   existingKnowledge: string;
   suspectedGap: string;
   proposedContribution: string;
-  framework: "PICO" | "PICOS" | "PECO" | "PCC" | "SPIDER" | "FINER" | "CIMO" | "Engineering";
+  framework: "PICO" | "PICOS" | "PECO" | "PCC" | "SPIDER" | "FINER" | "CIMO" | "Engineering" | "Researcher input required";
   aiSuggestions?: {
     refinedTopic?: string;
     candidateQuestions?: string[];
@@ -805,7 +854,7 @@ export interface ReportingChecklistItem {
 }
 
 export interface ReportingGuideline {
-  name: "CONSORT" | "STROBE" | "PRISMA" | "CARE" | "COREQ" | "STARD" | "TRIPOD" | "ARRIVE" | "CHEERS";
+  name: "CONSORT" | "STROBE" | "PRISMA" | "CARE" | "COREQ" | "STARD" | "TRIPOD" | "ARRIVE" | "CHEERS" | "Not configured";
   version: string;
   applicableStudyType: string;
   checklistItems: ReportingChecklistItem[];
@@ -1617,6 +1666,8 @@ export interface ProjectState {
   literatureSynthesisProposals?: LiteratureSynthesisProposal[];
   contradictionGroups?: EvidenceContradictionGroup[];
   researchGapProposals?: ResearchGapProposal[];
+  researchIntakeProposal?: ResearchIntakeProposal;
+  confirmedResearchIntakeClassification?: ConfirmedResearchIntakeClassification;
   analysisPlans: AnalysisPlan[];
   analysisOutputs: AnalysisOutput[];
   numericEvidenceRecords?: NumericEvidence[];
