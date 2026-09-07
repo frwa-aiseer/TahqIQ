@@ -6,6 +6,7 @@ import {
   GeneratedTable,
 } from "../types";
 import { AnalysisMethodRegistry } from "./analysisMethodRegistry";
+import { registerCommonComparisonMethods } from "./commonComparisonMethods";
 
 // ==========================================
 // High-Precision Statistical Distribution Helpers
@@ -903,7 +904,7 @@ analysisMethodRegistry.register<AnalysisExecutionOptions>({
   id: "paired-crossover-comparison",
   family: "paired-comparison",
   label: "Paired / Crossover Comparison",
-  aliases: ["Paired Student's t-test", "paired t-test", "2x2 crossover comparison"],
+  aliases: ["2x2 crossover comparison", "paired crossover analysis", "crossover analysis"],
   compatibleVariableTypes: {
     outcome: ["Numeric"],
     condition: ["Categorical"],
@@ -936,6 +937,8 @@ analysisMethodRegistry.register<AnalysisExecutionOptions>({
   execute: (options) => executePairedCrossoverMethod(options),
 });
 
+registerCommonComparisonMethods(analysisMethodRegistry);
+
 export function resolveAnalysisMethod(methodName: string) {
   return analysisMethodRegistry.resolve<AnalysisExecutionOptions>(methodName);
 }
@@ -967,6 +970,12 @@ export function generateAnalysisFiguresAndTables(
   plan: AnalysisPlan
 ): { figures: GeneratedFigure[]; tables: GeneratedTable[] } {
   const num = output.numericResults;
+  const hasPairedVisualizationSchema = ["conditionA_name", "conditionA_mean", "conditionA_sd", "conditionB_name", "conditionB_mean", "conditionB_sd", "mean_diff", "t_stat", "df", "p_val", "cohens_d"].every(
+    (field) => Object.prototype.hasOwnProperty.call(num, field)
+  );
+  if (output.executionStatus !== "Completed" || !hasPairedVisualizationSchema) {
+    return { figures: [], tables: [] };
+  }
   const condA_Name = (num.conditionA_name as string) || "Condition A";
   const condB_Name = (num.conditionB_name as string) || "Condition B";
   const meanA = Number(num.conditionA_mean || 0);

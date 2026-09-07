@@ -1759,3 +1759,42 @@ None. The harness is test-only and imports existing types without changing them.
 - The current registry contains only the preserved paired/crossover plugin. Common comparison methods belong to TQ-VSC-045 and were not implemented.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-044.
 - TQ-VSC-045 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-045 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added registry plugins for Welch independent-samples t-test, Mann–Whitney U, paired-samples t-test, Wilcoxon signed-rank, one-way ANOVA, Kruskal–Wallis, and one-way repeated-measures ANOVA.
+- Added deterministic distribution/ranking helpers, tie corrections, continuity corrections, group/pair extraction, complete-case counts, method-specific statistics, confidence intervals where applicable, effect sizes, and reproducibility hashes/metadata.
+- Every executor requires an approved dataset and plan and validates required variables, finite records, group counts, complete pairs/subjects, sample minima, and positive variance where required. Invalid inputs fail with empty p-value/effect-size arrays and no fallback numbers.
+- Independence, correct pairing, normality, homogeneity, symmetry, and multi-condition sphericity are not self-certified from numeric values; they remain explicitly unverified where researcher or additional diagnostic confirmation is required.
+- Removed general paired-test aliases from the crossover plugin. General paired plans now resolve to the non-crossover paired executor, while the preserved crossover implementation requires an explicit crossover alias or ID.
+- Prevented the legacy paired visualization helper from generating zero-valued paired figures/tables for the new method-specific output schemas.
+
+### Files changed and migrations
+
+- `src/lib/commonComparisonMethods.ts` (created)
+- `src/lib/statsEngine.ts`
+- `src/tests/commonComparisonMethods.test.ts` (created)
+- `src/tests/analysisMethodRegistry.test.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. Existing analysis output records remain readable. Existing plans named `Paired Student's t-test` now correctly resolve to the general paired method; explicit crossover names/IDs retain the prior plugin.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after the final implementation and tracker update.
+2. `npx vitest run src/tests/commonComparisonMethods.test.ts src/tests/analysisMethodRegistry.test.ts src/tests/phase5.test.ts src/tests/statisticalSensitivity.test.ts src/tests/dataIntegrityRegression.test.ts src/tests/apiSchemas.test.ts` — exit `0`; PASS, 6/6 files and 49/49 tests after the final visualization guard test.
+3. `npm test` — exit `1`; 57/59 executed files passed and 519/521 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion still expects legacy wording, and the established jsdom localStorage test still reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,007 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Golden fixtures cover all seven requested methods and assert reference statistics, degrees of freedom, p-values, effect sizes, tie behavior, counts, and repeated-measures warnings.
+- Negative coverage proves invalid/incomplete inputs fail closed without numerical fallbacks. A visualization regression proves unfamiliar method schemas do not become fabricated zero-valued paired charts or tables.
+- The implemented nonparametric p-values use documented asymptotic normal/chi-square approximations with tie/continuity corrections; exact small-sample distributions are not implemented and warnings disclose the approximation.
+- Repeated-measures ANOVA reports uncorrected degrees of freedom for more than two conditions and explicitly marks sphericity unverified. Greenhouse–Geisser/Huynh–Feldt corrections are not fabricated.
+- Post-hoc comparisons and multiplicity correction are outside this prompt. Regression, survival, and diagnostic analysis remain TQ-VSC-046 work and were not implemented.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-045.
+- TQ-VSC-046 and all later prompts remain `NOT STARTED`.

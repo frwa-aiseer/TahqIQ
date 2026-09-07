@@ -60,7 +60,7 @@ describe("AnalysisMethodRegistry", () => {
   it("preserves the validated paired execution through both legacy and registry entry points", () => {
     const options = { dataset, plan, outcomeVariable: "before,after" };
     const legacy = executePairedCrossoverAnalysis(options);
-    const registered = executeRegisteredAnalysisMethod(plan.statisticalMethod, options);
+    const registered = executeRegisteredAnalysisMethod("paired-crossover-comparison", options);
     expect(legacy.executionStatus).toBe("Completed");
     expect(registered.executionStatus).toBe("Completed");
     expect(registered.numericResults.mean_diff).toBe(legacy.numericResults.mean_diff);
@@ -68,7 +68,6 @@ describe("AnalysisMethodRegistry", () => {
   });
 
   it.each([
-    "Independent samples t-test",
     "Linear regression",
     "Chi-square test",
     "Qualitative thematic analysis",
@@ -76,5 +75,11 @@ describe("AnalysisMethodRegistry", () => {
   ])("does not assign paired or crossover assumptions to unrelated method '%s'", (methodName) => {
     expect(resolveAnalysisMethod(methodName)).toBeUndefined();
     expect(() => executeRegisteredAnalysisMethod(methodName, { dataset, plan })).toThrow("is not configured");
+  });
+
+  it("resolves a general independent comparison without crossover assumptions", () => {
+    const method = resolveAnalysisMethod("Independent samples t-test");
+    expect(method?.id).toBe("independent-t");
+    expect(method?.assumptions.join(" ")).not.toMatch(/paired|crossover|carryover|period|sequence/i);
   });
 });
