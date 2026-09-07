@@ -1641,3 +1641,43 @@ None. The harness is test-only and imports existing types without changing them.
 - A mounted confirmation/edit workflow and protected server persistence remain integration concerns. TQ-VSC-042 and later prompts were not executed.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-041.
 - TQ-VSC-042 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-042 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a structured `MethodologyDesignAgent` that refuses to run unless `explicitUserRequest` is true and its project-scoped prerequisites are present: an attributable approved research question, at least one attributable approved objective, researcher-confirmed intake classification, reviewed gap/evidence collections, supplied facts/constraints, and researcher-confirmed reporting guidance.
+- Defined eleven required output sections: proposed design, population/data source, sampling, variables/outcomes, instruments, procedure, bias/confounding, analysis needs, ethics considerations, limitations, and unresolved questions.
+- Every statement must be classified as `Researcher Fact`, `Evidence-grounded Recommendation`, `AI Proposal`, or `Missing Information`. Researcher facts must copy one supplied fact exactly; evidence-grounded recommendations must cite only reviewed evidence IDs; AI proposals require conditional proposal language; missing information must remain explicit.
+- Strict structured validation rejects missing/extra sections, unsupported statement fields, unknown evidence IDs, altered researcher facts, and classifications that masquerade as evidence or fact.
+- Added explicit safeguards against non-factual statements inventing sample sizes, ethics approval identifiers/status, recruited/enrolled/assigned participants, collected data, or completed procedures.
+- Model output cannot provide approval fields because the candidate schema permits only the eleven methodology sections. Successful output is always `AI Suggested` and `Needs Researcher Review`.
+- Added a separate approval function requiring researcher UID/email and rationale. It creates a distinct `Researcher Approved` record with proposal provenance and timestamp without mutating the original proposal.
+
+### Files changed and migrations
+
+- `src/lib/methodologyDesignAgent.ts` (created)
+- `src/tests/methodologyDesignAgent.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. The new agent uses stateless exported input/output contracts and does not alter existing persisted methodology workspaces or project documents.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after the final implementation and tracker update.
+2. `npx vitest run src/tests/methodologyDesignAgent.test.ts src/tests/methodologyWorkspace.test.tsx src/tests/reportingGuidelineRegistry.test.tsx src/tests/researchIntakeAgent.test.ts src/tests/apiSchemas.test.ts` — exit `0`; PASS, 5/5 files and 51/51 tests.
+3. `npm test` — exit `1`; 54/56 executed files passed and 492/494 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion still expects legacy wording while the provider returned the truthful `not found by Crossref Official Registry` message; the established jsdom localStorage failure still reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,005 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests verify the explicit request gate, approved/confirmed prerequisite gates, all eleven output areas, all four statement classifications, source identities, and review-pending output state.
+- Negative tests reject altered researcher facts, unknown evidence, invented sample sizes, ethics claims, participant recruitment, completed data collection, missing sections, extra/self-approval fields, and unattributed approval.
+- A positive approval test proves the original proposal remains `AI Suggested`/`Needs Researcher Review` while a separate attributable, rationalized record becomes `Researcher Approved`.
+- Pattern checks provide a strict last-line defense for common fabricated sample-size, ethics, participant, and completed-procedure claims; they are not a complete semantic fact checker. Human review remains mandatory.
+- The agent accepts reviewed gap/evidence IDs but does not independently adjudicate their scientific quality. Upstream review integrity remains required.
+- This prompt implements the domain contract only. It is not wired into the existing `/api/gemini/methodology-proposal` route, the methodology workspace UI, or protected persistence; those remain integration concerns. TQ-VSC-043 and later prompts were not executed.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-042.
+- TQ-VSC-043 and all later prompts remain `NOT STARTED`.
