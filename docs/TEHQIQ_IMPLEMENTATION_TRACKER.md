@@ -1520,3 +1520,41 @@ None. The harness is test-only and imports existing types without changing them.
 - CSL XML registration currently parses and retains style identity/category metadata, then uses compatible family rendering. It does not execute arbitrary CSL macros/layout instructions, locales, dependent-style links, or cite grouping rules; therefore exact imported/journal style is deliberately not claimed.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-038.
 - TQ-VSC-039 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-039 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a deterministic `OutletMatchingAgent` accepting field, manuscript type, abstract, keywords, methodology, optional outlet type/indexing/open-access constraints, and a bounded recommendation limit.
+- The matcher filters the supplied trusted database through the existing outlet-integrity validator, rejects duplicate catalogue IDs, and can only emit recommendation IDs from the resulting verified-ID set. It does not create outlet records.
+- Fit and mismatch explanations are deterministic and limited to verified identity subject/title terms, verified supported article types, verified outlet type, and independently verified indexing records. Each explanation preserves its source URL and field record ID where available.
+- Output preserves outlet identity provider/source/retrieval provenance and only valid `Verified` metric records, including their exact provider, metric name, year, subject category, source URL, retrieval timestamp, and available value/percentile/quartile.
+- Missing or unverified article types, indexing, methodology scope, open-access status, metrics, formatting, guidelines, policies, and conference requirements are enumerated explicitly. Unverified metrics are never upgraded or returned.
+- Fit scores are normalized deterministic overlap/constraint scores across assessed dimensions only. The response states that they are not acceptance predictions or outlet endorsements.
+
+### Files changed and migrations
+
+- `src/lib/outletMatchingAgent.ts` (created)
+- `src/tests/outletMatchingAgent.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. The matcher introduces stateless exported input/output contracts and does not alter persisted `ProjectState` or `TargetOutlet` records.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after the final implementation and tracker update.
+2. `npx vitest run src/tests/outletMatchingAgent.test.ts src/tests/outletIntelligenceService.test.ts src/tests/outletMetrics.test.ts src/tests/outletRequirements.test.ts` — exit `0`; PASS, 4/4 files and 27/27 tests.
+3. `npm test` — exit `1`; 51/53 executed files passed and 457/459 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion still expects legacy wording while the provider returned the truthful `not found by Crossref Official Registry` message; the established jsdom localStorage failure still reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,004 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests prove every recommendation ID belongs to the supplied integrity-verified trusted catalogue and that unverified records are excluded.
+- Tests cover deterministic fit and mismatch output, identity provenance, verified metric year/category/source preservation, unverified metric exclusion, missing/unverified facts, empty trusted-database state, incomplete input rejection, and duplicate-ID suppression.
+- Methodology is a required input but the current outlet requirement model has no independently sourced methodology-scope field; it is therefore reported as `Missing or Unverified` rather than inferred from prose.
+- The open-access legacy field is not independently provenance modeled, so an open-access constraint is reported as missing/unverified and does not influence the score. No acceptance likelihood is calculated.
+- This prompt implements the domain agent only; a protected persistence/API boundary and a mounted recommendations UI remain integration concerns.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-039.
+- TQ-VSC-040 and all later prompts remain `NOT STARTED`.
