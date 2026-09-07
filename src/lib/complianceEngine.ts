@@ -228,7 +228,7 @@ export function evaluateExportGateChecks(
     message: resultsPass
       ? "All empirical claims and Results section findings are linked to verified data or literature."
       : resultsUnlinked
-      ? "Results section exists but no approved statistical analysis outputs exist in project records."
+      ? "Results section exists but no approved empirical analysis outputs exist in project records."
       : `Detected ${unverifiedClaims.length} unlinked or unverified empirical claim(s) in Claim Matrix.`,
     affectedItemIds: unverifiedClaims.map((c) => c.id),
     resolutionPath: "Link evidence passages or approve statistical analysis outputs in Data Lab / Claim Matrix.",

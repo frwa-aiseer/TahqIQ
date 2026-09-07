@@ -1331,6 +1331,110 @@ export interface GeneratedTable {
   isSynthetic?: boolean;
 }
 
+export interface QualitativeActor {
+  uid: string;
+  email: string;
+}
+
+export interface QualitativeCorpusPassage {
+  id: string;
+  documentId: string;
+  text: string;
+  sourceLocation: string;
+}
+
+export interface QualitativeCorpusDocument {
+  id: string;
+  title: string;
+  artifactId: string;
+  artifactHash: string;
+  reviewState: "Researcher Reviewed";
+  reviewedBy: QualitativeActor;
+  reviewedAt: string;
+  passages: QualitativeCorpusPassage[];
+}
+
+export interface QualitativeCode {
+  id: string;
+  label: string;
+  definition: string;
+  origin: "Researcher" | "AI Suggested";
+  status: "Researcher Created" | "AI Suggested" | "Researcher Approved" | "Rejected";
+  createdBy: QualitativeActor | { system: string };
+  reviewedBy?: QualitativeActor;
+  reviewedAt?: string;
+  reviewRationale?: string;
+}
+
+export interface QualitativeCodebookVersion {
+  id: string;
+  version: number;
+  previousVersionId?: string;
+  state: "Draft" | "Needs Review" | "Researcher Approved";
+  codes: QualitativeCode[];
+  createdAt: string;
+  approvedBy?: QualitativeActor;
+  approvedAt?: string;
+  approvalRationale?: string;
+}
+
+export interface QualitativeCodeAssignment {
+  codeId: string;
+  coder: QualitativeActor | { system: string };
+  origin: "Researcher" | "AI Suggested";
+}
+
+export interface QualitativeCodedPassage {
+  id: string;
+  passageId: string;
+  codebookVersionId: string;
+  assignments: QualitativeCodeAssignment[];
+  reviewState: "Needs Review" | "Researcher Reviewed" | "Disputed";
+  reviewedBy?: QualitativeActor;
+  reviewedAt?: string;
+  reviewRationale?: string;
+}
+
+export interface QualitativeDisagreement {
+  id: string;
+  codedPassageId: string;
+  description: string;
+  status: "Open" | "Resolved";
+  raisedBy: QualitativeActor;
+  resolution?: string;
+  resolvedBy?: QualitativeActor;
+  resolvedAt?: string;
+  resolutionRationale?: string;
+}
+
+export interface QualitativeTheme {
+  id: string;
+  name: string;
+  analyticStatement: string;
+  supportingCodedPassageIds: string[];
+  supportingQuotations: { passageId: string; quotation: string }[];
+  origin: "Researcher" | "AI Suggested";
+  status: "Researcher Draft" | "AI Suggested" | "Researcher Approved" | "Rejected";
+  reviewedBy?: QualitativeActor;
+  reviewedAt?: string;
+  reviewRationale?: string;
+}
+
+export interface QualitativeAnalysisWorkflow {
+  id: string;
+  projectId: string;
+  corpus: QualitativeCorpusDocument[];
+  codebookVersions: QualitativeCodebookVersion[];
+  codedPassages: QualitativeCodedPassage[];
+  themes: QualitativeTheme[];
+  disagreements: QualitativeDisagreement[];
+  reflexiveMemos: { id: string; text: string; author: QualitativeActor; createdAt: string }[];
+  state: "Draft" | "Needs Review" | "Researcher Approved";
+  approvedBy?: QualitativeActor;
+  approvedAt?: string;
+  approvalRationale?: string;
+}
+
 export interface ManuscriptSection {
   id: string;
   title: string;
@@ -1677,6 +1781,7 @@ export interface ProjectState {
   confirmedResearchIntakeClassification?: ConfirmedResearchIntakeClassification;
   analysisPlans: AnalysisPlan[];
   analysisOutputs: AnalysisOutput[];
+  qualitativeAnalysis?: QualitativeAnalysisWorkflow;
   numericEvidenceRecords?: NumericEvidence[];
   evidenceRecords?: EvidenceRecord[];
   claimEvidenceLinks?: ClaimEvidenceLink[];

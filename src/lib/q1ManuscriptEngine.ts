@@ -95,6 +95,7 @@ export function expandSectionToQ1Length(
   // Contextual Analysis Outputs (Strictly grounded on actual output)
   const output = project.analysisOutputs?.[0];
   const hasValidAnalysis = Boolean(output && (isAnalysisOutputApproved(output)));
+  const isQualitativeOutput = output?.numericResults?.analysisType === "Qualitative";
 
   const primaryRq = project.researchQuestions?.[0]?.question || canvas.scientificProblem || "[Research Question: Researcher input required in Idea Canvas or Research Questions module]";
   const primaryHyp = project.researchQuestions?.[0]?.hypotheses?.find((h) => h.type === "Alternative")?.statement || "[Primary Hypothesis: Researcher input required in Idea Canvas or Research Questions module]";
@@ -184,14 +185,14 @@ Unavailable in the prototype: this function requires verified data, evidence or 
 ### 3.1 Primary Empirical Findings
 ${output.summaryText || "Analysis execution completed and recorded in project Data Lab."}
 
-${output.numericResults ? `**Verified Quantitative Metrics:**
+${output.numericResults && !isQualitativeOutput ? `**Verified Quantitative Metrics:**
 ${output.numericResults.mean_difference !== undefined ? `- Mean Difference: ${output.numericResults.mean_difference}` : ""}
 ${output.numericResults.t_statistic !== undefined && output.numericResults.df !== undefined ? `- Test Statistic: t(${output.numericResults.df}) = ${output.numericResults.t_statistic}` : ""}
 ${output.numericResults.p_value !== undefined ? `- Significance: ${typeof output.numericResults.p_value === "number" ? (output.numericResults.p_value < 0.001 ? "p < 0.001" : `p = ${output.numericResults.p_value}`) : String(output.numericResults.p_value)}` : ""}
 ${output.numericResults.cohens_d !== undefined ? `- Effect Size (Cohen's d): ${output.numericResults.cohens_d}` : ""}` : ""}
 
-### 3.2 Assumptions & Diagnostic Verification
-${output.assumptionChecks && output.assumptionChecks.length > 0 ? output.assumptionChecks.map((a) => `- ${a.assumption}: ${a.met ? "Met" : "Unmet"} (${a.testUsed}, ${a.pValue !== undefined ? `p = ${a.pValue}` : "Verified"})`).join("\n") : "Standard statistical assumption checks recorded in Data Lab analysis output."}`;
+### 3.2 ${isQualitativeOutput ? "Qualitative Evidence and Review" : "Assumptions & Diagnostic Verification"}
+${isQualitativeOutput ? "Findings were approved from researcher-reviewed coded passages and exact supporting quotations. No quantitative statistics were generated." : output.assumptionChecks && output.assumptionChecks.length > 0 ? output.assumptionChecks.map((a) => `- ${a.assumption}: ${a.met ? "Met" : "Unmet"} (${a.testUsed}, ${a.pValue !== undefined ? `p = ${a.pValue}` : "Verified"})`).join("\n") : "Statistical assumption checks are not available."}`;
     }
 
   } else if (titleLower.includes("discuss")) {

@@ -1879,3 +1879,44 @@ None. The harness is test-only and imports existing types without changing them.
 - Engineering unit compatibility and scientific pairing remain researcher-unverified. Cronbach's alpha is not promoted to construct-validity evidence.
 - Random-effects synthesis, meta-regression, cross-validation, training/tuning, ML AUC, DOE, global sensitivity, uncertainty propagation, factor analysis, and IRT require future validated contracts and remain non-executable.
 - TQ-VSC-048 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-048 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added an optional project-scoped qualitative workflow containing a reviewed corpus, versioned codebooks, researcher-created and AI-suggested codes, coded passages, disagreements, reflexive memos, themes, supporting coded-passage IDs, and exact corpus quotations.
+- Corpus records require reviewed artifact identity/hash, exact passage text/location, and attributable researcher-review provenance.
+- Researcher and AI code additions create successive codebook versions. AI codes always begin `AI Suggested`; attributable review with rationale is required before approval/rejection, and unresolved AI suggestions block codebook approval.
+- Coded passages reference a known corpus passage and a specific codebook version. Assignments require known non-rejected codes. Researcher review records actor, timestamp, and rationale.
+- Coding disagreements move passages to `Disputed`. They require attributable resolution and a subsequent explicit coded-passage review; resolution alone does not certify coding.
+- AI themes always begin `AI Suggested`; researcher themes begin `Researcher Draft`. Themes require known coded-passage support and exact quotations that are literal substrings of known corpus passages. Attributable disposition is mandatory.
+- Final findings approval requires an approved latest codebook, all coded passages researcher-reviewed, no open disagreements, every retained theme disposed, and at least one approved theme.
+- Added a manuscript adapter that accepts only attributable researcher-approved workflows. It emits qualitative summary evidence with no p-values, effect sizes, or quantitative claims. The demo manuscript engine now labels qualitative evidence/review accurately rather than inserting a quantitative heading or statistical diagnostics.
+
+### Files changed and migrations
+
+- `src/types.ts`
+- `src/lib/qualitativeAnalysisWorkflow.ts` (created)
+- `src/tests/qualitativeAnalysisWorkflow.test.ts` (created)
+- `src/lib/q1ManuscriptEngine.ts`
+- `src/lib/complianceEngine.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. `ProjectState.qualitativeAnalysis` is optional and additive, so existing projects remain readable without persisted rewrites.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after final workflow/provenance implementation.
+2. `npx vitest run src/tests/qualitativeAnalysisWorkflow.test.ts src/tests/questionHypothesisAgent.test.ts src/tests/methodologyWorkspace.test.tsx src/tests/apiSchemas.test.ts` — exit `0`; PASS, 4/4 files and 33/33 tests.
+3. `npm test` — exit `1`; 60/62 executed files passed and 538/540 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom localStorage test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests cover codebook versioning; AI suggestion isolation; attributable code, passage, theme, disagreement, and final review; exact quotation provenance; known coded-passage evidence; reflexive memos; and final manuscript output.
+- Negative cases block codebook self-approval, invented/non-source quotations, unknown coded evidence, passage review with open disagreement, premature final approval, and manuscript adaptation of unapproved findings.
+- The approved manuscript output explicitly contains `analysisType: Qualitative`, `quantitativeStatistics: Not applicable`, empty `pValues`, and empty `effectSizes`; a workflow serialization check confirms it contains no statistical-result fields.
+- The workflow is a domain/service layer and optional project field. A dedicated mounted qualitative coding UI and protected persistence endpoints are not implemented in this prompt.
+- Intercoder reliability statistics are not forced. Mixed-methods quantitative analysis would require an explicitly selected, separately approved analysis plan.
+- TQ-VSC-049 and all later prompts remain `NOT STARTED`.
