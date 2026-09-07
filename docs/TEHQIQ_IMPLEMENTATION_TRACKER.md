@@ -1681,3 +1681,42 @@ None. The harness is test-only and imports existing types without changing them.
 - This prompt implements the domain contract only. It is not wired into the existing `/api/gemini/methodology-proposal` route, the methodology workspace UI, or protected persistence; those remain integration concerns. TQ-VSC-043 and later prompts were not executed.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-042.
 - TQ-VSC-043 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-043 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a structured `QuestionHypothesisAgent` that requires a project concept, project-scoped researcher-confirmed intake classification, attributable researcher-reviewed synthesis, and a project-scoped attributable researcher-approved gap.
+- Added bounded candidate schemas for research questions and objectives. Every item requires rationale text linked to one or more evidence IDs from the reviewed synthesis/approved gap, a non-empty variables-or-concepts collection, and an explicit unresolved-assumptions collection.
+- Hypothesis candidates require supported hypothesis type, statement, and reviewed-evidence rationale. They are allowed only when the confirmed classification is hypothesis-compatible.
+- Qualitative, exploratory, systematic review, scoping review, narrative review, case-report, and theoretical classifications deterministically reject non-empty hypothesis output instead of forcing null/alternative hypotheses.
+- Structured validation rejects missing/extra top-level fields, malformed questions/objectives/hypotheses, empty or unknown evidence attribution, empty concepts, unapproved/cross-project prerequisites, and model-supplied self-approval fields.
+- All successful output remains `AI Suggested` and `Needs Researcher Review`. A separate approval function requires researcher UID/email and rationale, creates a distinct `Researcher Approved` record with proposal provenance/timestamp, and leaves the proposal unchanged.
+
+### Files changed and migrations
+
+- `src/lib/questionHypothesisAgent.ts` (created)
+- `src/tests/questionHypothesisAgent.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. The new agent uses stateless exported contracts and does not alter existing persisted `ResearchQuestionItem`, `Hypothesis`, or `ProjectState` records.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after the final implementation and tracker update.
+2. `npx vitest run src/tests/questionHypothesisAgent.test.ts src/tests/researchIntakeAgent.test.ts src/tests/researchGapAgent.test.ts src/tests/literatureSynthesisAgent.test.ts` — exit `0`; PASS, 4/4 files and 46/46 tests.
+3. `npm test` — exit `1`; 55/57 executed files passed and 503/505 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion still expects legacy wording while the provider returned the truthful `not found by Crossref Official Registry` message; the established jsdom localStorage failure still reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,005 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Parameterized cross-discipline fixtures cover clinical, qualitative, electrical engineering, machine learning, economics, and systematic-review classifications.
+- Tests prove hypothesis compatibility is classification-dependent and that qualitative and systematic-review proposals contain no forced hypotheses; a dedicated negative test rejects a qualitative hypothesis.
+- Tests cover evidence-linked rationale for research questions, objectives, and hypotheses; unknown/empty evidence rejection; prerequisite scope/review/approval gates; malformed/self-approved output rejection; and separate attributable human approval.
+- The compatibility predicate is deliberately conservative and classification-label based; ambiguous/custom classifications require upstream researcher correction rather than domain assumptions.
+- The agent validates evidence identities and upstream review states but does not independently establish the semantic truth or sufficiency of candidate questions and hypotheses. Human review remains mandatory.
+- This prompt implements the domain contract only. It is not connected to the current Question Builder UI, an API route, or protected persistence. TQ-VSC-044 and later prompts were not executed.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-043.
+- TQ-VSC-044 and all later prompts remain `NOT STARTED`.
