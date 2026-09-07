@@ -8,6 +8,7 @@ import {
 import { AnalysisMethodRegistry } from "./analysisMethodRegistry";
 import { registerCommonComparisonMethods } from "./commonComparisonMethods";
 import { registerRegressionSurvivalDiagnosticMethods } from "./regressionAnalysisMethods";
+import { registerSpecializedAnalysisMethods } from "./specializedAnalysisMethods";
 
 // ==========================================
 // High-Precision Statistical Distribution Helpers
@@ -941,6 +942,7 @@ analysisMethodRegistry.register<AnalysisExecutionOptions>({
 
 registerCommonComparisonMethods(analysisMethodRegistry);
 registerRegressionSurvivalDiagnosticMethods(analysisMethodRegistry);
+registerSpecializedAnalysisMethods(analysisMethodRegistry);
 
 export function resolveAnalysisMethod(methodName: string) {
   return analysisMethodRegistry.resolve<AnalysisExecutionOptions>(methodName);

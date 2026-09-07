@@ -1840,3 +1840,42 @@ None. The harness is test-only and imports existing types without changing them.
 - Logistic regression uses model-based Wald uncertainty; calibration, influence, goodness-of-fit, penalization, robust errors, and rare-event corrections are not implemented and are not claimed.
 - Survival methods remain planned because censoring/ties/risk-table/proportional-hazards contracts are absent. Diagnostic methods remain unavailable because reference-standard polarity, score direction, thresholds, indeterminate results, and uncertainty contracts are absent.
 - TQ-VSC-047 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-047 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added an explicit extensible specialized-family catalogue for meta-analysis, ML evaluation, engineering/computational analysis, and survey/psychometrics.
+- Enabled fixed-effect inverse-variance meta-analysis with positive-standard-error validation, pooled estimate/uncertainty, Cochran Q, descriptive I-squared, included/excluded study counts, and researcher-unverified effect-scale/common-effect assumptions.
+- Enabled held-out binary ML evaluation requiring numeric 0/1 truth, probabilities in `[0,1]`, explicit Train/Validation/Test split values, and non-empty sample IDs. Only Test records produce accuracy, precision, recall/sensitivity, specificity, F1, Brier score, log loss, confusion counts, and fixed-bin calibration error. Cross-split ID overlap fails as leakage; the executor never trains, tunes, cross-validates, or optimizes a threshold.
+- Enabled deterministic engineering reference/prediction error analysis with bias, alpha-aware finite-sample bias CI, MAE, RMSE, error SD, optional range-normalized RMSE, and complete/excluded pair counts.
+- Enabled Cronbach's alpha from researcher-designated numeric item columns with complete-case/item/total-variance validation and explicit warnings that internal consistency does not establish unidimensionality, validity, or stability.
+- Added non-executable availability entries for random-effects meta-analysis, meta-regression, cross-validation, ML training, ML ROC/AUC, DOE, global sensitivity, simulation uncertainty propagation, exploratory factor analysis, and item-response theory. Every entry is `Planned` or `Unavailable`, explains its missing contract, and has no executor.
+- All calculations are deterministic TypeScript. No Gemini or other language-model call is used.
+
+### Files changed and migrations
+
+- `src/lib/specializedAnalysisMethods.ts` (created)
+- `src/tests/specializedAnalysisMethods.test.ts` (created)
+- `src/lib/statsEngine.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. Specialized capabilities are additive runtime registry entries; existing analysis plans/outputs remain unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after final specialized implementation.
+2. `npx vitest run src/tests/specializedAnalysisMethods.test.ts src/tests/regressionAnalysisMethods.test.ts src/tests/commonComparisonMethods.test.ts src/tests/analysisMethodRegistry.test.ts src/tests/apiSchemas.test.ts` — exit `0`; PASS, 5/5 files and 37/37 tests.
+3. `npm test` — exit `1`; 59/61 executed files passed and 532/534 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom localStorage test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Golden fixtures verify fixed-effect pooling/heterogeneity summaries, held-out ML metrics/calibration/counts, engineering error summaries, and Cronbach's alpha.
+- Negative tests prove ML split-ID leakage fails with no effect-size output. Capability tests prove each family contains both a narrowly enabled executor and broader disabled entries, and every disabled entry exposes a reason but no executor.
+- Fixed-effect meta-analysis does not claim random-effects inference or establish study compatibility. I-squared is labelled descriptive, particularly with few studies.
+- ML procedural leakage cannot be disproved from IDs alone, so true holdout remains researcher-unverified. CV is not simulated from in-sample predictions.
+- Engineering unit compatibility and scientific pairing remain researcher-unverified. Cronbach's alpha is not promoted to construct-validity evidence.
+- Random-effects synthesis, meta-regression, cross-validation, training/tuning, ML AUC, DOE, global sensitivity, uncertainty propagation, factor analysis, and IRT require future validated contracts and remain non-executable.
+- TQ-VSC-048 and all later prompts remain `NOT STARTED`.
