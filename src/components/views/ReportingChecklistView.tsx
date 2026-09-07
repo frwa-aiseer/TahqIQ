@@ -1,6 +1,6 @@
 import React from "react";
 import { ReportingGuideline } from "../../types";
-import { ClipboardCheck, CheckCircle2 } from "lucide-react";
+import { ClipboardCheck } from "lucide-react";
 
 interface ReportingChecklistViewProps {
   guideline: ReportingGuideline;
@@ -13,13 +13,15 @@ export const ReportingChecklistView: React.FC<ReportingChecklistViewProps> = ({ 
         <div>
           <div className="flex items-center space-x-2 text-[#0B5D4B] text-xs font-mono uppercase tracking-wider mb-1">
             <ClipboardCheck className="w-4 h-4" />
-            <span>Reporting Guidelines • {guideline.name} Checklist</span>
+            <span>Reporting Guidelines • {guideline.name}</span>
           </div>
           <h2 className="font-serif font-bold text-xl text-[#102A43]">
             {guideline.name} ({guideline.version}) Compliance Matrix
           </h2>
           <p className="text-xs text-slate-600 mt-1">
-            Ensure every mandatory item for {guideline.applicableStudyType} is addressed before manuscript export.
+            {guideline.recommendationStatus === "Suggested—Needs Researcher Review"
+              ? "Suggested guidance requires researcher confirmation before use."
+              : `Assess each item for ${guideline.applicableStudyType} against linked manuscript evidence.`}
           </p>
         </div>
       </div>
@@ -41,10 +43,9 @@ export const ReportingChecklistView: React.FC<ReportingChecklistViewProps> = ({ 
                 <td className="p-3 font-mono font-bold text-[#0B5D4B]">{item.itemNumber}</td>
                 <td className="p-3 font-semibold text-slate-800">{item.sectionOrTopic}</td>
                 <td className="p-3 text-slate-700">{item.description}</td>
-                <td className="p-3 font-mono text-slate-600">{item.manuscriptLocation || "Section 2"}</td>
+                <td className="p-3 font-mono text-slate-600">{item.manuscriptLocation || "Not documented"}</td>
                 <td className="p-3 text-right">
-                  <span className="bg-emerald-100 text-emerald-800 font-bold text-[10px] px-2 py-0.5 rounded inline-flex items-center space-x-1">
-                    <CheckCircle2 className="w-3 h-3" />
+                  <span className={`font-bold text-[10px] px-2 py-0.5 rounded inline-flex items-center ${item.status === "Addressed" && item.evidenceArtifactIds?.length ? "bg-emerald-100 text-emerald-800" : item.status === "Missing" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>
                     <span>{item.status}</span>
                   </span>
                 </td>

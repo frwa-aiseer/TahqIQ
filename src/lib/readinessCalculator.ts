@@ -1,4 +1,5 @@
 import { ProjectState, PipelineStage, StageStatus } from "../types";
+import { isEvidenceBackedChecklistItem } from "./reportingGuidelineRegistry";
 
 export function calculateProjectReadiness(project: ProjectState): {
   overall: number;
@@ -59,7 +60,7 @@ export function calculateProjectReadiness(project: ProjectState): {
   if (hasQuestions) methodScore += 25;
   if ((project.searchStrategies || []).length > 0) methodScore += 25;
   if (project.ethicsInfo?.approvalNumber || project.ethicsInfo?.consentObtained) methodScore += 25;
-  if ((project.reportingGuideline?.checklistItems || []).some((i) => i.status === "Addressed")) methodScore += 25;
+  if ((project.reportingGuideline?.checklistItems || []).some(isEvidenceBackedChecklistItem)) methodScore += 25;
   const methodCompleteness = Math.min(100, methodScore);
 
   // 5. Data Quality

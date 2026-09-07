@@ -1598,3 +1598,46 @@ None. The harness is test-only and imports existing types without changing them.
 - Reporting-guideline resolution is not implemented here; the new-project guideline remains `Not configured`. TQ-VSC-041 and later prompts were not executed.
 - The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-040.
 - TQ-VSC-041 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-041 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added an extensible `ReportingGuidelineRegistry` with sourced definitions and deterministic study-type patterns for CONSORT, STROBE, PRISMA, PRISMA-ScR, STARD, TRIPOD, COREQ, ARRIVE, and CARE.
+- Registry records link to official guideline/checklist sites and provide a review instruction rather than embedding unverified or incomplete checklist contents. New checklist template items always start `Required`.
+- Added a resolver for randomized, observational, systematic/scoping, diagnostic, clinical prediction, qualitative, animal, and case-report designs. Every match remains `Suggested—Needs Researcher Review` until an attributable researcher confirms it.
+- Engineering, computational, general machine-learning, software/tool, simulation, unknown, custom, and future study types resolve to `Not configured`; no clinical checklist is assigned by fallback.
+- Added evidence-gated checklist assessment. `Addressed` and `Partially addressed` require a manuscript location, one or more artifact IDs from the supplied available-evidence set, a confirmed guideline, assessor identity, and timestamp. `Not applicable` requires researcher rationale.
+- Updated readiness calculation so legacy/static `Addressed` strings do not earn method-completeness credit without evidence and assessment provenance.
+- Updated the checklist view to show suggested-guidance review status, `Not documented` for missing locations, and status-sensitive amber/red/green badges rather than universal green ticks.
+
+### Files changed and migrations
+
+- `src/lib/reportingGuidelineRegistry.ts` (created)
+- `src/tests/reportingGuidelineRegistry.test.tsx` (created)
+- `src/types.ts`
+- `src/lib/readinessCalculator.ts`
+- `src/components/views/ReportingChecklistView.tsx`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk migration is required. Reporting-guideline metadata and checklist assessment provenance are optional additive fields, and guideline names are extensible strings. Existing guideline/checklist records remain readable, but legacy `Addressed` items without evidence/location/assessor/timestamp no longer contribute readiness credit.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after the final implementation and tracker update.
+2. `npx vitest run src/tests/reportingGuidelineRegistry.test.tsx src/tests/researchIntakeAgent.test.ts src/tests/unit.test.ts src/tests/accessibility.test.tsx` — exit `0`; PASS, 4/4 files and 54/54 tests.
+3. `npm test` — exit `1`; 53/55 executed files passed and 486/488 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion still expects legacy wording while the provider returned the truthful `not found by Crossref Official Registry` message; the established jsdom localStorage failure still reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,005 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS after tracker completion.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Parameterized fixtures cover randomized, observational, systematic, scoping, diagnostic, prediction, qualitative, animal, and case-report resolution.
+- Five non-clinical fixtures prove engineering, computational, machine-learning, software/tool, and simulation projects do not receive clinical checklists; unknown/future types also remain unconfigured.
+- Tests prove suggestions require researcher confirmation, checklist completion requires known evidence, unavailable evidence is rejected, legacy green ticks do not earn readiness, and unassessed UI rows remain amber with `Not documented` location.
+- Registry entries intentionally link to official current checklist sources rather than copying full checklist text into this codebase. The single registry instruction is not a substitute for retrieving and versioning the official complete checklist before production use.
+- The matcher is deterministic and based on the supplied study-type label. Ambiguous hybrid designs remain unconfigured and require researcher selection.
+- A mounted confirmation/edit workflow and protected server persistence remain integration concerns. TQ-VSC-042 and later prompts were not executed.
+- The full suite remains red only for the two recorded baseline/environment failures; neither was introduced by TQ-VSC-041.
+- TQ-VSC-042 and all later prompts remain `NOT STARTED`.

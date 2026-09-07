@@ -851,13 +851,20 @@ export interface ReportingChecklistItem {
   status: "Required" | "Addressed" | "Partially addressed" | "Missing" | "Not applicable";
   manuscriptLocation?: string;
   researcherComment?: string;
+  evidenceArtifactIds?: string[];
+  assessedByUid?: string;
+  assessedAt?: string;
 }
 
 export interface ReportingGuideline {
-  name: "CONSORT" | "STROBE" | "PRISMA" | "CARE" | "COREQ" | "STARD" | "TRIPOD" | "ARRIVE" | "CHEERS" | "Not configured";
+  name: string;
   version: string;
   applicableStudyType: string;
   checklistItems: ReportingChecklistItem[];
+  registryId?: string;
+  officialUrl?: string;
+  recommendationStatus?: "Suggested—Needs Researcher Review" | "Researcher Confirmed" | "Not configured";
+  recommendationReason?: string;
 }
 
 export interface PiiWarning {
