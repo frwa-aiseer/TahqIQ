@@ -1920,3 +1920,39 @@ None. The harness is test-only and imports existing types without changing them.
 - The workflow is a domain/service layer and optional project field. A dedicated mounted qualitative coding UI and protected persistence endpoints are not implemented in this prompt.
 - Intercoder reliability statistics are not forced. Mixed-methods quantitative analysis would require an explicitly selected, separately approved analysis plan.
 - TQ-VSC-049 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-049 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a structured recommendation-only `AnalysisPlanningAgent` requiring an explicit user request, project-scoped attributable researcher-approved methodology, dataset profile and variable dictionary, approved research questions/hypotheses, researcher-confirmed study classification, and the live `AnalysisMethodRegistry`.
+- The tool receives dataset metadata/dictionary but never raw dataset rows. Registry capabilities are passed as sanitized IDs, families, labels, availability, reasons, compatible types, required inputs, and assumptions; deterministic executors are never exposed to the agent.
+- Output contains exactly primary, secondary, and sensitivity recommendations, unsupported needs, and global missing information. Recommendations contain registered method IDs, approved RQ/hypothesis links, variable mappings, assumptions with explicit planning status, exact missing-variable collections, and preprocessing steps fixed to `Proposed—Needs Researcher Approval`.
+- Executable recommendations accept only `Enabled` registered methods with executors. Planned/unavailable capabilities can appear only as unsupported needs, and only by their registered IDs. Hallucinated IDs fail closed.
+- Mapped variable names must exist in the supplied dictionary and match the method's declared compatible type where the mapping role resolves. Missing mappings must be absent from the dictionary and exactly match the recommendation's missing-variable list.
+- The proposal remains `AI Suggested` / `Needs Researcher Review`. A separate approval operation requires researcher UID/email and rationale, creates a distinct approved record with proposal provenance, and leaves the original proposal unchanged.
+- No statistics, p-values, effect sizes, numeric results, preprocessing execution, or method execution occur in this agent.
+
+### Files changed and migrations
+
+- `src/lib/analysisPlanningAgent.ts` (created)
+- `src/tests/analysisPlanningAgent.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. The agent uses stateless exported proposal/approval contracts and does not alter persisted `AnalysisPlan` or project schemas.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after final planning validation.
+2. `npx vitest run src/tests/analysisPlanningAgent.test.ts src/tests/analysisMethodRegistry.test.ts src/tests/methodologyDesignAgent.test.ts src/tests/questionHypothesisAgent.test.ts src/tests/apiSchemas.test.ts` — exit `0`; PASS, 5/5 files and 38/38 tests.
+3. `npm test` — exit `1`; 61/63 executed files passed and 544/546 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom localStorage test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests cover every prerequisite; sanitized registry context; primary/secondary/sensitivity roles; enabled recommendations; registered unsupported needs; variable and missing-state mappings; assumption states; proposed preprocessing; and separate attributable approval.
+- Negative tests reject hallucinated method IDs, disabled methods presented as executable, unregistered unsupported IDs, unknown questions, unknown/unapproved hypotheses, fabricated mapped variables, type-incompatible mappings, completed preprocessing, extra/self-approval fields, and unattributed approval.
+- The agent validates registry identity/availability and structural compatibility, but it does not establish causal identification, scientific sufficiency, or assumption truth. Those remain researcher responsibilities.
+- This prompt implements the domain contract only. It is not wired into a mounted planning UI, protected API route, or persistence workflow.
+- TQ-VSC-050 and all later prompts remain `NOT STARTED`.
