@@ -3,8 +3,7 @@ export interface ValidationFailure { valid: false; errors: string[] }
 export type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure;
 
 export interface AgentRequest {
-  agentType: string;
-  prompt: string;
+  agentId: string;
   context: Record<string, unknown>;
 }
 
@@ -112,11 +111,10 @@ function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): b
 
 export function validateAgentRequest(value: unknown): ValidationResult<AgentRequest> {
   if (!object(value)) return failure("Request body must be an object.");
-  if (!hasOnlyKeys(value, ["agentType", "prompt", "context"])) return failure("Request contains unsupported fields.");
-  if (!boundedString(value.agentType, 1, 100)) return failure("agentType must be a bounded non-empty string.");
-  if (!boundedString(value.prompt, 1, 20_000)) return failure("prompt must be a bounded non-empty string.");
+  if (!hasOnlyKeys(value, ["agentId", "context"])) return failure("Request contains unsupported fields.");
+  if (!boundedString(value.agentId, 1, 100)) return failure("agentId must be a bounded non-empty string.");
   if (!object(value.context)) return failure("context must be an object.");
-  return success({ agentType: value.agentType.trim(), prompt: value.prompt.trim(), context: value.context });
+  return success({ agentId: value.agentId.trim(), context: value.context });
 }
 
 export function validateAgentModelOutput(value: unknown): ValidationResult<AgentModelOutput> {

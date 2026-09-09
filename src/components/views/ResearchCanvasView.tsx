@@ -33,9 +33,11 @@ export const ResearchCanvasView: React.FC<ResearchCanvasViewProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          agentType: "Research Question Agent",
-          prompt: `Analyze the research canvas topic: "${formData.broadTopic}" with practical problem "${formData.practicalProblem}" and proposed population "${formData.population}". Propose refined research topic, candidate questions, objectives, hypotheses, and feasibility/ethical risks.`,
-          context: formData,
+          agentId: "research-intake",
+          context: {
+            researchDescription: [formData.broadTopic, formData.practicalProblem, formData.population].filter(Boolean).join("\n"),
+            statedClassification: formData.studyType || "Missing",
+          },
         }),
       });
 

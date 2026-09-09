@@ -40,6 +40,7 @@ import {
   validatePeerReviewRequest,
   validateSearchExecutionRequest,
 } from "./src/server/apiSchemas";
+import { agentRegistry, type AgentContract } from "./src/server/agentRegistry";
 
 dotenv.config();
 
@@ -218,19 +219,32 @@ async function startServer() {
     try {
       const requestValidation = validateAgentRequest(req.body);
       if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
-      const { agentType, prompt, context } = requestValidation.value;
+      const { agentId, context } = requestValidation.value;
+      let agentContract: AgentContract;
+      try {
+        const authenticatedRequest = req as AuthenticatedProjectRequest;
+        agentContract = agentRegistry.authorizeFrontend(agentId, authenticatedRequest.projectAuth!.role, Object.keys(context));
+      } catch (error: any) {
+        const message = String(error?.message || "Agent invocation is not permitted.");
+        return res.status(message.includes("not registered") ? 404 : 403).json({ status: "failed", error: message });
+      }
+      if (agentContract.modelTier === "Deterministic" || !agentContract.allowedTools.includes("structured-language-model")) {
+        return res.status(403).json({ status: "failed", error: `Agent '${agentId}' is not available through the language-model endpoint.` });
+      }
       const ai = getGeminiClient();
 
-      const systemInstruction = `You are TehqIQ's specialized research agent (${agentType || "Research Orchestrator"}).
-Your primary directives:
-1. Maintain strict scientific integrity and evidence traceability.
-2. NEVER invent citations, DOIs, sample numbers, or statistical p-values.
-3. Provide scholarly, rigorous, precise analysis appropriate for doctoral-level publication.
-4. Output structured JSON matching the TehqIQ schema.
+      const systemInstruction = `You are TehqIQ's registered ${agentContract.id} agent.
+Purpose: ${agentContract.purpose}
+Allowed tools: ${agentContract.allowedTools.join(", ")}.
+Required workflow state: ${agentContract.requiredWorkflowStates.join("; ")}.
+Output contract: ${agentContract.outputSchema.id} v${agentContract.outputSchema.version}; required fields: ${agentContract.outputSchema.requiredFields.join(", ")}.
+Human review: ${agentContract.humanReviewRequirement}. Output is a proposal and must not represent itself as approved.
+Prohibited behavior: ${agentContract.prohibitedBehavior.join("; ")}.
+Use only the supplied allowed artifacts. Preserve missing information explicitly and do not infer missing research facts.
 
 Notice: TehqIQ assists researchers but does not replace subject expertise, ethical approval, statistical review, scholarly judgment or author responsibility.`;
 
-      const userMessage = `Context: ${JSON.stringify(context || {})}\n\nTask Instructions:\n${prompt}`;
+      const userMessage = `Allowed input artifacts: ${JSON.stringify(context)}\n\nPerform only the registered purpose stated in the system instruction.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3.6-flash",
@@ -258,7 +272,7 @@ Notice: TehqIQ assists researchers but does not replace subject expertise, ethic
       res.json({
         status: "completed",
         result: modelValidation.value,
-        agentType,
+        agentId,
         timestamp: new Date().toISOString(),
       });
     } catch (error: any) {

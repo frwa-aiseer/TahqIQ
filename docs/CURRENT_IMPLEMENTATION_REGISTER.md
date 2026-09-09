@@ -206,6 +206,12 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 - `ProtocolBuilderView` supports researcher entry, text protocol upload (`Needs Review`), and structured AI proposal (`AI Suggested`). Blank values display `Researcher Input Required`.
 - The fixed 48-hour washout, power, effect-size, minimum-participant, and synthetic sample defaults were removed from the mounted Protocol Builder.
 
+## Server-controlled agent registry
+
+- `src/server/agentRegistry.ts` is the typed, immutable source of truth for 19 agent contracts spanning intake through export. Contracts declare purpose, permitted artifacts/tools, output schema metadata, model tier, workflow prerequisites, review obligations, next states, prohibited behavior, and server-side role/frontend permissions.
+- The authenticated `/api/gemini/agent` endpoint no longer accepts a client-selected `agentType` or free-form task prompt. It resolves a registered ID on the server and rejects unknown/internal agents, unauthorized roles, undeclared context keys, and agents incompatible with the language-model endpoint before model invocation.
+- Only the bounded research-intake contract is currently callable from the frontend. Other entries describe server-only contracts and are not evidence that a WorkflowOrchestrator, centralized AI gateway, or every listed executable agent has been implemented.
+
 ## Literature and reference providers
 
 - Normalized DOI provider adapters in `src/lib/metadataProviders.ts`: Crossref, OpenAlex, DataCite, Europe PMC, and PubMed/NCBI E-utilities.
@@ -260,7 +266,7 @@ The Firestore rule tests inspect rule source and simulate helper behavior; no Fi
 
 These are source observations, not work completed under later prompts:
 
-1. Four direct Gemini integrations are not centralized; TQ-VSC-017 validates their structured server responses, but no universal model gateway exists.
+1. Four direct Gemini integrations are not centralized; TQ-VSC-017 validates their structured server responses and TQ-VSC-051 constrains the generic agent endpoint through the server registry, but no universal model gateway exists.
 2. Some deeply nested research entity fields are validated at their server-use boundary rather than exhaustively re-declaring the full persisted project schema; schema versioning remains a future compatibility consideration.
 3. Several implemented views are unreachable, while legacy route labels misleadingly land on other step content.
 4. Step 9 is labeled References but renders Claim Matrix rather than a dedicated reference-list view.

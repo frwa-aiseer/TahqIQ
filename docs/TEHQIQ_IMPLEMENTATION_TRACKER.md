@@ -1993,4 +1993,43 @@ None. The harness is test-only and imports existing types without changing them.
 - A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
 - The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
-- TQ-VSC-051 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-052 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-051 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a typed, immutable, server-controlled `AgentRegistry` containing 19 explicit contracts: research intake, outlet matching, search planning, literature retrieval, screening, evidence extraction, literature synthesis, contradiction detection, research gap, question/hypothesis, methodology design, analysis planning, results interpretation/writing, section writing, peer review, compliance, integrity review, manuscript editing, and export.
+- Every contract declares its stable ID, bounded purpose, allowed input artifacts and tools, output schema ID/version/required fields, model tier, prerequisite workflow states, human-review rule, next states, prohibited behavior, and server-side role/frontend permissions.
+- The existing generic `/api/gemini/agent` boundary now accepts a registered `agentId` and declared context only. It rejects arbitrary/unknown IDs, disallowed agents, unauthorized roles, undeclared input artifacts, deterministic/non-language agents, extra fields, and client-authored arbitrary task prompts before model invocation.
+- Only `research-intake` is frontend-callable. Its authenticated project route establishes the required existing-project state, and its model output remains a structured proposal requiring researcher review. All later-workflow agents remain server-only until their workflow prerequisites can be verified by dedicated server orchestration.
+- The mounted Research Canvas request now invokes the bounded intake contract with only a researcher-supplied description and stated classification; missing classification stays explicitly `Missing`.
+
+### Files changed and migrations
+
+- `src/server/agentRegistry.ts` (created)
+- `src/tests/agentRegistry.test.ts` (created)
+- `src/server/apiSchemas.ts`
+- `src/tests/apiSchemas.test.ts`
+- `src/components/views/ResearchCanvasView.tsx`
+- `server.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No persisted data migration is required. The HTTP request contract intentionally replaces legacy `agentType`/free-form `prompt` with `agentId` plus bounded context; the only repository caller was migrated in the same change.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/agentRegistry.test.ts src/tests/apiSchemas.test.ts src/tests/authMiddleware.test.ts` — exit `0`; PASS, 3/3 files and 21/21 tests.
+3. `npm test` — exit `1`; 63/65 executed files passed and 557/559 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two established failures remain: the Crossref test expects legacy wording, and the jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Contract tests assert the exact required registry inventory, unique IDs, complete contract fields, immutable server definitions, human-review/no-fabrication/no-self-approval rules, the single bounded frontend permission, writer access, and rejection of unknown agents, internal agents, viewers, undeclared artifacts, duplicate IDs, and incomplete contracts.
+- API schema tests prove legacy arbitrary `agentType` and client-authored prompt fields are rejected.
+- This prompt does not implement the deterministic WorkflowOrchestrator, SectionContracts, model gateway/router, or later agent implementations. Registry entries describe and constrain those future server integrations; they do not claim those agents are all executable today.
+- The full-suite failures are pre-existing and unrelated to the registry change; focused registry/security tests, typecheck, and build pass.
+- TQ-VSC-052 and all later prompts remain `NOT STARTED`.
