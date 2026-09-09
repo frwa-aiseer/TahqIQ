@@ -1956,3 +1956,41 @@ None. The harness is test-only and imports existing types without changing them.
 - The agent validates registry identity/availability and structural compatibility, but it does not establish causal identification, scientific sufficiency, or assumption truth. Those remain researcher responsibilities.
 - This prompt implements the domain contract only. It is not wired into a mounted planning UI, protected API route, or persistence workflow.
 - TQ-VSC-050 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-050 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a `ResultsInterpretationAndWritingAgent` (not a “Results Generator”) that requires an explicit request and at least one eligible approved empirical source.
+- Quantitative/registered analysis eligibility uses the existing attributable `Approved for Manuscript` or locked lifecycle gate. Completed, reviewed, malformed, or otherwise unapproved outputs are never shown to the tool.
+- Qualitative eligibility requires the governed workflow's final `Researcher Approved` state, attributable approval identity/timestamp/rationale, successful workflow provenance validation, and individually approved themes.
+- The tool receives only approved result IDs, exact approved finding text, and exact recorded warning arrays. It can select/order those records but cannot alter their content. Hallucinated IDs, changed findings, omitted/changed warnings, duplicates, malformed output, and self-approval are rejected.
+- Manuscript text is assembled deterministically from the selected exact findings and cautions. Unresolved information is permitted only with explicit Missing/Unverified/Researcher input required/Not available/Not configured/Unresolved language.
+- Numeric grounding runs after manuscript assembly via the existing provenance-based manuscript numeric validator. Exact approved prose containing numbers is still blocked if traceable project numeric evidence is absent.
+- No result is recalculated. The agent creates no p-values, sample sizes, effects, significance decisions, or new findings. The adversarial “make p significant” case fails exact-text validation.
+- Successful output remains `AI Suggested` / `Needs Researcher Review`. A separate attributable approval action creates a distinct researcher-approved record and preserves the original proposal.
+
+### Files changed and migrations
+
+- `src/lib/resultsInterpretationWritingAgent.ts` (created)
+- `src/tests/resultsInterpretationWritingAgent.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. The agent uses stateless exported proposal/approval contracts and reads existing project analysis and qualitative records without schema mutation.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`) after final implementation.
+2. `npx vitest run src/tests/resultsInterpretationWritingAgent.test.ts src/tests/numericGrounding.test.ts src/tests/numericEvidence.test.ts src/tests/qualitativeAnalysisWorkflow.test.ts src/tests/analysisLifecycle.test.ts` — exit `0`; PASS, 4 discovered files and 22/22 tests (`analysisLifecycle.test.ts` is not present and added no discovered file).
+3. `npm test` — exit `1`; 62/64 executed files passed and 551/553 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom localStorage test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Adversarial tests prove no-data execution blocks before tool invocation and altered `p = 0.001`/“statistically significant” prose is rejected against the exact approved finding.
+- Tests prove unapproved analysis outputs are hidden, result IDs and warnings are immutable, hallucinated IDs/self-approval fail, numeric grounding executes after assembly, and absent numeric provenance blocks approved numeric prose.
+- A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
+- The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
+- This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
+- TQ-VSC-051 and all later prompts remain `NOT STARTED`.
