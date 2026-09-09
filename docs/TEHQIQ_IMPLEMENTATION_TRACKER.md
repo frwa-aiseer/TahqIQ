@@ -1993,7 +1993,43 @@ None. The harness is test-only and imports existing types without changing them.
 - A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
 - The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
-- TQ-VSC-052 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-053 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-052 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a deterministic `WorkflowOrchestrator` with a fixed server-owned route for every registered agent. Each route controls workflow kind, stage, exact prerequisite artifact keys and acceptable review states, permitted registry roles, output storage destination, proposal/review status, and the registry-defined next states.
+- Planning returns either a frozen dispatch plan or an explicit list of missing prerequisites. It never invokes a model/tool, chooses a free-form agent, chains another agent, auto-approves output, writes output, or advances workflow state.
+- Runtime requests for unregistered agents, incorrect stages/workflow kinds, unauthorized roles, absent or insufficiently reviewed artifacts, duplicate artifacts, and inputs outside the agent contract fail closed.
+- Flexible entry is artifact-governed rather than order-forced: supplied literature can enter systematic-review screening, approved qualitative findings can enter Results writing, and existing dataset or existing methodology projects can enter analysis planning when all required governed artifacts are present.
+- Deterministic outputs remain `Needs Researcher Review`; language-agent outputs remain `AI Suggested`. Every successful plan sets `approvalRequired: true` and `automaticNextAgent: null`.
+
+### Files changed and migrations
+
+- `src/server/workflowOrchestrator.ts` (created)
+- `src/tests/workflowOrchestrator.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No persisted schema or data migration is required. The orchestrator is a stateless server-domain planning boundary over TQ-VSC-051 contracts and supplied artifact metadata.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/workflowOrchestrator.test.ts src/tests/agentRegistry.test.ts` — exit `0`; PASS, 2/2 files and 13/13 tests.
+3. `npm test` — exit `1`; 64/66 executed files passed and 565/567 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — exit `0`; PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests cover the required empirical, systematic-review, qualitative, existing-dataset, and existing-methodology paths, including flexible entry through researcher uploads/inputs with required approval or verification states.
+- Negative tests cover missing/under-reviewed prerequisites, incorrect stage, incompatible workflow kind, viewer access, undeclared input, duplicate artifact keys, unregistered runtime agent IDs, and quantitative outputs lacking `Approved for Manuscript` status.
+- Output storage is declared but deliberately not performed by this pure planner. Persistence, authenticated endpoint wiring, and state mutation must use a later dedicated server boundary; no such later prompt was implemented here.
+- SectionContracts, manuscript writer agents, EditorAgent, and the AI gateway remain outside this prompt.
+- The full-suite failures are pre-existing and unrelated to the orchestrator; focused tests, typecheck, build, and diff validation pass.
+- TQ-VSC-053 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-051 verification details
 

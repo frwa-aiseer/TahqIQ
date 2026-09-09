@@ -210,7 +210,9 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 
 - `src/server/agentRegistry.ts` is the typed, immutable source of truth for 19 agent contracts spanning intake through export. Contracts declare purpose, permitted artifacts/tools, output schema metadata, model tier, workflow prerequisites, review obligations, next states, prohibited behavior, and server-side role/frontend permissions.
 - The authenticated `/api/gemini/agent` endpoint no longer accepts a client-selected `agentType` or free-form task prompt. It resolves a registered ID on the server and rejects unknown/internal agents, unauthorized roles, undeclared context keys, and agents incompatible with the language-model endpoint before model invocation.
-- Only the bounded research-intake contract is currently callable from the frontend. Other entries describe server-only contracts and are not evidence that a WorkflowOrchestrator, centralized AI gateway, or every listed executable agent has been implemented.
+- Only the bounded research-intake contract is currently callable from the frontend. Other entries describe server-only contracts and are not evidence that a centralized AI gateway or every listed executable agent has been implemented.
+- `src/server/workflowOrchestrator.ts` provides a deterministic route planner for all registered agents. Fixed routes validate workflow kind, stage, registry role, artifact presence/review state, output destination, and approval requirement, while returning no automatic next-agent call. It supports governed flexible entry for existing literature, qualitative findings, datasets, and methodologies.
+- The orchestrator is currently a stateless server-domain boundary, not a mounted persistence endpoint. A successful plan does not itself run an agent, store an output, approve content, or mutate project workflow state.
 
 ## Literature and reference providers
 
