@@ -214,6 +214,13 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 - `src/server/workflowOrchestrator.ts` provides a deterministic route planner for all registered agents. Fixed routes validate workflow kind, stage, registry role, artifact presence/review state, output destination, and approval requirement, while returning no automatic next-agent call. It supports governed flexible entry for existing literature, qualitative findings, datasets, and methodologies.
 - The orchestrator is currently a stateless server-domain boundary, not a mounted persistence endpoint. A successful plan does not itself run an agent, store an output, approve content, or mutate project workflow state.
 
+## Manuscript section contracts
+
+- `src/lib/manuscriptSectionContracts.ts` defines immutable contracts for Introduction, Literature Review, Methods, Results, Discussion, Conclusion, Abstract, Title, and Keywords. Each contract specifies verified/approved input artifacts, permitted empirical-claim sources, proposal status, and section-specific prohibited behavior.
+- The shared output contract requires claim/evidence mappings, source IDs, NumericEvidence IDs, explicit missing-information entries, and warnings. Input validation blocks absent or insufficiently reviewed prerequisites, undeclared inputs, duplicates, and any demo/synthetic artifact in a real project.
+- Methods requires actual researcher-confirmed ethics information or a researcher-confirmed not-applicable state. Results accepts only `Approved for Manuscript` quantitative outputs or researcher-approved qualitative findings. Conclusion explicitly prohibits introducing new empirical claims.
+- These definitions do not yet replace or wire the existing generic drafting endpoint. Evidence-constrained section writer execution belongs to the subsequent writer-agent task and is not claimed here.
+
 ## Literature and reference providers
 
 - Normalized DOI provider adapters in `src/lib/metadataProviders.ts`: Crossref, OpenAlex, DataCite, Europe PMC, and PubMed/NCBI E-utilities.

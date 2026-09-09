@@ -1993,7 +1993,43 @@ None. The harness is test-only and imports existing types without changing them.
 - A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
 - The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
-- TQ-VSC-053 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-054 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-053 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added an immutable typed `ManuscriptSectionContractRegistry` for Introduction, Literature Review, Methods, Results, Discussion, Conclusion, Abstract, Title, and Keywords.
+- Introduction requires an approved problem statement and research gap plus verified evidence. Literature Review requires approved synthesis and a verified evidence graph. Methods requires approved methodology/protocol, approved analysis plan, and actual ethics information explicitly confirmed by a researcher or explicitly confirmed not applicable.
+- Results accepts only analysis outputs with `Approved for Manuscript` state or researcher-approved qualitative findings. Discussion requires approved Results plus verified literature. Conclusion requires approved interpretation and Results and explicitly prohibits new empirical claims. Abstract requires approved relevant sections and approved Results. Title and Keywords require approved project content.
+- Every contract shares an exact proposal output schema requiring section ID/content, claim/evidence mappings, source IDs, NumericEvidence IDs, missing information, and warnings. Output remains `AI Suggested—Needs Researcher Review` and cannot self-approve.
+- Deterministic input validation rejects missing/under-reviewed prerequisites, duplicate or undeclared artifacts, and demo/synthetic artifacts supplied to a real project. Isolated demo inputs are permitted only with an explicit warning requiring visible labeling and isolation.
+- Deterministic output validation rejects missing required traceability arrays, extra hidden fields, incorrect section IDs, malformed claim mappings, and self-approved status.
+
+### Files changed and migrations
+
+- `src/lib/manuscriptSectionContracts.ts` (created)
+- `src/tests/manuscriptSectionContracts.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No persisted schema or data migration is required. These are stateless contract and validation definitions; existing `ManuscriptSection` records remain unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/manuscriptSectionContracts.test.ts` — PASS, 1/1 file and 6/6 tests.
+3. `npm test` — suite reported FAIL; 65/67 executed files passed and 571/573 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests assert the exact nine-section inventory and section-specific input requirements, actual ethics confirmation, quantitative/qualitative Results gates, complete output traceability schema, immutable proposal status, and absence of any default content field.
+- Real-project adversarial tests reject demo/synthetic input rather than allowing hidden demonstration facts to enter a section contract. The contract definitions contain no example research content, empirical defaults, or inferred project facts.
+- This prompt defines and validates contracts only. It does not implement or wire the evidence-constrained manuscript writer agents reserved for TQ-VSC-054, and it does not modify the existing generic drafting endpoint/UI.
+- The two full-suite failures are pre-existing and unrelated to SectionContracts; typecheck, focused tests, production build, and diff validation pass.
+- TQ-VSC-054 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-052 verification details
 
