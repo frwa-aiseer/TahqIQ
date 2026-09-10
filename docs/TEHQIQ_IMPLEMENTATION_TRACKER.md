@@ -1993,7 +1993,42 @@ None. The harness is test-only and imports existing types without changing them.
 - A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
 - The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
-- TQ-VSC-055 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-056 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-055 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a proposal-only `ManuscriptEditorAgent` supporting the bounded operations requested by this prompt: repetition removal, terminology/acronym harmonization, transitions/order, approved cross-references, tense/style alignment, and word-limit compliance.
+- Input requires an explicit user request, attributable project/user context, an approved source section, unique approved claims with evidence/source/NumericEvidence provenance, and a fixed list of requested editor operations. Terminology replacements and cross-references must be supplied as researcher-approved allowances.
+- Output uses structured pre/post claim records. Every original claim must be retained or explicitly removed, no new/duplicate claim ID is permitted, provenance arrays must remain exact, and proposed content must exactly match the ordered post-edit claims.
+- Deterministic comparison blocks changed/added numbers, citations, protected statistical direction/significance/negation terms, removed uncertainty markers, new overstatement language, and added factual vocabulary outside the source claim plus narrow connective/style vocabulary and approved terminology/cross-references.
+- Repetition removal cannot delete a unique claim: a removed claim must have an exact retained duplicate with identical provenance. Approved structural cross-references may contain section numbers without being misclassified as new empirical numbers.
+- Successful output remains `AI Suggested—Needs Researcher Review`, includes a complete pre/post claim comparison, and returns a pending attributable AI-use log without inventing a researcher decision.
+
+### Files changed and migrations
+
+- `src/lib/manuscriptEditorAgent.ts` (created)
+- `src/tests/manuscriptEditorAgent.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No persisted schema or data migration is required. The editor is a stateless domain service returning a proposal and pending AI-use record; existing manuscript sections remain unchanged until a separate researcher review action is implemented.
+
+### Verification and tests
+
+1. `npm run lint` — PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/manuscriptEditorAgent.test.ts src/tests/manuscriptSectionWriters.test.ts src/tests/manuscriptSectionContracts.test.ts` — PASS, 3/3 files and 26/26 tests.
+3. `npm test` — suite reported FAIL; 67/69 executed files passed and 591/593 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- The required adversarial test proves editor-introduced unsupported claim vocabulary is rejected. Additional tests block created citations/numbers, changed statistical direction, removed uncertainty, overstatement, new claim IDs, provenance changes, unaccounted claims, unique-claim deletion, self-approval, excessive word count, and unrequested operations.
+- Positive tests cover safe order/transition editing, exact pre/post comparisons, pending AI-use logging, and researcher-approved structural cross-references.
+- This service is not mounted in the writing UI, authenticated endpoint, persistence workflow, or canonical AI ledger. It deliberately does not implement the AiGateway reserved for TQ-VSC-056.
+- TQ-VSC-056 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-054 verification details
 
