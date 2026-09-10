@@ -1993,7 +1993,42 @@ None. The harness is test-only and imports existing types without changing them.
 - A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
 - The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
-- TQ-VSC-058 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-059 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-058 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added configurable server-endpoint adapters for SPECTER2-compatible scientific embeddings, BGE-M3-compatible general embeddings, Whisper-compatible transcription, Qwen-VL-compatible vision/document analysis, and an OpenAI-compatible local general LLM endpoint such as a separately hosted gpt-oss/Qwen service.
+- Every adapter starts as `Not Configured` when its endpoint is absent or invalid and as `Configured` when an HTTP(S) endpoint exists. Mocked `/health` checks transition configured adapters to `Healthy`, `Unavailable` for non-success HTTP status, or `Failed` for transport/malformed-health failures.
+- The capability registry routes only `Healthy` providers. Direct inference calls also fail closed until health has been verified, and health/request calls use bounded timeouts.
+- Adapter response contracts validate embedding vectors, transcript shape, vision/document blocks and warnings, and OpenAI-compatible chat output before returning data. Server API keys are sent only as bearer headers and are not exposed in provider status.
+- All configuration uses server-only environment variables. Status explicitly identifies execution as `Server Endpoint`; no code or UI claims these models execute in-browser.
+
+### Files changed and migrations
+
+- `src/server/localModelProviders.ts` (created)
+- `src/tests/localModelProviders.test.ts` (created)
+- `.env.example`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No persisted schema or data migration is required. Existing Gemini gateway/model routing and existing `TRANSCRIPTION_SERVICE_URL` behavior remain compatible; the new Whisper adapter accepts that variable as a fallback when `TEHQIQ_WHISPER_ENDPOINT` is absent.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/localModelProviders.test.ts src/tests/aiGateway.test.ts src/tests/modelRouter.test.ts src/tests/mediaTranscriptionProvider.test.ts src/tests/richDocumentParser.test.ts` — exit `0`; PASS, 5/5 files and 31/31 tests.
+3. `npm test` — exit `1`; 70/72 executed files passed and 608/610 executed tests passed, with 2 emulator-only files and 18 tests skipped. The same two established unrelated failures remain: the Crossref test expects legacy error wording, and the jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Mocked tests cover missing configuration without network access; all required health states; capability routing restricted to healthy providers; fail-closed pre-health invocation; bearer-key privacy; request/response contracts for embeddings, transcription, vision/documents, and general LLM output; and gateway-compatible token usage mapping.
+- This prompt creates provider abstractions only. It intentionally does not select open/local providers for production feature routes or decide whether data may be sent locally or to a cloud provider. Privacy-aware task routing remains TQ-VSC-059.
+- Actual endpoint deployment, model installation, capacity, model quality, and runtime health are external operational responsibilities and are not represented as verified by mocked adapter tests.
+- TQ-VSC-059 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-057 verification details
 
@@ -2032,8 +2067,8 @@ None. The harness is test-only and imports existing types without changing them.
 
 - Tests prove FAST/MAIN/REVIEW tier selection, environment-driven changes across each tier without feature-code edits, fallback defaults, invalid-ID rejection, structured schema configuration, rejection of tools on structured tasks, undeclared-tool rejection, SDK-safe controlled declarations, and explicit function allowlisting.
 - Existing route behavior is preserved because all three central defaults currently resolve to the prior model unless deployment configuration overrides them.
-- This prompt does not add non-Gemini or local provider adapters, provider health states, or privacy-aware routing. Those belong to TQ-VSC-058 and TQ-VSC-059 and were not implemented.
-- TQ-VSC-058 and all later prompts remain `NOT STARTED`.
+- Non-Gemini/local provider adapters and provider health states are now implemented by TQ-VSC-058. Privacy-aware routing remains reserved for TQ-VSC-059.
+- TQ-VSC-059 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-056 verification details
 
