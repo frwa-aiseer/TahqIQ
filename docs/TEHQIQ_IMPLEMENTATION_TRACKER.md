@@ -1993,7 +1993,45 @@ None. The harness is test-only and imports existing types without changing them.
 - A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
 - The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
-- TQ-VSC-054 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-055 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-054 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added SectionContract-driven `IntroductionWriter`, `LiteratureReviewWriter`, `MethodsWriter`, `DiscussionWriter`, `ConclusionWriter`, and `AbstractWriter` domain services. Results remains on the existing governed `ResultsInterpretationAndWritingAgent`; no competing Results writer was added.
+- Each writer requires an explicit user request, attributable user/project context, and section-specific verified/approved artifacts validated by TQ-VSC-053 before a tool can run. Real projects reject demo/synthetic artifacts before invocation.
+- Tools receive only cloned grounded content units and the immutable SectionContract. Accepted drafts may select and order exact units only: claim text, evidence IDs, source IDs, and NumericEvidence IDs must remain unchanged, and draft prose must exactly equal the selected claims in declared order.
+- Draft-level source/NumericEvidence collections must exactly match their claim mappings. New or omitted references/provenance, invented claim IDs/text, malformed output, extra fields, ungrounded numbers, fabricated methodology text, and self-approved state fail closed.
+- Successful drafts remain `AI Suggested—Needs Researcher Review` and return an attributable pending AI-use log with provider/model/prompt version, input artifact IDs, and input source IDs. The log records no fabricated researcher decision.
+- Manual writing remains a separate `Researcher Draft` path and does not create an AI-use record.
+
+### Files changed and migrations
+
+- `src/lib/manuscriptSectionWriters.ts` (created)
+- `src/tests/manuscriptSectionWriters.test.ts` (created)
+- `src/lib/manuscriptSectionContracts.ts`
+- `src/tests/manuscriptSectionContracts.test.ts`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No persisted schema or data migration is required. Writer results and AI-use logs are returned as stateless domain records; existing manuscript sections and AI ledger records are unchanged.
+
+### Verification and tests
+
+1. `npm run lint` — PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/manuscriptSectionWriters.test.ts src/tests/manuscriptSectionContracts.test.ts src/tests/resultsInterpretationWritingAgent.test.ts` — PASS, 3/3 files and 25/25 tests.
+3. `npm test` — suite reported FAIL; 66/68 executed files passed and 583/585 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Parameterized tests prove successful section-specific grounding for all six requested writers and confirm contract context plus pending AI-use logging.
+- Negative tests prove tools are not called when requests/prerequisites fail; real-project synthetic input is blocked; invented references/provenance and factual methodology are rejected; exact NumericEvidence-backed prose is accepted; altered prose/numbers fail; and manual drafting remains available.
+- Results reuse is regression-tested against the exported existing `ResultsInterpretationAndWritingAgent` rather than reimplemented.
+- These domain services are not yet mounted in the writing UI, an authenticated endpoint, persistence, or the canonical AI ledger. Returning the pending AI-use record makes omission visible, but complete ledger persistence awaits the later centralized AI gateway/ledger work.
+- TQ-VSC-055 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-053 verification details
 

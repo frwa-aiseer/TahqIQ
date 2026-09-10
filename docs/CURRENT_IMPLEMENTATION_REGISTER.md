@@ -219,7 +219,8 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 - `src/lib/manuscriptSectionContracts.ts` defines immutable contracts for Introduction, Literature Review, Methods, Results, Discussion, Conclusion, Abstract, Title, and Keywords. Each contract specifies verified/approved input artifacts, permitted empirical-claim sources, proposal status, and section-specific prohibited behavior.
 - The shared output contract requires claim/evidence mappings, source IDs, NumericEvidence IDs, explicit missing-information entries, and warnings. Input validation blocks absent or insufficiently reviewed prerequisites, undeclared inputs, duplicates, and any demo/synthetic artifact in a real project.
 - Methods requires actual researcher-confirmed ethics information or a researcher-confirmed not-applicable state. Results accepts only `Approved for Manuscript` quantitative outputs or researcher-approved qualitative findings. Conclusion explicitly prohibits introducing new empirical claims.
-- These definitions do not yet replace or wire the existing generic drafting endpoint. Evidence-constrained section writer execution belongs to the subsequent writer-agent task and is not claimed here.
+- `src/lib/manuscriptSectionWriters.ts` implements Introduction, Literature Review, Methods, Discussion, Conclusion, and Abstract writer domain services over these contracts. They select/order exact grounded units only, preserve claim/evidence/source/NumericEvidence mappings, reject created facts/references/numbers, remain review-pending, and return a pending attributable AI-use record. Results continues to use `ResultsInterpretationAndWritingAgent`.
+- A separate manual-draft helper preserves non-AI researcher writing. These writer services are not yet mounted in the existing generic drafting endpoint/UI or persisted to the canonical AI ledger; that integration is not claimed here.
 
 ## Literature and reference providers
 

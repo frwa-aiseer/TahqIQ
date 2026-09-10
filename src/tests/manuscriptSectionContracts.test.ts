@@ -55,7 +55,7 @@ describe("explicit manuscript SectionContracts", () => {
   it("validates exact proposal fields including claim mappings, sources, NumericEvidence IDs, missing info, and warnings", () => {
     const valid = {
       sectionId: "Discussion", content: "Researcher review required.",
-      claimEvidenceMappings: [{ claimId: "claim-1", evidenceIds: ["evidence-1"], sourceIds: ["source-1"], numericEvidenceIds: ["numeric-1"] }],
+      claimEvidenceMappings: [{ claimId: "claim-1", claimText: "Researcher review required.", evidenceIds: ["evidence-1"], sourceIds: ["source-1"], numericEvidenceIds: ["numeric-1"] }],
       sourceIds: ["source-1"], numericEvidenceIds: ["numeric-1"], missingInformation: ["Researcher Input Required"], warnings: ["Not independently reproduced"],
       status: "AI Suggested—Needs Researcher Review",
     };

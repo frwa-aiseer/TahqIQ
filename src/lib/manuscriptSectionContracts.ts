@@ -37,6 +37,7 @@ export interface SectionDraftProposal {
   content: string;
   claimEvidenceMappings: readonly {
     claimId: string;
+    claimText: string;
     evidenceIds: readonly string[];
     sourceIds: readonly string[];
     numericEvidenceIds: readonly string[];
@@ -141,7 +142,7 @@ export function validateSectionDraftOutput(sectionId: ManuscriptSectionContractI
   return value.claimEvidenceMappings.every((mapping) => {
     if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) return false;
     const item = mapping as Record<string, unknown>;
-    return Object.keys(item).length === 4 && typeof item.claimId === "string" && Array.isArray(item.evidenceIds) && stringArray(item.evidenceIds) && Array.isArray(item.sourceIds) && stringArray(item.sourceIds) && Array.isArray(item.numericEvidenceIds) && stringArray(item.numericEvidenceIds);
+    return Object.keys(item).length === 5 && typeof item.claimId === "string" && typeof item.claimText === "string" && Array.isArray(item.evidenceIds) && stringArray(item.evidenceIds) && Array.isArray(item.sourceIds) && stringArray(item.sourceIds) && Array.isArray(item.numericEvidenceIds) && stringArray(item.numericEvidenceIds);
   });
 }
 
