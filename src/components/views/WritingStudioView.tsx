@@ -304,8 +304,8 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
         status: "Incomplete",
         assessedAt: new Date().toISOString(),
         assessedByUid: user?.uid || "tehqiq-system",
-        rationale: "Section drafting uses a direct model-call path pending centralized gateway coverage verification.",
-        knownBypassPaths: ["POST /api/gemini/draft-section"],
+        rationale: "The server AiGateway records generation events; reconciliation with this legacy project decision ledger remains incomplete.",
+        knownBypassPaths: [],
       },
     });
   };

@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import dotenv from "dotenv";
 import { lookupDoiMetadata } from "./src/lib/metadataProviders";
 import { createSearchExecution, executeSearchExecution } from "./src/lib/searchExecution";
@@ -41,6 +41,7 @@ import {
   validateSearchExecutionRequest,
 } from "./src/server/apiSchemas";
 import { agentRegistry, type AgentContract } from "./src/server/agentRegistry";
+import { AiGateway, AiGatewayError, GeminiAiProvider, StaticAiModelRouter, type AiGatewayArtifactRef } from "./src/server/aiGateway";
 
 dotenv.config();
 
@@ -50,19 +51,37 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: "25mb" }));
 
-  // Shared Gemini client initialization helper
-  function getGeminiClient() {
+  function getAiGateway(req: AuthenticatedProjectRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is missing.");
-    }
-    return new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
+    if (!apiKey) throw new Error("GEMINI_API_KEY environment variable is missing.");
+    const provider = new GeminiAiProvider(apiKey);
+    const projectRef = req.projectAuth!.projectRef as any;
+    return new AiGateway(
+      new StaticAiModelRouter(provider.id, "gemini-3.6-flash"),
+      new Map([[provider.id, provider]]),
+      async (event, outputArtifact) => {
+        const batch = projectRef.firestore.batch();
+        batch.create(projectRef.collection("aiGatewayEvents").doc(event.id), event);
+        if (outputArtifact) batch.create(projectRef.collection("aiOutputArtifacts").doc(outputArtifact.id), outputArtifact);
+        await batch.commit();
       },
+    );
+  }
+
+  const artifactRefs = (type: string, values: Record<string, unknown>[], prefix: string): AiGatewayArtifactRef[] =>
+    values.map((value, index) => ({ id: `${prefix}:${typeof value.id === "string" && value.id.trim() ? value.id : `unidentified-${index}`}`, type }));
+
+  function gatewayActor(req: AuthenticatedProjectRequest) {
+    const auth = req.projectAuth!;
+    return { uid: auth.actor.uid, email: auth.actor.email, role: auth.role };
+  }
+
+  function gatewayFailure(res: express.Response, error: unknown, fallback: string) {
+    const gatewayError = error instanceof AiGatewayError ? error : undefined;
+    const schemaFailure = gatewayError?.code === "SCHEMA_VALIDATION_FAILED" || gatewayError?.code === "EMPTY_PROVIDER_OUTPUT";
+    return res.status(schemaFailure ? 502 : 500).json({
+      status: "failed", error: fallback, traceId: gatewayError?.ledgerEvent?.traceId,
+      failureCode: gatewayError?.code || "GATEWAY_FAILURE", ledgerEvent: gatewayError?.ledgerEvent,
     });
   }
 
@@ -89,10 +108,6 @@ async function startServer() {
 
   function rejectInvalidRequest(res: express.Response, errors: string[]) {
     return res.status(400).json({ status: "failed", error: "Request validation failed.", errors });
-  }
-
-  function rejectInvalidModelOutput(res: express.Response, errors: string[]) {
-    return res.status(502).json({ status: "failed", error: "AI response validation failed.", errors });
   }
 
   function getAuditedEntity(project: Record<string, any>, entityType: TrustedAuditEntityType, entityId: string): Record<string, any> | null {
@@ -216,13 +231,13 @@ async function startServer() {
 
   // 1. AI Agent Orchestrator Endpoint
   app.post("/api/gemini/agent", protectedProjectRoute(PROJECT_WRITER_ROLES, 1024 * 1024), async (req, res) => {
+    const authenticatedRequest = req as AuthenticatedProjectRequest;
     try {
       const requestValidation = validateAgentRequest(req.body);
       if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
       const { agentId, context } = requestValidation.value;
       let agentContract: AgentContract;
       try {
-        const authenticatedRequest = req as AuthenticatedProjectRequest;
         agentContract = agentRegistry.authorizeFrontend(agentId, authenticatedRequest.projectAuth!.role, Object.keys(context));
       } catch (error: any) {
         const message = String(error?.message || "Agent invocation is not permitted.");
@@ -231,8 +246,6 @@ async function startServer() {
       if (agentContract.modelTier === "Deterministic" || !agentContract.allowedTools.includes("structured-language-model")) {
         return res.status(403).json({ status: "failed", error: `Agent '${agentId}' is not available through the language-model endpoint.` });
       }
-      const ai = getGeminiClient();
-
       const systemInstruction = `You are TehqIQ's registered ${agentContract.id} agent.
 Purpose: ${agentContract.purpose}
 Allowed tools: ${agentContract.allowedTools.join(", ")}.
@@ -246,14 +259,11 @@ Notice: TehqIQ assists researchers but does not replace subject expertise, ethic
 
       const userMessage = `Allowed input artifacts: ${JSON.stringify(context)}\n\nPerform only the registered purpose stated in the system instruction.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: userMessage,
-        config: {
-          systemInstruction,
-          temperature: 0.2,
-          responseMimeType: "application/json",
-          responseSchema: {
+      const gatewayResult = await getAiGateway(authenticatedRequest).execute({
+        projectId: authenticatedRequest.projectAuth!.projectId, actor: gatewayActor(authenticatedRequest), agentId: agentContract.id,
+        promptVersion: "registered-agent-v1", responseSchemaId: "AgentSuggestionEnvelope-v1", systemInstruction, contents: userMessage,
+        inputArtifacts: Object.keys(context).map((type) => ({ id: `context:${type}`, type })), temperature: 0.2,
+        responseSchema: {
             type: Type.OBJECT,
             properties: {
               summary: { type: Type.STRING },
@@ -262,27 +272,26 @@ Notice: TehqIQ assists researchers but does not replace subject expertise, ethic
               evidenceIds: { type: Type.ARRAY, items: { type: Type.STRING } },
             },
             required: ["summary", "proposals", "missingInformationFlags", "evidenceIds"],
-          },
         },
+        validateResponse: (text) => parseAndValidateModelJson(text, validateAgentModelOutput),
       });
-
-      const modelValidation = parseAndValidateModelJson(response.text, validateAgentModelOutput);
-      if (!modelValidation.valid) return rejectInvalidModelOutput(res, modelValidation.errors);
 
       res.json({
         status: "completed",
-        result: modelValidation.value,
+        result: gatewayResult.outputArtifact.data,
         agentId,
-        timestamp: new Date().toISOString(),
+        timestamp: gatewayResult.ledgerEvent.timestamp,
+        aiGateway: gatewayResult,
       });
     } catch (error: any) {
       console.error("Gemini Agent Error:", error);
-      res.status(500).json({ status: "failed", error: "AI agent request failed safely." });
+      gatewayFailure(res, error, "AI agent request failed safely.");
     }
   });
 
   // 2. Structured Section Drafting Endpoint (Phase 6 Evidence-First Section Generation)
   app.post("/api/gemini/draft-section", protectedProjectRoute(PROJECT_WRITER_ROLES, 5 * 1024 * 1024), async (req, res) => {
+    const authenticatedRequest = req as AuthenticatedProjectRequest;
     try {
       const requestValidation = validateDraftSectionRequest(req.body);
       if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
@@ -305,7 +314,6 @@ Notice: TehqIQ assists researchers but does not replace subject expertise, ethic
         }
       }
 
-      const ai = getGeminiClient();
       const systemInstruction = `You are an expert scholarly manuscript assistant for TehqIQ.
 STRICT EVIDENCE RULES:
 1. ONLY use approved project facts, provided sources, and verified analysis outputs.
@@ -319,13 +327,15 @@ Available Verified Sources: ${JSON.stringify(sources || [])}
 Verified Claims: ${JSON.stringify(claims || [])}
 Approved Analysis Outputs: ${JSON.stringify((analysisOutputs || []).filter((out: any) => hasAttributableManuscriptApproval(out)))}`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: promptText,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: {
+      const gatewayResult = await getAiGateway(authenticatedRequest).execute({
+        projectId: authenticatedRequest.projectAuth!.projectId, actor: gatewayActor(authenticatedRequest), agentId: "section-writer",
+        promptVersion: "v2.4-phase6", responseSchemaId: "DraftSectionModelOutput-v1", systemInstruction, contents: promptText,
+        inputArtifacts: [
+          { id: `section:${sectionTitle}`, type: "sectionRequest" }, { id: `canvas:${authenticatedRequest.projectAuth!.projectId}`, type: "approvedProjectFacts" },
+          ...artifactRefs("approvedProjectFacts", claims, "claim"), ...artifactRefs("verifiedSources", sources, "source"),
+          ...artifactRefs("approvedAnalysisOutputs", analysisOutputs.filter((out: any) => hasAttributableManuscriptApproval(out)), "analysis"),
+        ],
+        responseSchema: {
             type: Type.OBJECT,
             properties: {
               title: { type: Type.STRING },
@@ -336,47 +346,46 @@ Approved Analysis Outputs: ${JSON.stringify((analysisOutputs || []).filter((out:
               missingInformationFlags: { type: Type.ARRAY, items: { type: Type.STRING } },
             },
             required: ["title", "content", "citationsUsed", "evidenceUsed", "numbersUsed", "missingInformationFlags"],
-          },
         },
+        validateResponse: (text) => parseAndValidateModelJson(text, validateDraftSectionModelOutput),
       });
-
-      const modelValidation = parseAndValidateModelJson(response.text, validateDraftSectionModelOutput);
-      if (!modelValidation.valid) return rejectInvalidModelOutput(res, modelValidation.errors);
 
       res.json({
         status: "completed",
-        draft: modelValidation.value,
-        promptVersion: "v2.4-phase6",
-        model: "gemini-3.6-flash",
-        timestamp: new Date().toISOString(),
+        draft: gatewayResult.outputArtifact.data,
+        promptVersion: gatewayResult.promptVersion,
+        model: gatewayResult.model,
+        timestamp: gatewayResult.ledgerEvent.timestamp,
+        aiGateway: gatewayResult,
       });
     } catch (error: any) {
       console.error("Gemini Section Drafting Error:", error);
-      res.status(500).json({ status: "failed", error: "AI section drafting failed safely." });
+      gatewayFailure(res, error, "AI section drafting failed safely.");
     }
   });
 
   // 3. Structured Multi-Agent Peer Review Endpoint
   app.post("/api/gemini/peer-review", protectedProjectRoute([...PROJECT_WRITER_ROLES, "Reviewer"], 5 * 1024 * 1024), async (req, res) => {
+    const authenticatedRequest = req as AuthenticatedProjectRequest;
     try {
       const requestValidation = validatePeerReviewRequest(req.body);
       if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
       const { sections, sources, analysisOutputs, reviewerRole } = requestValidation.value;
 
-      const ai = getGeminiClient();
       const systemInstruction = `You are a peer reviewer specialized as: ${reviewerRole}.
 Provide 1 to 2 schema-validated, critical, constructive reviewer comments on the manuscript text and empirical data.
 Strict rules: Output structured JSON matching the responseSchema. Never make generic compliment comments.`;
 
       const promptText = `Manuscript Sections: ${JSON.stringify(sections || [])}\nSources: ${JSON.stringify(sources || [])}\nAnalysis: ${JSON.stringify(analysisOutputs || [])}`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: promptText,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: {
+      const gatewayResult = await getAiGateway(authenticatedRequest).execute({
+        projectId: authenticatedRequest.projectAuth!.projectId, actor: gatewayActor(authenticatedRequest), agentId: "peer-review",
+        promptVersion: "v2.4-phase6", responseSchemaId: "PeerReviewModelOutput-v1", systemInstruction, contents: promptText,
+        inputArtifacts: [
+          { id: `reviewer-role:${reviewerRole}`, type: "reviewerRole" }, ...artifactRefs("manuscriptSections", sections, "section"),
+          ...artifactRefs("verifiedSources", sources, "source"), ...artifactRefs("approvedAnalysisOutputs", analysisOutputs, "analysis"),
+        ],
+        responseSchema: {
             type: Type.OBJECT,
             properties: {
               comments: {
@@ -395,27 +404,19 @@ Strict rules: Output structured JSON matching the responseSchema. Never make gen
               },
             },
             required: ["comments"],
-          },
         },
+        validateResponse: (text) => parseAndValidateModelJson(text, validatePeerReviewModelOutput),
       });
-
-      const modelValidation = parseAndValidateModelJson(response.text, validatePeerReviewModelOutput);
-      if (!modelValidation.valid) return rejectInvalidModelOutput(res, modelValidation.errors);
       res.json({
         status: "completed",
         reviewerRole,
-        comments: modelValidation.value.comments,
-        timestamp: new Date().toISOString(),
+        comments: gatewayResult.outputArtifact.data.comments,
+        timestamp: gatewayResult.ledgerEvent.timestamp,
+        aiGateway: gatewayResult,
       });
     } catch (error: any) {
       console.error("Gemini Peer Review Error:", error);
-      res.status(500).json({
-        status: "failed",
-        reviewerRole: req.body?.reviewerRole,
-        unavailable: true,
-        reason: "Reviewer agent call failed safely.",
-        error: "Reviewer agent call failed safely.",
-      });
+      gatewayFailure(res, error, "Reviewer agent call failed safely.");
     }
   });
 
@@ -427,7 +428,6 @@ Strict rules: Output structured JSON matching the responseSchema. Never make gen
       if (!requestValidation.valid) return rejectInvalidRequest(res, requestValidation.errors);
       const { projectId, projectContext } = requestValidation.value;
 
-      const ai = getGeminiClient();
       const methodologyProperties = {
         design: { type: Type.STRING },
         populationOrDataSource: { type: Type.STRING },
@@ -442,43 +442,37 @@ Strict rules: Output structured JSON matching the responseSchema. Never make gen
         limitations: { type: Type.STRING },
       };
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: `Create a domain-neutral methodology proposal using only this researcher-provided project context:\n${JSON.stringify(projectContext)}`,
-        config: {
-          systemInstruction: `You are a methodology proposal assistant. Return a reviewable proposal, never an approved protocol.
+      const systemInstruction = `You are a methodology proposal assistant. Return a reviewable proposal, never an approved protocol.
 Use only facts explicitly present in the supplied project context.
 Do not invent participants, sample sizes, power assumptions, instruments, timings, ethics approvals, statistical values, interventions, exposures, comparators, or data sources.
 For every unsupported field, return exactly "Researcher input required".
-Intervention, exposure, and comparator are optional and must remain "Researcher input required" when not supplied.`,
-          temperature: 0.1,
-          responseMimeType: "application/json",
-          responseSchema: {
+Intervention, exposure, and comparator are optional and must remain "Researcher input required" when not supplied.`;
+      const gatewayResult = await getAiGateway(req).execute({
+        projectId, actor: gatewayActor(req), agentId: "methodology-design", promptVersion: "tq-vsc-003-v1",
+        responseSchemaId: "MethodologyProposalOutput-v1", systemInstruction,
+        contents: `Create a domain-neutral methodology proposal using only this researcher-provided project context:\n${JSON.stringify(projectContext)}`,
+        inputArtifacts: [{ id: `project-context:${projectId}`, type: "researcherFacts" }], temperature: 0.1,
+        responseSchema: {
             type: Type.OBJECT,
             properties: methodologyProperties,
             required: [...METHODOLOGY_KEYS],
-          },
         },
+        validateResponse: (text) => parseAndValidateModelJson(text, validateMethodologyModelOutput),
       });
-
-      const modelValidation = parseAndValidateModelJson(response.text, validateMethodologyModelOutput);
-      if (!modelValidation.valid) return rejectInvalidModelOutput(res, modelValidation.errors);
 
       res.json({
         status: "completed",
         projectId,
         reviewState: "AI Suggested",
-        proposal: modelValidation.value,
-        model: "gemini-3.6-flash",
-        promptVersion: "tq-vsc-003-v1",
-        timestamp: new Date().toISOString(),
+        proposal: gatewayResult.outputArtifact.data,
+        model: gatewayResult.model,
+        promptVersion: gatewayResult.promptVersion,
+        timestamp: gatewayResult.ledgerEvent.timestamp,
+        aiGateway: gatewayResult,
       });
     } catch (error: any) {
       console.error("Gemini Methodology Proposal Error:", error);
-      res.status(500).json({
-        status: "failed",
-        error: "AI methodology proposal failed safely. No fallback content was generated.",
-      });
+      gatewayFailure(res, error, "AI methodology proposal failed safely. No fallback content was generated.");
     }
   });
 

@@ -53,7 +53,7 @@ export const ProtocolBuilderView: React.FC<ProtocolBuilderViewProps> = ({
   const [notice, setNotice] = useState<{ type: "error" | "success"; message: string } | null>(null);
   const [isRequestingAi, setIsRequestingAi] = useState(false);
 
-  const persistWorkspace = (nextWorkspace: typeof workspace, recordsBypassAiCall = false) => {
+  const persistWorkspace = (nextWorkspace: typeof workspace, recordsGatewayAiCall = false) => {
     const now = new Date().toISOString();
     onUpdateProject?.({
       ...project,
@@ -61,13 +61,13 @@ export const ProtocolBuilderView: React.FC<ProtocolBuilderViewProps> = ({
         ...nextWorkspace,
         updatedAt: now,
       },
-      ...(recordsBypassAiCall ? {
+      ...(recordsGatewayAiCall ? {
         aiLedgerIntegrity: {
           status: "Incomplete" as const,
           assessedAt: now,
           assessedByUid: currentUserUid || "tehqiq-system",
-          rationale: "Methodology AI proposal used a direct model-call path that is not recorded as an AiLedgerEvent.",
-          knownBypassPaths: ["POST /api/gemini/methodology-proposal"],
+          rationale: "The server AiGateway records generation events; reconciliation into the legacy project AI ledger remains incomplete.",
+          knownBypassPaths: [],
         },
       } : {}),
       updatedAt: now,

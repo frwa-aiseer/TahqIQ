@@ -1993,7 +1993,49 @@ None. The harness is test-only and imports existing types without changing them.
 - A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
 - The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
-- TQ-VSC-056 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-057 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-056 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a central server-side `AiGateway` and the sole approved Gemini SDK provider boundary. The generic agent, draft-section, peer-review, and methodology-proposal routes no longer instantiate the SDK or call `models.generateContent` directly.
+- Gateway requests require authenticated project/actor/role context, a registered non-deterministic AgentRegistry ID, a prompt version, response schema ID/schema, server-owned instructions, and unique input artifact IDs whose types are allowed by the agent contract.
+- Model selection is delegated to an injected minimal `AiModelRouter` interface. TQ-VSC-056 supplies a static compatibility router only; environment/configurable model policy remains correctly reserved for TQ-VSC-057.
+- Provider output is accepted only after the route-specific runtime schema validator succeeds. The gateway creates a traceable review-pending output artifact and records provider, actual/routed model, prompt version, response schema, trace ID, input artifact IDs, output artifact ID, and available prompt/output/total token usage.
+- Every provider/schema success must atomically persist its review-pending output under `aiOutputArtifacts` and matching ledger event under `aiGatewayEvents` before the route returns successful research output. Provider, empty-output, and schema failures record `Failed` with `outputArtifactId: null`; a failed persistence batch fails the request rather than returning an unlogged successful artifact.
+- Gateway errors exposed by routes are sanitized and include trace/failure metadata when a failure event exists. Provider exception text and secrets are not returned.
+- Legacy UI integrity notices no longer label these endpoints as direct-call bypasses. They remain honestly `Incomplete` until gateway-event reconciliation into the legacy project `aiLedger` array is implemented by later ledger work.
+
+### Files changed and migrations
+
+- `src/server/aiGateway.ts` (created)
+- `src/tests/aiGateway.test.ts` (created)
+- `server.ts`
+- `src/components/views/WritingStudioView.tsx`
+- `src/components/views/PeerReviewView.tsx`
+- `src/components/views/ProtocolBuilderView.tsx`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No destructive data migration is required. New server records are append-only documents under `projects/{projectId}/aiGatewayEvents/{eventId}` and `projects/{projectId}/aiOutputArtifacts/{artifactId}`. Existing project-level `aiLedger` arrays remain readable and are not falsely marked complete.
+
+### Verification and tests
+
+1. `npm run lint` — PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/aiGateway.test.ts src/tests/apiSchemas.test.ts src/tests/authMiddleware.test.ts src/tests/agentRegistry.test.ts src/tests/methodologyWorkspace.test.tsx src/tests/phase6.test.ts` — PASS, 6/6 files and 42/42 tests.
+3. `rg -n "models\\.generateContent|new GoogleGenAI|getGeminiClient" --glob '*.{ts,tsx}' . --glob '!node_modules/**' --glob '!dist/**'` — PASS; only `src/server/aiGateway.ts` contains SDK construction/provider invocation, and no legacy helper remains.
+4. `npm test` — suite reported FAIL; 68/70 executed files passed and 598/600 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom integration test reports `window.localStorage.setItem is not a function`.
+5. `npm run build` — PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+6. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Gateway tests cover successful routing/schema validation, review-pending output creation, token usage, trace/provider/model/prompt metadata, input/output artifact linkage, durable success logging, role/agent/artifact rejection, provider and schema failure records, ledger-write failure, and provider-error sanitization.
+- A source-level regression test recursively scans production TypeScript and fails if `GoogleGenAI` construction or `models.generateContent` appears outside the approved gateway/provider module.
+- The existing route response fields remain available; gateway metadata is additive. Failures never create or return a successful research output.
+- The static model router is intentionally not configurable in this prompt. Provider abstractions beyond Gemini, privacy routing, budgets, retries, and full canonical AI-ledger reconciliation belong to later prompts and were not implemented.
+- TQ-VSC-057 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-055 verification details
 

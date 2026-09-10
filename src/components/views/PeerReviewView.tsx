@@ -178,8 +178,8 @@ export const PeerReviewView: React.FC<PeerReviewViewProps> = ({
           status: "Incomplete",
           assessedAt: new Date().toISOString(),
           assessedByUid: "tehqiq-system",
-          rationale: "Peer review uses a direct model-call path pending centralized gateway coverage verification.",
-          knownBypassPaths: ["POST /api/gemini/peer-review"],
+          rationale: "The server AiGateway records generation events; reconciliation with this legacy project decision ledger remains incomplete.",
+          knownBypassPaths: [],
         },
       });
     }
