@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { AiGateway, AiGatewayError, StaticAiModelRouter, type AiGatewayLedgerEvent, type AiProvider } from "../server/aiGateway";
+import { AiGateway, AiGatewayError, type AiGatewayLedgerEvent, type AiProvider } from "../server/aiGateway";
+import { ConfigurableModelRouter } from "../server/modelRouter";
 
 const validText = JSON.stringify({ summary: "Proposal", proposals: [], missingInformationFlags: [], evidenceIds: [] });
 const actor = { uid: "owner-1", email: "owner@example.org", role: "Owner" as const };
@@ -13,7 +14,7 @@ const request = {
 };
 const provider = (generate: AiProvider["generate"]): AiProvider => ({ id: "gemini", generate });
 const gateway = (aiProvider: AiProvider, events: AiGatewayLedgerEvent[], recorder?: (event: AiGatewayLedgerEvent, outputArtifact?: unknown) => Promise<void>) => new AiGateway(
-  new StaticAiModelRouter("gemini", "model-main"), new Map([["gemini", aiProvider]]), recorder || (async (event) => { events.push(event); }),
+  new ConfigurableModelRouter({ provider: "gemini", fast: "model-main", main: "model-advanced", review: "model-review" }), new Map([["gemini", aiProvider]]), recorder || (async (event) => { events.push(event); }),
   () => "2026-09-10T12:00:00.000Z", () => "trace-1",
 );
 
@@ -58,6 +59,21 @@ describe("central AiGateway", () => {
     await expect(instance.execute({ ...request, inputArtifacts: [{ id: "raw-1", type: "rawDataset" }] })).rejects.toMatchObject({ code: "INVALID_ARTIFACTS" });
     await expect(instance.execute({ ...request, inputArtifacts: [{ id: "same", type: "researchDescription" }, { id: "same", type: "statedClassification" }] })).rejects.toMatchObject({ code: "INVALID_ARTIFACTS" });
     expect(calls).toBe(0);
+  });
+
+  it("enforces structured schemas and controlled function declarations by task mode", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const instance = gateway(provider(async ({ config }) => { calls.push(config); return { text: validText }; }), []);
+    await instance.execute(request);
+    expect(calls[0]).toMatchObject({ responseMimeType: "application/json", responseSchema: { type: "OBJECT" } });
+    expect(calls[0]).not.toHaveProperty("tools");
+
+    await expect(instance.execute({ ...request, controlledTools: [{ registryToolId: "structured-language-model", name: "language_model", description: "Not a function task", parameters: {} }] })).rejects.toMatchObject({ code: "INVALID_TOOLS" });
+    await expect(instance.execute({ ...request, taskMode: "Controlled Tools", controlledTools: [{ registryToolId: "undeclared-tool", name: "unsafe_tool", description: "Unsafe", parameters: {} }] })).rejects.toMatchObject({ code: "INVALID_TOOLS" });
+
+    await instance.execute({ ...request, agentId: "section-writer", inputArtifacts: [{ id: "section-1", type: "sectionRequest" }], taskMode: "Controlled Tools", controlledTools: [{ registryToolId: "citation-processor", name: "citation_processor", description: "Resolve supplied stable citation IDs only.", parameters: { type: "object" } }] });
+    expect(calls[1]).toMatchObject({ tools: [{ functionDeclarations: [{ name: "citation_processor" }] }], toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: ["citation_processor"] } } });
+    expect(calls[1]).not.toHaveProperty("responseSchema");
   });
 
   it("records schema-validation failure and never creates a successful output artifact", async () => {

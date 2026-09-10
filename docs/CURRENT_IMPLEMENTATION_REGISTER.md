@@ -219,7 +219,8 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 - `src/server/aiGateway.ts` is the sole production TypeScript boundary that constructs the Gemini SDK or invokes `models.generateContent`. The generic agent, draft-section, peer-review, and methodology-proposal endpoints all execute through it.
 - The gateway checks authenticated project actor/role, registered agent permissions, non-deterministic provider compatibility, allowed unique input artifact IDs, prompt/schema metadata, and route-specific structured response validation. It returns a traceable `AI Suggested—Needs Researcher Review` output artifact only after durable success-event recording.
 - Successful output artifacts and their gateway ledger events are atomically written to append-only project subcollections. Events contain agent/provider/model/prompt/schema/trace, input and output artifact IDs, available token usage, actor context, and success/failure state. Failed provider/schema calls have no output artifact; inability to record a success also fails closed.
-- A static compatibility model router is injected today. Configurable environment/model policy, additional providers, privacy routing, budgets, and canonical reconciliation with the legacy project `aiLedger` array remain later work; legacy ledger integrity remains `Incomplete`, not falsely certified.
+- `src/server/modelRouter.ts` centrally maps registered agents to FAST, MAIN, and REVIEW tiers configured by server-only `TEHQIQ_MODEL_FAST`, `TEHQIQ_MODEL_MAIN`, and `TEHQIQ_MODEL_REVIEW` values. Model IDs can change without editing feature routes; absent variables use the prior model through one explicit central default.
+- Structured gateway tasks enforce their JSON response schema. Controlled-tool tasks instead require registry-approved tool IDs, SDK-safe function declarations, and an explicit Gemini `allowedFunctionNames` allowlist. Additional providers, privacy routing, budgets, and canonical reconciliation with the legacy project `aiLedger` array remain later work; legacy ledger integrity remains `Incomplete`, not falsely certified.
 
 ## Manuscript section contracts
 
@@ -285,7 +286,7 @@ The Firestore rule tests inspect rule source and simulate helper behavior; no Fi
 
 These are source observations, not work completed under later prompts:
 
-1. Material server model calls are centralized through `AiGateway`, but the current router is static and Gemini-only. Configurable routing, provider expansion, privacy policy, budgets/retries, and reconciliation of gateway events into the legacy project AI ledger remain incomplete.
+1. Material server model calls and model selection are centralized through `AiGateway` and the configurable FAST/MAIN/REVIEW `ModelRouter`, but the provider is Gemini-only. Provider expansion, privacy policy, budgets/retries, and reconciliation of gateway events into the legacy project AI ledger remain incomplete.
 2. Some deeply nested research entity fields are validated at their server-use boundary rather than exhaustively re-declaring the full persisted project schema; schema versioning remains a future compatibility consideration.
 3. Several implemented views are unreachable, while legacy route labels misleadingly land on other step content.
 4. Step 9 is labeled References but renders Claim Matrix rather than a dedicated reference-list view.

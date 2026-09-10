@@ -41,7 +41,8 @@ import {
   validateSearchExecutionRequest,
 } from "./src/server/apiSchemas";
 import { agentRegistry, type AgentContract } from "./src/server/agentRegistry";
-import { AiGateway, AiGatewayError, GeminiAiProvider, StaticAiModelRouter, type AiGatewayArtifactRef } from "./src/server/aiGateway";
+import { AiGateway, AiGatewayError, GeminiAiProvider, type AiGatewayArtifactRef } from "./src/server/aiGateway";
+import { createModelRouterFromEnv } from "./src/server/modelRouter";
 
 dotenv.config();
 
@@ -57,7 +58,7 @@ async function startServer() {
     const provider = new GeminiAiProvider(apiKey);
     const projectRef = req.projectAuth!.projectRef as any;
     return new AiGateway(
-      new StaticAiModelRouter(provider.id, "gemini-3.6-flash"),
+      createModelRouterFromEnv(process.env),
       new Map([[provider.id, provider]]),
       async (event, outputArtifact) => {
         const batch = projectRef.firestore.batch();

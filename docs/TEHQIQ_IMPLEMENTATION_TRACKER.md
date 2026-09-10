@@ -1993,7 +1993,47 @@ None. The harness is test-only and imports existing types without changing them.
 - A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
 - The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
-- TQ-VSC-057 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-058 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-057 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a dedicated configurable `ModelRouter` with server-only `TEHQIQ_MODEL_FAST`, `TEHQIQ_MODEL_MAIN`, and `TEHQIQ_MODEL_REVIEW` configuration. Feature routes no longer contain or select model IDs.
+- Registered `Language—Standard` agents route to FAST, other language agents route to MAIN, and peer-review/compliance/integrity review identities route to REVIEW. Deterministic-agent rejection remains enforced by the AiGateway before provider execution.
+- Environment values are trimmed and validated as bounded whitespace-free model IDs. Explicit safe defaults preserve existing behavior when variables are absent, and `.env.example` documents all three server-only settings.
+- AiGateway requests now distinguish `Structured Output` from `Controlled Tools`. Structured tasks always send the configured response schema and JSON MIME type and reject attached tools.
+- Controlled-tool tasks require a registry-allowed tool ID, an SDK-safe function name, non-empty description, and parameters. Gemini receives only the declared function definitions plus `ANY` function-calling mode constrained by `allowedFunctionNames`; response-schema settings are not mixed into tool calls.
+- The installed `@google/genai` provider remains the sole SDK boundary created in TQ-VSC-056. API keys and model configuration remain server-side.
+
+### Files changed and migrations
+
+- `src/server/modelRouter.ts` (created)
+- `src/tests/modelRouter.test.ts` (created)
+- `src/server/aiGateway.ts`
+- `src/tests/aiGateway.test.ts`
+- `server.ts`
+- `.env.example`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No persisted schema or data migration is required. Deployments may optionally set the three new server environment variables; absent values retain the prior Gemini model as an explicit central default.
+
+### Verification and tests
+
+1. `npm run lint` — PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/modelRouter.test.ts src/tests/aiGateway.test.ts src/tests/agentRegistry.test.ts src/tests/apiSchemas.test.ts` — PASS, 4/4 files and 25/25 tests.
+3. `npm test` — suite reported FAIL; 69/71 executed files passed and 602/604 executed tests passed, with 2 emulator-only files and 18 tests skipped. The established Crossref assertion expects legacy wording, and the established jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `rg -n 'gemini-[0-9]|TEHQIQ_MODEL_' server.ts src/server --glob '*.{ts,tsx}'` — PASS; the only model default/environment reads are centralized in `src/server/modelRouter.ts`, with none in feature routes.
+6. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests prove FAST/MAIN/REVIEW tier selection, environment-driven changes across each tier without feature-code edits, fallback defaults, invalid-ID rejection, structured schema configuration, rejection of tools on structured tasks, undeclared-tool rejection, SDK-safe controlled declarations, and explicit function allowlisting.
+- Existing route behavior is preserved because all three central defaults currently resolve to the prior model unless deployment configuration overrides them.
+- This prompt does not add non-Gemini or local provider adapters, provider health states, or privacy-aware routing. Those belong to TQ-VSC-058 and TQ-VSC-059 and were not implemented.
+- TQ-VSC-058 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-056 verification details
 

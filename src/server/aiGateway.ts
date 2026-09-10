@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { GoogleGenAI } from "@google/genai";
 import type { ProjectRole } from "../types";
 import { agentRegistry, type AgentId } from "./agentRegistry";
+import type { AiModelRouter, AiTaskMode } from "./modelRouter";
 
 export interface AiGatewayActor {
   uid: string;
@@ -61,10 +62,6 @@ export interface AiGatewayResult<T> {
   usage: AiGatewayUsage;
 }
 
-export interface AiModelRouter {
-  route(agentId: AgentId): { provider: string; model: string };
-}
-
 export interface AiProviderRequest {
   model: string;
   contents: string;
@@ -92,6 +89,8 @@ export interface AiGatewayRequest<T> {
   systemInstruction: string;
   contents: string;
   inputArtifacts: readonly AiGatewayArtifactRef[];
+  taskMode?: AiTaskMode;
+  controlledTools?: readonly { registryToolId: string; name: string; description: string; parameters: Record<string, unknown> }[];
   temperature?: number;
   validateResponse(text: string): { valid: true; value: T } | { valid: false; errors: string[] };
 }
@@ -105,11 +104,6 @@ export class AiGatewayError extends Error {
 }
 
 const emptyUsage = (): AiGatewayUsage => ({ promptTokens: null, outputTokens: null, totalTokens: null });
-
-export class StaticAiModelRouter implements AiModelRouter {
-  constructor(private readonly provider: string, private readonly model: string) {}
-  route(): { provider: string; model: string } { return { provider: this.provider, model: this.model }; }
-}
 
 export class GeminiAiProvider implements AiProvider {
   readonly id = "gemini";
@@ -155,7 +149,14 @@ export class AiGateway {
     }
     const traceId = this.createTraceId();
     const timestamp = this.now();
-    const route = this.router.route(request.agentId);
+    const taskMode = request.taskMode || "Structured Output";
+    const controlledTools = request.controlledTools || [];
+    if (taskMode === "Controlled Tools") {
+      if (!controlledTools.length || controlledTools.some((tool) => !/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(tool.name) || !tool.description.trim() || !contract.allowedTools.includes(tool.registryToolId))) throw new AiGatewayError("Controlled tool task contains an undeclared or malformed function.", "INVALID_TOOLS");
+    } else if (controlledTools.length) {
+      throw new AiGatewayError("Structured-output tasks cannot attach function tools.", "INVALID_TOOLS");
+    }
+    const route = this.router.route(request.agentId, taskMode);
     const provider = this.providers.get(route.provider);
     if (!provider) throw new AiGatewayError(`AI provider '${route.provider}' is Not Configured.`, "PROVIDER_NOT_CONFIGURED");
     let usage = emptyUsage();
@@ -163,7 +164,9 @@ export class AiGateway {
       const response = await provider.generate({
         model: route.model,
         contents: request.contents,
-        config: { systemInstruction: request.systemInstruction, temperature: request.temperature, responseMimeType: "application/json", responseSchema: request.responseSchema },
+        config: taskMode === "Controlled Tools"
+          ? { systemInstruction: request.systemInstruction, temperature: request.temperature, tools: [{ functionDeclarations: controlledTools.map(({ name, description, parameters }) => ({ name, description, parameters })) }], toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: controlledTools.map(({ name }) => name) } } }
+          : { systemInstruction: request.systemInstruction, temperature: request.temperature, responseMimeType: "application/json", responseSchema: request.responseSchema },
       });
       usage = { promptTokens: response.usage?.promptTokens ?? null, outputTokens: response.usage?.outputTokens ?? null, totalTokens: response.usage?.totalTokens ?? null };
       if (!response.text) throw new AiGatewayError("AI provider returned no output.", "EMPTY_PROVIDER_OUTPUT");
