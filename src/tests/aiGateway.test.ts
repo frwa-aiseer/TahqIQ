@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { AiGateway, AiGatewayError, type AiGatewayLedgerEvent, type AiProvider } from "../server/aiGateway";
 import { ConfigurableModelRouter } from "../server/modelRouter";
+import { PrivacyAwareTaskRouter } from "../server/privacyTaskRouter";
 
 const validText = JSON.stringify({ summary: "Proposal", proposals: [], missingInformationFlags: [], evidenceIds: [] });
 const actor = { uid: "owner-1", email: "owner@example.org", role: "Owner" as const };
@@ -10,11 +11,14 @@ const request = {
   projectId: "project-1", actor, agentId: "research-intake" as const, promptVersion: "prompt-v1", responseSchemaId: "Intake-v1",
   responseSchema: { type: "OBJECT" }, systemInstruction: "Use supplied facts only.", contents: "Research description.",
   inputArtifacts: [{ id: "description-1", type: "researchDescription" }],
+  privacy: { sensitivity: "Internal" as const, includesRawUploads: false, permittedProviders: ["gemini"], preferredTier: "FAST" as const },
   validateResponse: (text: string) => text === validText ? { valid: true as const, value: JSON.parse(text) } : { valid: false as const, errors: ["invalid"] },
 };
 const provider = (generate: AiProvider["generate"]): AiProvider => ({ id: "gemini", generate });
 const gateway = (aiProvider: AiProvider, events: AiGatewayLedgerEvent[], recorder?: (event: AiGatewayLedgerEvent, outputArtifact?: unknown) => Promise<void>) => new AiGateway(
-  new ConfigurableModelRouter({ provider: "gemini", fast: "model-main", main: "model-advanced", review: "model-review" }), new Map([["gemini", aiProvider]]), recorder || (async (event) => { events.push(event); }),
+  new ConfigurableModelRouter({ provider: "gemini", fast: "model-main", main: "model-advanced", review: "model-review" }), new Map([["gemini", aiProvider]]),
+  new PrivacyAwareTaskRouter("Standard Cloud", [{ providerId: "gemini", location: "Cloud", available: true, models: { FAST: "model-main", MAIN: "model-advanced", REVIEW: "model-review" } }]),
+  recorder || (async (event) => { events.push(event); }),
   () => "2026-09-10T12:00:00.000Z", () => "trace-1",
 );
 
@@ -71,7 +75,7 @@ describe("central AiGateway", () => {
     await expect(instance.execute({ ...request, controlledTools: [{ registryToolId: "structured-language-model", name: "language_model", description: "Not a function task", parameters: {} }] })).rejects.toMatchObject({ code: "INVALID_TOOLS" });
     await expect(instance.execute({ ...request, taskMode: "Controlled Tools", controlledTools: [{ registryToolId: "undeclared-tool", name: "unsafe_tool", description: "Unsafe", parameters: {} }] })).rejects.toMatchObject({ code: "INVALID_TOOLS" });
 
-    await instance.execute({ ...request, agentId: "section-writer", inputArtifacts: [{ id: "section-1", type: "sectionRequest" }], taskMode: "Controlled Tools", controlledTools: [{ registryToolId: "citation-processor", name: "citation_processor", description: "Resolve supplied stable citation IDs only.", parameters: { type: "object" } }] });
+    await instance.execute({ ...request, agentId: "section-writer", inputArtifacts: [{ id: "section-1", type: "sectionRequest" }], privacy: { ...request.privacy, preferredTier: "MAIN" }, taskMode: "Controlled Tools", controlledTools: [{ registryToolId: "citation-processor", name: "citation_processor", description: "Resolve supplied stable citation IDs only.", parameters: { type: "object" } }] });
     expect(calls[1]).toMatchObject({ tools: [{ functionDeclarations: [{ name: "citation_processor" }] }], toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: ["citation_processor"] } } });
     expect(calls[1]).not.toHaveProperty("responseSchema");
   });
@@ -107,5 +111,18 @@ describe("central AiGateway", () => {
       expect(error).toBeInstanceOf(AiGatewayError);
       expect((error as Error).message).not.toContain("API key secret");
     }
+  });
+
+  it("blocks provider execution when the privacy mode cannot be satisfied", async () => {
+    let calls = 0;
+    const cloud = provider(async () => { calls += 1; return { text: validText }; });
+    const instance = new AiGateway(
+      new ConfigurableModelRouter({ provider: "gemini", fast: "cloud", main: "cloud", review: "cloud" }),
+      new Map([["gemini", cloud]]),
+      new PrivacyAwareTaskRouter("Local-Only", [{ providerId: "gemini", location: "Cloud", available: true, models: { FAST: "cloud", MAIN: "cloud", REVIEW: "cloud" } }]),
+      async () => undefined,
+    );
+    await expect(instance.execute(request)).rejects.toMatchObject({ code: "PRIVACY_MODE_BLOCKED", message: "Cannot Run Under Current Privacy Mode" });
+    expect(calls).toBe(0);
   });
 });

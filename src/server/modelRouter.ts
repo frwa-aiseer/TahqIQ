@@ -2,7 +2,7 @@ import { agentRegistry, type AgentId } from "./agentRegistry";
 
 export type AiModelTier = "FAST" | "MAIN" | "REVIEW";
 export type AiTaskMode = "Structured Output" | "Controlled Tools";
-export interface AiModelRoute { provider: "gemini"; model: string; tier: AiModelTier; taskMode: AiTaskMode }
+export interface AiModelRoute { provider: string; model: string; tier: AiModelTier; taskMode: AiTaskMode }
 export interface AiModelRouter { route(agentId: AgentId, taskMode: AiTaskMode): AiModelRoute }
 export interface AiModelConfiguration { provider: "gemini"; fast: string; main: string; review: string }
 

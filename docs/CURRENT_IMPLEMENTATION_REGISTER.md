@@ -220,9 +220,10 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 - The gateway checks authenticated project actor/role, registered agent permissions, non-deterministic provider compatibility, allowed unique input artifact IDs, prompt/schema metadata, and route-specific structured response validation. It returns a traceable `AI Suggested—Needs Researcher Review` output artifact only after durable success-event recording.
 - Successful output artifacts and their gateway ledger events are atomically written to append-only project subcollections. Events contain agent/provider/model/prompt/schema/trace, input and output artifact IDs, available token usage, actor context, and success/failure state. Failed provider/schema calls have no output artifact; inability to record a success also fails closed.
 - `src/server/modelRouter.ts` centrally maps registered agents to FAST, MAIN, and REVIEW tiers configured by server-only `TEHQIQ_MODEL_FAST`, `TEHQIQ_MODEL_MAIN`, and `TEHQIQ_MODEL_REVIEW` values. Model IDs can change without editing feature routes; absent variables use the prior model through one explicit central default.
-- Structured gateway tasks enforce their JSON response schema. Controlled-tool tasks instead require registry-approved tool IDs, SDK-safe function declarations, and an explicit Gemini `allowedFunctionNames` allowlist. Production selection of additional providers, privacy routing, budgets, and canonical reconciliation with the legacy project `aiLedger` array remain later work; legacy ledger integrity remains `Incomplete`, not falsely certified.
+- Structured gateway tasks enforce their JSON response schema. Controlled-tool tasks instead require registry-approved tool IDs, SDK-safe function declarations, and an explicit Gemini `allowedFunctionNames` allowlist. Budgets and canonical reconciliation with the legacy project `aiLedger` array remain later work; legacy ledger integrity remains `Incomplete`, not falsely certified.
 - `src/server/localModelProviders.ts` adds configurable server-endpoint abstractions for SPECTER2-compatible scientific embeddings, BGE-M3-compatible general embeddings, Whisper-compatible transcription, Qwen-VL-compatible vision/document analysis, and an OpenAI-compatible local general LLM (for example, a separately hosted gpt-oss/Qwen service). Providers report `Not Configured`, `Configured`, `Healthy`, `Unavailable`, or `Failed`; only `Healthy` adapters route. API keys remain private server configuration, response shapes are validated, and no model is represented as running in the browser.
-- These open/local adapters are capability infrastructure only. They are not selected by production feature routes in TQ-VSC-058, and no data-sensitivity or local-versus-cloud decision is inferred; privacy-aware task routing remains TQ-VSC-059.
+- `src/server/privacyTaskRouter.ts` enforces `Standard Cloud`, `Private/Hybrid`, and `Local-Only` modes before provider invocation. Every gateway task declares sensitivity, whether raw uploads are included, permitted provider IDs, and its registered preferred tier. Private/Hybrid prevents confidential or raw-upload tasks from using cloud providers; Local-Only accepts only explicitly classified local infrastructure. When no permitted healthy provider satisfies the mode, the gateway returns `Cannot Run Under Current Privacy Mode` without calling a provider.
+- Privacy mode is read from the trusted project document (`aiPrivacyMode`) ahead of the server default. Local/private endpoint location requires the server operator's explicit `TEHQIQ_LOCAL_LLM_LOCATION` classification and is never inferred from a hostname or client input. Successful and failed gateway events retain the applied privacy mode, sensitivity, and raw-upload declaration.
 
 ## Manuscript section contracts
 
@@ -288,7 +289,7 @@ The Firestore rule tests inspect rule source and simulate helper behavior; no Fi
 
 These are source observations, not work completed under later prompts:
 
-1. Material server model calls and model selection are centralized through `AiGateway` and the configurable FAST/MAIN/REVIEW `ModelRouter`. Server-only open/local endpoint adapters now exist, but production feature routing remains Gemini-only; privacy-aware provider selection, budgets/retries, and reconciliation of gateway events into the legacy project AI ledger remain incomplete.
+1. Material server model calls and model selection are centralized through `AiGateway`, the configurable FAST/MAIN/REVIEW `ModelRouter`, and privacy-aware cloud/private/local selection. Budgets/retries and reconciliation of gateway events into the legacy project AI ledger remain incomplete.
 2. Some deeply nested research entity fields are validated at their server-use boundary rather than exhaustively re-declaring the full persisted project schema; schema versioning remains a future compatibility consideration.
 3. Several implemented views are unreachable, while legacy route labels misleadingly land on other step content.
 4. Step 9 is labeled References but renders Claim Matrix rather than a dedicated reference-list view.
@@ -296,7 +297,7 @@ These are source observations, not work completed under later prompts:
 6. JATS validation language overstates the local validator's demonstrated assurance.
 7. Build externalizes Node `crypto` from browser code and emits a very large main chunk.
 8. The baseline suite is red because of a network-dependent DOI expectation and a localStorage test-environment issue.
-9. The new in-process API rate limiter is per server instance; no distributed limiter, request budget, explicit bounded provider retry policy, or centralized privacy policy is present.
+9. The new in-process API rate limiter is per server instance; no distributed limiter, request budget, or explicit bounded provider retry policy is present.
 10. The repository has both npm and Bun lockfiles, creating package-manager ambiguity; the declared verification scripts were run through npm for this baseline.
 
 ## Data migration and backward compatibility

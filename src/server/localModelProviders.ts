@@ -152,6 +152,10 @@ export class EndpointProviderRegistry {
   constructor(private readonly adapters: readonly TehqIqEndpointAdapter[]) {}
   listStatuses(): ProviderStatus[] { return this.adapters.map((adapter) => adapter.getStatus()); }
   async checkAllHealth(): Promise<ProviderStatus[]> { return Promise.all(this.adapters.map((adapter) => adapter.checkHealth())); }
+  async checkHealth(capability: ProviderCapability): Promise<ProviderStatus | null> {
+    const adapter = this.adapters.find((candidate) => candidate.capability === capability);
+    return adapter ? adapter.checkHealth() : null;
+  }
   route(capability: ProviderCapability): TehqIqEndpointAdapter | null {
     return this.adapters.find((adapter) => adapter.capability === capability && adapter.getStatus().state === "Healthy") || null;
   }

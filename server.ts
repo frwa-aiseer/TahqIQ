@@ -42,7 +42,9 @@ import {
 } from "./src/server/apiSchemas";
 import { agentRegistry, type AgentContract } from "./src/server/agentRegistry";
 import { AiGateway, AiGatewayError, GeminiAiProvider, type AiGatewayArtifactRef } from "./src/server/aiGateway";
-import { createModelRouterFromEnv } from "./src/server/modelRouter";
+import { createEndpointProviderRegistryFromEnv, LocalGeneralLlmEndpointAdapter } from "./src/server/localModelProviders";
+import { createModelRouterFromEnv, readAiModelConfiguration } from "./src/server/modelRouter";
+import { PrivacyAwareTaskRouter, readAiPrivacyMode, readLocalProviderLocation, type AiTaskPrivacyDeclaration } from "./src/server/privacyTaskRouter";
 
 dotenv.config();
 
@@ -52,14 +54,29 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: "25mb" }));
 
-  function getAiGateway(req: AuthenticatedProjectRequest) {
+  async function getAiGateway(req: AuthenticatedProjectRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY environment variable is missing.");
-    const provider = new GeminiAiProvider(apiKey);
+    const providers = new Map<string, import("./src/server/aiGateway").AiProvider>();
+    if (apiKey) {
+      const gemini = new GeminiAiProvider(apiKey);
+      providers.set(gemini.id, gemini);
+    }
+    const endpointRegistry = createEndpointProviderRegistryFromEnv(process.env);
+    await endpointRegistry.checkHealth("General LLM");
+    const localLlm = endpointRegistry.route("General LLM");
+    const localLocation = readLocalProviderLocation(process.env);
+    if (localLocation && localLlm instanceof LocalGeneralLlmEndpointAdapter) providers.set(localLlm.id, localLlm);
+    const models = readAiModelConfiguration(process.env);
+    const localModel = process.env.TEHQIQ_LOCAL_LLM_MODEL?.trim() || "Local-general-compatible";
+    const privacyRouter = new PrivacyAwareTaskRouter(readAiPrivacyMode(req.projectAuth!.project, process.env), [
+      { providerId: "gemini", location: "Cloud", available: providers.has("gemini"), models: { FAST: models.fast, MAIN: models.main, REVIEW: models.review } },
+      { providerId: "local-general-llm", location: localLocation || "Private", available: providers.has("local-general-llm"), models: { FAST: localModel, MAIN: localModel, REVIEW: localModel } },
+    ]);
     const projectRef = req.projectAuth!.projectRef as any;
     return new AiGateway(
       createModelRouterFromEnv(process.env),
-      new Map([[provider.id, provider]]),
+      providers,
+      privacyRouter,
       async (event, outputArtifact) => {
         const batch = projectRef.firestore.batch();
         batch.create(projectRef.collection("aiGatewayEvents").doc(event.id), event);
@@ -68,6 +85,10 @@ async function startServer() {
       },
     );
   }
+
+  const taskPrivacy = (preferredTier: AiTaskPrivacyDeclaration["preferredTier"], sensitivity: AiTaskPrivacyDeclaration["sensitivity"] = "Confidential", includesRawUploads = false): AiTaskPrivacyDeclaration => ({
+    sensitivity, includesRawUploads, permittedProviders: ["gemini", "local-general-llm"], preferredTier,
+  });
 
   const artifactRefs = (type: string, values: Record<string, unknown>[], prefix: string): AiGatewayArtifactRef[] =>
     values.map((value, index) => ({ id: `${prefix}:${typeof value.id === "string" && value.id.trim() ? value.id : `unidentified-${index}`}`, type }));
@@ -80,8 +101,9 @@ async function startServer() {
   function gatewayFailure(res: express.Response, error: unknown, fallback: string) {
     const gatewayError = error instanceof AiGatewayError ? error : undefined;
     const schemaFailure = gatewayError?.code === "SCHEMA_VALIDATION_FAILED" || gatewayError?.code === "EMPTY_PROVIDER_OUTPUT";
-    return res.status(schemaFailure ? 502 : 500).json({
-      status: "failed", error: fallback, traceId: gatewayError?.ledgerEvent?.traceId,
+    const privacyBlocked = gatewayError?.code === "PRIVACY_MODE_BLOCKED";
+    return res.status(privacyBlocked ? 409 : schemaFailure ? 502 : 500).json({
+      status: "failed", error: privacyBlocked ? "Cannot Run Under Current Privacy Mode" : fallback, traceId: gatewayError?.ledgerEvent?.traceId,
       failureCode: gatewayError?.code || "GATEWAY_FAILURE", ledgerEvent: gatewayError?.ledgerEvent,
     });
   }
@@ -260,10 +282,11 @@ Notice: TehqIQ assists researchers but does not replace subject expertise, ethic
 
       const userMessage = `Allowed input artifacts: ${JSON.stringify(context)}\n\nPerform only the registered purpose stated in the system instruction.`;
 
-      const gatewayResult = await getAiGateway(authenticatedRequest).execute({
+      const gatewayResult = await (await getAiGateway(authenticatedRequest)).execute({
         projectId: authenticatedRequest.projectAuth!.projectId, actor: gatewayActor(authenticatedRequest), agentId: agentContract.id,
         promptVersion: "registered-agent-v1", responseSchemaId: "AgentSuggestionEnvelope-v1", systemInstruction, contents: userMessage,
         inputArtifacts: Object.keys(context).map((type) => ({ id: `context:${type}`, type })), temperature: 0.2,
+        privacy: taskPrivacy("FAST"),
         responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -328,7 +351,7 @@ Available Verified Sources: ${JSON.stringify(sources || [])}
 Verified Claims: ${JSON.stringify(claims || [])}
 Approved Analysis Outputs: ${JSON.stringify((analysisOutputs || []).filter((out: any) => hasAttributableManuscriptApproval(out)))}`;
 
-      const gatewayResult = await getAiGateway(authenticatedRequest).execute({
+      const gatewayResult = await (await getAiGateway(authenticatedRequest)).execute({
         projectId: authenticatedRequest.projectAuth!.projectId, actor: gatewayActor(authenticatedRequest), agentId: "section-writer",
         promptVersion: "v2.4-phase6", responseSchemaId: "DraftSectionModelOutput-v1", systemInstruction, contents: promptText,
         inputArtifacts: [
@@ -336,6 +359,7 @@ Approved Analysis Outputs: ${JSON.stringify((analysisOutputs || []).filter((out:
           ...artifactRefs("approvedProjectFacts", claims, "claim"), ...artifactRefs("verifiedSources", sources, "source"),
           ...artifactRefs("approvedAnalysisOutputs", analysisOutputs.filter((out: any) => hasAttributableManuscriptApproval(out)), "analysis"),
         ],
+        privacy: taskPrivacy("MAIN"),
         responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -379,13 +403,14 @@ Strict rules: Output structured JSON matching the responseSchema. Never make gen
 
       const promptText = `Manuscript Sections: ${JSON.stringify(sections || [])}\nSources: ${JSON.stringify(sources || [])}\nAnalysis: ${JSON.stringify(analysisOutputs || [])}`;
 
-      const gatewayResult = await getAiGateway(authenticatedRequest).execute({
+      const gatewayResult = await (await getAiGateway(authenticatedRequest)).execute({
         projectId: authenticatedRequest.projectAuth!.projectId, actor: gatewayActor(authenticatedRequest), agentId: "peer-review",
         promptVersion: "v2.4-phase6", responseSchemaId: "PeerReviewModelOutput-v1", systemInstruction, contents: promptText,
         inputArtifacts: [
           { id: `reviewer-role:${reviewerRole}`, type: "reviewerRole" }, ...artifactRefs("manuscriptSections", sections, "section"),
           ...artifactRefs("verifiedSources", sources, "source"), ...artifactRefs("approvedAnalysisOutputs", analysisOutputs, "analysis"),
         ],
+        privacy: taskPrivacy("REVIEW"),
         responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -448,11 +473,12 @@ Use only facts explicitly present in the supplied project context.
 Do not invent participants, sample sizes, power assumptions, instruments, timings, ethics approvals, statistical values, interventions, exposures, comparators, or data sources.
 For every unsupported field, return exactly "Researcher input required".
 Intervention, exposure, and comparator are optional and must remain "Researcher input required" when not supplied.`;
-      const gatewayResult = await getAiGateway(req).execute({
+      const gatewayResult = await (await getAiGateway(req)).execute({
         projectId, actor: gatewayActor(req), agentId: "methodology-design", promptVersion: "tq-vsc-003-v1",
         responseSchemaId: "MethodologyProposalOutput-v1", systemInstruction,
         contents: `Create a domain-neutral methodology proposal using only this researcher-provided project context:\n${JSON.stringify(projectContext)}`,
         inputArtifacts: [{ id: `project-context:${projectId}`, type: "researcherFacts" }], temperature: 0.1,
+        privacy: taskPrivacy("MAIN"),
         responseSchema: {
             type: Type.OBJECT,
             properties: methodologyProperties,

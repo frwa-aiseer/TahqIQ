@@ -1993,7 +1993,48 @@ None. The harness is test-only and imports existing types without changing them.
 - A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
 - The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
-- TQ-VSC-059 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-060 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-059 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a deterministic privacy-aware task router supporting `Standard Cloud`, `Private/Hybrid`, and `Local-Only`. Mode is taken first from the authenticated project document's `aiPrivacyMode`, then the server-only `TEHQIQ_AI_PRIVACY_MODE`; existing projects without either retain the documented `Standard Cloud` compatibility default.
+- Every AiGateway invocation now declares sensitivity, raw-upload inclusion, explicit permitted provider IDs, and preferred FAST/MAIN/REVIEW tier. Missing, duplicated, invalid, or tier-inconsistent declarations fail before provider use.
+- `Standard Cloud` prefers an explicitly permitted available cloud provider. `Private/Hybrid` prefers private then local infrastructure and prohibits cloud use for confidential/restricted or raw-upload tasks. `Local-Only` accepts only explicitly classified local infrastructure and never falls back to cloud/private.
+- Local/general endpoint deployment location must be explicitly asserted server-side as `Local` or `Private` through `TEHQIQ_LOCAL_LLM_LOCATION`; it is not inferred from a URL or accepted from the request. The endpoint must also pass the TQ-VSC-058 health check before it is available.
+- If no available provider satisfies the task declaration and mode, gateway execution stops before any provider call and the API returns `Cannot Run Under Current Privacy Mode`. Privacy mode is never silently downgraded.
+- Gateway success/failure ledger events now retain privacy mode, sensitivity, and raw-upload inclusion alongside provider/model provenance.
+
+### Files changed and migrations
+
+- `src/server/privacyTaskRouter.ts` (created)
+- `src/tests/privacyTaskRouter.test.ts` (created)
+- `src/server/aiGateway.ts`
+- `src/server/modelRouter.ts`
+- `src/server/localModelProviders.ts`
+- `src/tests/aiGateway.test.ts`
+- `server.ts`
+- `.env.example`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No bulk data migration is required. `aiPrivacyMode` is an optional project field for backward compatibility. Existing projects default to the documented server mode; deployments can set a safer global default. Existing gateway event readers remain compatible with the added fields.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/privacyTaskRouter.test.ts src/tests/aiGateway.test.ts src/tests/modelRouter.test.ts src/tests/localModelProviders.test.ts src/tests/authMiddleware.test.ts` — exit `0`; PASS, 5/5 files and 33/33 tests.
+3. `npm test` — exit `1`; 71/73 executed files passed and 617/619 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two established unrelated failures remain: the Crossref test expects legacy error wording, and the jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests prove each privacy mode's provider ordering, cloud blocking for confidential/raw-upload work, explicit permitted-provider enforcement, unavailable-local blocking, declaration/tier validation, trusted project-mode precedence, legacy default behavior, explicit endpoint trust-boundary classification, and gateway-level blocking before provider invocation.
+- The four currently mounted language tasks declare project content `Confidential`, no raw uploads, both configured gateway providers as potentially permitted, and their registered model tier. Consequently they run on cloud only in Standard Cloud; Private/Hybrid and Local-Only require an appropriately classified healthy open/local endpoint.
+- This prompt does not add budgets, retries, or loop protection reserved for TQ-VSC-060. It also does not certify that an operator's Local/Private location assertion is true; deployment governance and network controls must verify that assertion.
+- TQ-VSC-060 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-058 verification details
 
@@ -2026,9 +2067,9 @@ None. The harness is test-only and imports existing types without changing them.
 ### Acceptance coverage, compatibility, and blockers
 
 - Mocked tests cover missing configuration without network access; all required health states; capability routing restricted to healthy providers; fail-closed pre-health invocation; bearer-key privacy; request/response contracts for embeddings, transcription, vision/documents, and general LLM output; and gateway-compatible token usage mapping.
-- This prompt creates provider abstractions only. It intentionally does not select open/local providers for production feature routes or decide whether data may be sent locally or to a cloud provider. Privacy-aware task routing remains TQ-VSC-059.
+- TQ-VSC-059 now selects healthy permitted providers through a privacy-aware server boundary; the adapter behavior implemented here is unchanged.
 - Actual endpoint deployment, model installation, capacity, model quality, and runtime health are external operational responsibilities and are not represented as verified by mocked adapter tests.
-- TQ-VSC-059 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-060 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-057 verification details
 
@@ -2067,8 +2108,8 @@ None. The harness is test-only and imports existing types without changing them.
 
 - Tests prove FAST/MAIN/REVIEW tier selection, environment-driven changes across each tier without feature-code edits, fallback defaults, invalid-ID rejection, structured schema configuration, rejection of tools on structured tasks, undeclared-tool rejection, SDK-safe controlled declarations, and explicit function allowlisting.
 - Existing route behavior is preserved because all three central defaults currently resolve to the prior model unless deployment configuration overrides them.
-- Non-Gemini/local provider adapters and provider health states are now implemented by TQ-VSC-058. Privacy-aware routing remains reserved for TQ-VSC-059.
-- TQ-VSC-059 and all later prompts remain `NOT STARTED`.
+- Non-Gemini/local provider adapters and provider health states are implemented by TQ-VSC-058, with privacy-aware routing implemented by TQ-VSC-059.
+- TQ-VSC-060 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-056 verification details
 

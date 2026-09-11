@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import type { ProjectRole } from "../types";
 import { agentRegistry, type AgentId } from "./agentRegistry";
 import type { AiModelRouter, AiTaskMode } from "./modelRouter";
+import type { AiTaskPrivacyDeclaration, PrivacyAwareTaskRouter } from "./privacyTaskRouter";
 
 export interface AiGatewayActor {
   uid: string;
@@ -39,6 +40,9 @@ export interface AiGatewayLedgerEvent {
   status: "Succeeded" | "Failed";
   usage: AiGatewayUsage;
   failureCode?: string;
+  privacyMode: string;
+  sensitivity: string;
+  includesRawUploads: boolean;
 }
 
 export interface AiGatewayOutputArtifact<T> {
@@ -92,6 +96,7 @@ export interface AiGatewayRequest<T> {
   taskMode?: AiTaskMode;
   controlledTools?: readonly { registryToolId: string; name: string; description: string; parameters: Record<string, unknown> }[];
   temperature?: number;
+  privacy: AiTaskPrivacyDeclaration;
   validateResponse(text: string): { valid: true; value: T } | { valid: false; errors: string[] };
 }
 
@@ -130,6 +135,7 @@ export class AiGateway {
   constructor(
     private readonly router: AiModelRouter,
     private readonly providers: ReadonlyMap<string, AiProvider>,
+    private readonly privacyRouter: PrivacyAwareTaskRouter,
     private readonly recordEvent: AiGatewayEventRecorder,
     private readonly now: () => string = () => new Date().toISOString(),
     private readonly createTraceId: () => string = () => randomUUID(),
@@ -156,7 +162,14 @@ export class AiGateway {
     } else if (controlledTools.length) {
       throw new AiGatewayError("Structured-output tasks cannot attach function tools.", "INVALID_TOOLS");
     }
-    const route = this.router.route(request.agentId, taskMode);
+    const baseRoute = this.router.route(request.agentId, taskMode);
+    let route;
+    try {
+      route = this.privacyRouter.route(baseRoute, request.privacy, taskMode);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Cannot Run Under Current Privacy Mode";
+      throw new AiGatewayError(message, message === "Cannot Run Under Current Privacy Mode" ? "PRIVACY_MODE_BLOCKED" : "INVALID_PRIVACY_DECLARATION");
+    }
     const provider = this.providers.get(route.provider);
     if (!provider) throw new AiGatewayError(`AI provider '${route.provider}' is Not Configured.`, "PROVIDER_NOT_CONFIGURED");
     let usage = emptyUsage();
@@ -182,6 +195,7 @@ export class AiGateway {
         provider: provider.id, model: response.modelVersion || route.model, promptVersion: request.promptVersion,
         responseSchemaId: request.responseSchemaId, inputArtifactIds: [...ids], outputArtifactId: outputArtifact.id,
         status: "Succeeded", usage,
+        privacyMode: route.privacyMode, sensitivity: route.sensitivity, includesRawUploads: route.includesRawUploads,
       };
       await this.recordEvent(ledgerEvent, outputArtifact);
       return { outputArtifact, ledgerEvent, provider: ledgerEvent.provider, model: ledgerEvent.model, promptVersion: request.promptVersion, traceId, usage };
@@ -192,6 +206,7 @@ export class AiGateway {
         actorEmail: request.actor.email || "Not available", actorRole: request.actor.role, agentId: request.agentId,
         provider: provider.id, model: route.model, promptVersion: request.promptVersion, responseSchemaId: request.responseSchemaId,
         inputArtifactIds: [...ids], outputArtifactId: null, status: "Failed", usage, failureCode: gatewayError.code,
+        privacyMode: route.privacyMode, sensitivity: route.sensitivity, includesRawUploads: route.includesRawUploads,
       };
       try { await this.recordEvent(ledgerEvent); } catch { throw new AiGatewayError("AI gateway failure audit could not be recorded.", "LEDGER_WRITE_FAILED", ledgerEvent); }
       throw new AiGatewayError(gatewayError.message, gatewayError.code, ledgerEvent);
