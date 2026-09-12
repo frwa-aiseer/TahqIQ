@@ -4,6 +4,7 @@ import path from "node:path";
 import { AiGateway, AiGatewayError, type AiGatewayLedgerEvent, type AiProvider } from "../server/aiGateway";
 import { ConfigurableModelRouter } from "../server/modelRouter";
 import { PrivacyAwareTaskRouter } from "../server/privacyTaskRouter";
+import { AiBudgetGuard, InMemoryAiBudgetStore, type AiBudgetPolicy } from "../server/aiBudgetGuard";
 
 const validText = JSON.stringify({ summary: "Proposal", proposals: [], missingInformationFlags: [], evidenceIds: [] });
 const actor = { uid: "owner-1", email: "owner@example.org", role: "Owner" as const };
@@ -12,12 +13,20 @@ const request = {
   responseSchema: { type: "OBJECT" }, systemInstruction: "Use supplied facts only.", contents: "Research description.",
   inputArtifacts: [{ id: "description-1", type: "researchDescription" }],
   privacy: { sensitivity: "Internal" as const, includesRawUploads: false, permittedProviders: ["gemini"], preferredTier: "FAST" as const },
+  budget: { estimatedInputTokens: 100, maxOutputTokens: 100, loopId: "request-1", loopIteration: 1, premiumReview: false },
   validateResponse: (text: string) => text === validText ? { valid: true as const, value: JSON.parse(text) } : { valid: false as const, errors: ["invalid"] },
 };
 const provider = (generate: AiProvider["generate"]): AiProvider => ({ id: "gemini", generate });
+const budgetPolicy: AiBudgetPolicy = { softLimitUsd: 10, hardLimitUsd: 20, maxProviderCallsPerRequest: 1, maxAgentLoopIterations: 3, minimumRemainingUsdByTier: {} };
+const budgetGuard = (policy = budgetPolicy) => new AiBudgetGuard({ version: "test-v1", effectiveAt: "2026-01-01T00:00:00.000Z", entries: [
+  { provider: "gemini", model: "model-main", inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 2 },
+  { provider: "gemini", model: "model-advanced", inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 2 },
+  { provider: "gemini", model: "model-review", inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 2 },
+] }, policy, new InMemoryAiBudgetStore(), () => "reservation-1");
 const gateway = (aiProvider: AiProvider, events: AiGatewayLedgerEvent[], recorder?: (event: AiGatewayLedgerEvent, outputArtifact?: unknown) => Promise<void>) => new AiGateway(
   new ConfigurableModelRouter({ provider: "gemini", fast: "model-main", main: "model-advanced", review: "model-review" }), new Map([["gemini", aiProvider]]),
   new PrivacyAwareTaskRouter("Standard Cloud", [{ providerId: "gemini", location: "Cloud", available: true, models: { FAST: "model-main", MAIN: "model-advanced", REVIEW: "model-review" } }]),
+  budgetGuard(),
   recorder || (async (event) => { events.push(event); }),
   () => "2026-09-10T12:00:00.000Z", () => "trace-1",
 );
@@ -120,9 +129,31 @@ describe("central AiGateway", () => {
       new ConfigurableModelRouter({ provider: "gemini", fast: "cloud", main: "cloud", review: "cloud" }),
       new Map([["gemini", cloud]]),
       new PrivacyAwareTaskRouter("Local-Only", [{ providerId: "gemini", location: "Cloud", available: true, models: { FAST: "cloud", MAIN: "cloud", REVIEW: "cloud" } }]),
+      budgetGuard(),
       async () => undefined,
     );
     await expect(instance.execute(request)).rejects.toMatchObject({ code: "PRIVACY_MODE_BLOCKED", message: "Cannot Run Under Current Privacy Mode" });
     expect(calls).toBe(0);
+  });
+
+  it("bounds provider retries and records the exact provider-call count", async () => {
+    let calls = 0;
+    const retryingProvider = provider(async () => {
+      calls += 1;
+      if (calls === 1) throw new Error("temporary failure");
+      return { text: validText, usage: { promptTokens: 8, outputTokens: 4, totalTokens: 12 } };
+    });
+    const events: AiGatewayLedgerEvent[] = [];
+    const instance = new AiGateway(
+      new ConfigurableModelRouter({ provider: "gemini", fast: "model-main", main: "model-advanced", review: "model-review" }),
+      new Map([["gemini", retryingProvider]]),
+      new PrivacyAwareTaskRouter("Standard Cloud", [{ providerId: "gemini", location: "Cloud", available: true, models: { FAST: "model-main", MAIN: "model-advanced", REVIEW: "model-review" } }]),
+      budgetGuard({ ...budgetPolicy, maxProviderCallsPerRequest: 2 }),
+      async (event) => { events.push(event); },
+    );
+    const result = await instance.execute({ ...request, budget: { ...request.budget, loopId: "retry-request" } });
+    expect(calls).toBe(2);
+    expect(result.budget).toMatchObject({ providerCalls: 2, pricingVersion: "test-v1" });
+    expect(events[0]).toMatchObject({ providerCalls: 2, pricingVersion: "test-v1", usage: { promptTokens: 8, outputTokens: 4, totalTokens: 12 } });
   });
 });

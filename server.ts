@@ -45,6 +45,7 @@ import { AiGateway, AiGatewayError, GeminiAiProvider, type AiGatewayArtifactRef 
 import { createEndpointProviderRegistryFromEnv, LocalGeneralLlmEndpointAdapter } from "./src/server/localModelProviders";
 import { createModelRouterFromEnv, readAiModelConfiguration } from "./src/server/modelRouter";
 import { PrivacyAwareTaskRouter, readAiPrivacyMode, readLocalProviderLocation, type AiTaskPrivacyDeclaration } from "./src/server/privacyTaskRouter";
+import { AiBudgetGuard, InMemoryAiBudgetStore, parseAiBudgetPolicy, parseAiPricingConfiguration, validateAiBudgetPolicy } from "./src/server/aiBudgetGuard";
 
 dotenv.config();
 
@@ -53,6 +54,7 @@ const PORT = 3000;
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: "25mb" }));
+  const aiBudgetStore = new InMemoryAiBudgetStore();
 
   async function getAiGateway(req: AuthenticatedProjectRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -72,11 +74,15 @@ async function startServer() {
       { providerId: "gemini", location: "Cloud", available: providers.has("gemini"), models: { FAST: models.fast, MAIN: models.main, REVIEW: models.review } },
       { providerId: "local-general-llm", location: localLocation || "Private", available: providers.has("local-general-llm"), models: { FAST: localModel, MAIN: localModel, REVIEW: localModel } },
     ]);
+    const projectBudgetPolicy = req.projectAuth!.project.aiBudgetPolicy;
+    const budgetPolicy = projectBudgetPolicy === undefined ? parseAiBudgetPolicy(process.env.TEHQIQ_AI_BUDGET_POLICY_JSON) : validateAiBudgetPolicy(projectBudgetPolicy);
+    const budgetGuard = new AiBudgetGuard(parseAiPricingConfiguration(process.env.TEHQIQ_AI_PRICING_CONFIG_JSON), budgetPolicy, aiBudgetStore);
     const projectRef = req.projectAuth!.projectRef as any;
     return new AiGateway(
       createModelRouterFromEnv(process.env),
       providers,
       privacyRouter,
+      budgetGuard,
       async (event, outputArtifact) => {
         const batch = projectRef.firestore.batch();
         batch.create(projectRef.collection("aiGatewayEvents").doc(event.id), event);
@@ -88,6 +94,11 @@ async function startServer() {
 
   const taskPrivacy = (preferredTier: AiTaskPrivacyDeclaration["preferredTier"], sensitivity: AiTaskPrivacyDeclaration["sensitivity"] = "Confidential", includesRawUploads = false): AiTaskPrivacyDeclaration => ({
     sensitivity, includesRawUploads, permittedProviders: ["gemini", "local-general-llm"], preferredTier,
+  });
+  const taskBudget = (contents: string, loopId: string, premiumReview = false) => ({
+    estimatedInputTokens: Math.max(1, Math.ceil(contents.length / 4)),
+    maxOutputTokens: Math.max(1, Number.parseInt(process.env.TEHQIQ_AI_MAX_OUTPUT_TOKENS || "4096", 10) || 4096),
+    loopId, loopIteration: 1, premiumReview,
   });
 
   const artifactRefs = (type: string, values: Record<string, unknown>[], prefix: string): AiGatewayArtifactRef[] =>
@@ -102,8 +113,10 @@ async function startServer() {
     const gatewayError = error instanceof AiGatewayError ? error : undefined;
     const schemaFailure = gatewayError?.code === "SCHEMA_VALIDATION_FAILED" || gatewayError?.code === "EMPTY_PROVIDER_OUTPUT";
     const privacyBlocked = gatewayError?.code === "PRIVACY_MODE_BLOCKED";
-    return res.status(privacyBlocked ? 409 : schemaFailure ? 502 : 500).json({
-      status: "failed", error: privacyBlocked ? "Cannot Run Under Current Privacy Mode" : fallback, traceId: gatewayError?.ledgerEvent?.traceId,
+    const budgetBlocked = gatewayError?.code === "HARD_BUDGET_EXCEEDED" || gatewayError?.code === "BUDGET_ROUTING_THRESHOLD";
+    const loopBlocked = gatewayError?.code === "AGENT_LOOP_LIMIT_REACHED";
+    return res.status(budgetBlocked ? 402 : privacyBlocked || loopBlocked ? 409 : schemaFailure ? 502 : 500).json({
+      status: "failed", error: privacyBlocked ? "Cannot Run Under Current Privacy Mode" : budgetBlocked || loopBlocked ? gatewayError?.message : fallback, traceId: gatewayError?.ledgerEvent?.traceId,
       failureCode: gatewayError?.code || "GATEWAY_FAILURE", ledgerEvent: gatewayError?.ledgerEvent,
     });
   }
@@ -287,6 +300,7 @@ Notice: TehqIQ assists researchers but does not replace subject expertise, ethic
         promptVersion: "registered-agent-v1", responseSchemaId: "AgentSuggestionEnvelope-v1", systemInstruction, contents: userMessage,
         inputArtifacts: Object.keys(context).map((type) => ({ id: `context:${type}`, type })), temperature: 0.2,
         privacy: taskPrivacy("FAST"),
+        budget: taskBudget(`${systemInstruction}\n${userMessage}`, `request:${authenticatedRequest.projectAuth!.projectId}:research-intake:${Date.now()}`),
         responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -360,6 +374,7 @@ Approved Analysis Outputs: ${JSON.stringify((analysisOutputs || []).filter((out:
           ...artifactRefs("approvedAnalysisOutputs", analysisOutputs.filter((out: any) => hasAttributableManuscriptApproval(out)), "analysis"),
         ],
         privacy: taskPrivacy("MAIN"),
+        budget: taskBudget(`${systemInstruction}\n${promptText}`, `request:${authenticatedRequest.projectAuth!.projectId}:section-writer:${Date.now()}`),
         responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -411,6 +426,7 @@ Strict rules: Output structured JSON matching the responseSchema. Never make gen
           ...artifactRefs("verifiedSources", sources, "source"), ...artifactRefs("approvedAnalysisOutputs", analysisOutputs, "analysis"),
         ],
         privacy: taskPrivacy("REVIEW"),
+        budget: taskBudget(`${systemInstruction}\n${promptText}`, `request:${authenticatedRequest.projectAuth!.projectId}:peer-review:${Date.now()}`, true),
         responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -479,6 +495,7 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
         contents: `Create a domain-neutral methodology proposal using only this researcher-provided project context:\n${JSON.stringify(projectContext)}`,
         inputArtifacts: [{ id: `project-context:${projectId}`, type: "researcherFacts" }], temperature: 0.1,
         privacy: taskPrivacy("MAIN"),
+        budget: taskBudget(`${systemInstruction}\n${JSON.stringify(projectContext)}`, `request:${projectId}:methodology-design:${Date.now()}`),
         responseSchema: {
             type: Type.OBJECT,
             properties: methodologyProperties,

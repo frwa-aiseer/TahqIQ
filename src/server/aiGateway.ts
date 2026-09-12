@@ -4,6 +4,7 @@ import type { ProjectRole } from "../types";
 import { agentRegistry, type AgentId } from "./agentRegistry";
 import type { AiModelRouter, AiTaskMode } from "./modelRouter";
 import type { AiTaskPrivacyDeclaration, PrivacyAwareTaskRouter } from "./privacyTaskRouter";
+import type { AiBudgetDeclaration, AiBudgetGuard } from "./aiBudgetGuard";
 
 export interface AiGatewayActor {
   uid: string;
@@ -43,6 +44,11 @@ export interface AiGatewayLedgerEvent {
   privacyMode: string;
   sensitivity: string;
   includesRawUploads: boolean;
+  pricingVersion: string;
+  estimatedCostUsd: number;
+  providerCalls: number;
+  premiumReview: boolean;
+  softBudgetReached: boolean;
 }
 
 export interface AiGatewayOutputArtifact<T> {
@@ -64,6 +70,7 @@ export interface AiGatewayResult<T> {
   promptVersion: string;
   traceId: string;
   usage: AiGatewayUsage;
+  budget: { pricingVersion: string; estimatedCostUsd: number; providerCalls: number; premiumReview: boolean; softLimitReached: boolean };
 }
 
 export interface AiProviderRequest {
@@ -97,6 +104,7 @@ export interface AiGatewayRequest<T> {
   controlledTools?: readonly { registryToolId: string; name: string; description: string; parameters: Record<string, unknown> }[];
   temperature?: number;
   privacy: AiTaskPrivacyDeclaration;
+  budget: AiBudgetDeclaration;
   validateResponse(text: string): { valid: true; value: T } | { valid: false; errors: string[] };
 }
 
@@ -136,6 +144,7 @@ export class AiGateway {
     private readonly router: AiModelRouter,
     private readonly providers: ReadonlyMap<string, AiProvider>,
     private readonly privacyRouter: PrivacyAwareTaskRouter,
+    private readonly budgetGuard: AiBudgetGuard,
     private readonly recordEvent: AiGatewayEventRecorder,
     private readonly now: () => string = () => new Date().toISOString(),
     private readonly createTraceId: () => string = () => randomUUID(),
@@ -172,19 +181,40 @@ export class AiGateway {
     }
     const provider = this.providers.get(route.provider);
     if (!provider) throw new AiGatewayError(`AI provider '${route.provider}' is Not Configured.`, "PROVIDER_NOT_CONFIGURED");
-    let usage = emptyUsage();
+    let reservation;
     try {
-      const response = await provider.generate({
-        model: route.model,
-        contents: request.contents,
-        config: taskMode === "Controlled Tools"
-          ? { systemInstruction: request.systemInstruction, temperature: request.temperature, tools: [{ functionDeclarations: controlledTools.map(({ name, description, parameters }) => ({ name, description, parameters })) }], toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: controlledTools.map(({ name }) => name) } } }
-          : { systemInstruction: request.systemInstruction, temperature: request.temperature, responseMimeType: "application/json", responseSchema: request.responseSchema },
-      });
+      reservation = this.budgetGuard.authorize({ projectId: request.projectId, actorUid: request.actor.uid, provider: route.provider, model: route.model, tier: route.tier, declaration: request.budget });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AI budget authorization failed.";
+      const code = message.includes("hard budget") ? "HARD_BUDGET_EXCEEDED" : message.includes("loop limit") ? "AGENT_LOOP_LIMIT_REACHED" : message.includes("routing threshold") ? "BUDGET_ROUTING_THRESHOLD" : "BUDGET_CONFIGURATION_ERROR";
+      throw new AiGatewayError(message, code);
+    }
+    let usage = emptyUsage();
+    let providerCalls = 0;
+    let budgetResult: ReturnType<AiBudgetGuard["settle"]> | undefined;
+    try {
+      let response: AiProviderResponse | undefined;
+      let lastProviderError: unknown;
+      for (let attempt = 0; attempt < reservation.maxProviderCalls; attempt += 1) {
+        providerCalls += 1;
+        try {
+          response = await provider.generate({
+            model: route.model,
+            contents: request.contents,
+            config: taskMode === "Controlled Tools"
+              ? { systemInstruction: request.systemInstruction, temperature: request.temperature, maxOutputTokens: request.budget.maxOutputTokens, tools: [{ functionDeclarations: controlledTools.map(({ name, description, parameters }) => ({ name, description, parameters })) }], toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: controlledTools.map(({ name }) => name) } } }
+              : { systemInstruction: request.systemInstruction, temperature: request.temperature, maxOutputTokens: request.budget.maxOutputTokens, responseMimeType: "application/json", responseSchema: request.responseSchema },
+          });
+          break;
+        } catch (error) { lastProviderError = error; }
+      }
+      if (!response) throw lastProviderError || new Error("AI provider execution failed.");
       usage = { promptTokens: response.usage?.promptTokens ?? null, outputTokens: response.usage?.outputTokens ?? null, totalTokens: response.usage?.totalTokens ?? null };
       if (!response.text) throw new AiGatewayError("AI provider returned no output.", "EMPTY_PROVIDER_OUTPUT");
       const validated = request.validateResponse(response.text);
       if (validated.valid === false) throw new AiGatewayError(`AI response validation failed: ${validated.errors.join("; ")}`, "SCHEMA_VALIDATION_FAILED");
+      const budget = this.budgetGuard.settle(reservation, { inputTokens: usage.promptTokens, outputTokens: usage.outputTokens }, providerCalls);
+      budgetResult = budget;
       const outputArtifact: AiGatewayOutputArtifact<T> = {
         id: `ai-output-${traceId}`, projectId: request.projectId, agentId: request.agentId, traceId,
         schemaId: request.responseSchemaId, status: "AI Suggested—Needs Researcher Review", createdAt: timestamp, data: validated.value,
@@ -196,10 +226,13 @@ export class AiGateway {
         responseSchemaId: request.responseSchemaId, inputArtifactIds: [...ids], outputArtifactId: outputArtifact.id,
         status: "Succeeded", usage,
         privacyMode: route.privacyMode, sensitivity: route.sensitivity, includesRawUploads: route.includesRawUploads,
+        pricingVersion: budget.pricingVersion, estimatedCostUsd: budget.estimatedCostUsd, providerCalls: budget.providerCalls,
+        premiumReview: reservation.premiumReview, softBudgetReached: budget.softLimitReached,
       };
       await this.recordEvent(ledgerEvent, outputArtifact);
-      return { outputArtifact, ledgerEvent, provider: ledgerEvent.provider, model: ledgerEvent.model, promptVersion: request.promptVersion, traceId, usage };
+      return { outputArtifact, ledgerEvent, provider: ledgerEvent.provider, model: ledgerEvent.model, promptVersion: request.promptVersion, traceId, usage, budget };
     } catch (error) {
+      const budget = budgetResult || this.budgetGuard.settle(reservation, { inputTokens: usage.promptTokens, outputTokens: usage.outputTokens }, providerCalls);
       const gatewayError = error instanceof AiGatewayError ? error : new AiGatewayError("AI provider execution failed.", "PROVIDER_FAILURE");
       const ledgerEvent: AiGatewayLedgerEvent = {
         id: `ai-ledger-${traceId}`, traceId, timestamp, projectId: request.projectId, actorUid: request.actor.uid,
@@ -207,6 +240,8 @@ export class AiGateway {
         provider: provider.id, model: route.model, promptVersion: request.promptVersion, responseSchemaId: request.responseSchemaId,
         inputArtifactIds: [...ids], outputArtifactId: null, status: "Failed", usage, failureCode: gatewayError.code,
         privacyMode: route.privacyMode, sensitivity: route.sensitivity, includesRawUploads: route.includesRawUploads,
+        pricingVersion: budget.pricingVersion, estimatedCostUsd: budget.estimatedCostUsd, providerCalls: budget.providerCalls,
+        premiumReview: reservation.premiumReview, softBudgetReached: budget.softLimitReached,
       };
       try { await this.recordEvent(ledgerEvent); } catch { throw new AiGatewayError("AI gateway failure audit could not be recorded.", "LEDGER_WRITE_FAILED", ledgerEvent); }
       throw new AiGatewayError(gatewayError.message, gatewayError.code, ledgerEvent);

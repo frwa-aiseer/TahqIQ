@@ -1993,7 +1993,80 @@ None. The harness is test-only and imports existing types without changing them.
 - A governed qualitative fixture proves approved themes can feed Results writing without p-values, effect sizes, sample sizes, or significance claims.
 - The agent deliberately permits no free-form inferential interpretation beyond exact approved findings and warnings. Broader interpretation would require a separately validated evidence-grounded language contract.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
-- TQ-VSC-060 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-061 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-061 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added deterministic `runCitationAudit`, a CitationAuditAgent-style service that audits manuscript citation metadata against real project `SourceRecord` entries, `EvidenceRecord` support, and explicit bibliography entries.
+- Citation references must map to an existing project Source or remain explicitly unresolved. An optional identifier resolver can report external resolution, but the service never imports, synthesizes, or fabricates a Source.
+- The audit reports `PASS`, `WARNING`, or `BLOCKER` and identifies unresolved identifiers, unverified sources, retraction/correction notices, missing researcher-verified EvidenceRecords, duplicate citations, duplicate bibliography entries, orphan bibliography entries, and missing bibliography entries.
+- Bibliography synchronization is source-ID/identifier based, and evidence support requires a non-demo/non-synthetic EvidenceRecord with exact passage text, `Researcher Verified` verification, and a verified researcher review.
+
+### Files changed and migrations
+
+- `src/lib/citationAuditAgent.ts` (created)
+- `src/tests/citationAuditAgent.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No persisted schema or data migration is required. The audit consumes existing source/evidence/manuscript records and returns a stateless report. Existing `citationVerifier.ts` behavior and UI remain compatible.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/citationAuditAgent.test.ts src/tests/citationVerifierRules.test.ts src/tests/evidenceRecords.test.ts` — exit `0`; PASS, 3/3 files and 17/17 tests.
+3. `npm test` — exit `1`; 73/75 executed files passed and 628/630 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two established unrelated failures remain: the Crossref test expects legacy error wording, and the jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests prove a verified citation with verified evidence and synchronized bibliography passes; a fake DOI remains unresolved with `sourceCreationAttempted: false`; externally resolved-but-not-imported identifiers remain blocked; and retraction/correction, evidence, duplicate, orphan, and missing-bibliography conditions are surfaced.
+- This prompt does not alter or fabricate SourceRecord metadata, perform DOI imports, or silently replace unresolved references. Researchers must explicitly import and verify a real source before it can satisfy the audit.
+- The audit is a deterministic domain service and is not mounted as a new API/UI endpoint in this prompt. Existing Writing Studio citation verification remains available; later integration may expose this richer report.
+- TQ-VSC-062 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-060 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added a deterministic `AiBudgetGuard` with atomic in-process maximum-cost reservations scoped by project and authenticated user. Concurrent reservations include current settled plus reserved cost before admitting another request, preventing a server instance from crossing the configured hard budget.
+- Versioned pricing is injected from `TEHQIQ_AI_PRICING_CONFIG_JSON` using provider/model-specific input and output USD-per-million-token entries. Missing, malformed, duplicate, or unmatched pricing fails closed; transient commercial prices are not hard-coded in core logic.
+- Trusted project `aiBudgetPolicy` can override the server-only `TEHQIQ_AI_BUDGET_POLICY_JSON`. Policies validate soft/hard limits, per-request provider-call maximum, repeated-loop maximum, and optional FAST/MAIN/REVIEW remaining-budget routing thresholds.
+- Each gateway task supplies a server-owned budget declaration containing estimated input tokens, maximum output tokens, loop identity/iteration, and premium-review status. The guard reserves the maximum cost across all permitted provider attempts before provider execution.
+- Provider retries are bounded to 1–4 calls by validated policy and record the exact call count. Repeated loop identities and declared iterations fail before model invocation once the configured limit is reached.
+- Settlement tracks request count, provider calls, premium reviews, provider/model, provider-reported input/output tokens, estimated cost, and released reservation per project/user. Gateway success/failure events record pricing version, cost, calls, premium-review flag, and soft-limit status.
+- Hard-limit and tier-threshold failures return explicit budget errors without provider invocation. Soft limits remain advisory and visible rather than silently changing the requested model tier.
+
+### Files changed and migrations
+
+- `src/server/aiBudgetGuard.ts` (created)
+- `src/tests/aiBudgetGuard.test.ts` (created)
+- `src/server/aiGateway.ts`
+- `src/tests/aiGateway.test.ts`
+- `server.ts`
+- `.env.example`
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No persisted research-data migration is required. Gateway event documents gain additive budget metadata. Existing projects may add a trusted `aiBudgetPolicy`; otherwise the required server policy applies. Deployment must supply versioned pricing configuration before AI execution.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/aiBudgetGuard.test.ts src/tests/aiGateway.test.ts src/tests/privacyTaskRouter.test.ts src/tests/modelRouter.test.ts src/tests/localModelProviders.test.ts` — exit `0`; PASS, 5/5 files and 33/33 tests.
+3. `npm test` — exit `1`; 72/74 executed files passed and 624/626 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two established unrelated failures remain: the Crossref test expects legacy error wording, and the jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests cover hard-budget denial, concurrent-reservation protection, per-project/user isolation, repeated-loop denial, explicit iteration limits, versioned cost estimation, token/provider/model/call/premium tracking, soft-limit state, routing thresholds, configuration rejection, and gateway retries stopping at the configured maximum.
+- Cost is an estimate based on versioned operator-supplied pricing and provider-reported tokens. Calls without provider token metadata still record request/provider-call counts but have `0` token-derived incremental cost; operators must select providers that report usage when cost precision is required.
+- The current budget store is atomic only inside one server process and resets on restart. Horizontally scaled or restart-durable hard-budget enforcement requires replacing the injected store with a shared transactional implementation before relying on it as a financial control.
+- TQ-VSC-062 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-059 verification details
 
@@ -2033,8 +2106,8 @@ None. The harness is test-only and imports existing types without changing them.
 
 - Tests prove each privacy mode's provider ordering, cloud blocking for confidential/raw-upload work, explicit permitted-provider enforcement, unavailable-local blocking, declaration/tier validation, trusted project-mode precedence, legacy default behavior, explicit endpoint trust-boundary classification, and gateway-level blocking before provider invocation.
 - The four currently mounted language tasks declare project content `Confidential`, no raw uploads, both configured gateway providers as potentially permitted, and their registered model tier. Consequently they run on cloud only in Standard Cloud; Private/Hybrid and Local-Only require an appropriately classified healthy open/local endpoint.
-- This prompt does not add budgets, retries, or loop protection reserved for TQ-VSC-060. It also does not certify that an operator's Local/Private location assertion is true; deployment governance and network controls must verify that assertion.
-- TQ-VSC-060 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-060 now supplies budgets, bounded retries, and loop protection. This prompt still does not certify that an operator's Local/Private location assertion is true; deployment governance and network controls must verify that assertion.
+- TQ-VSC-062 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-058 verification details
 
@@ -2069,7 +2142,7 @@ None. The harness is test-only and imports existing types without changing them.
 - Mocked tests cover missing configuration without network access; all required health states; capability routing restricted to healthy providers; fail-closed pre-health invocation; bearer-key privacy; request/response contracts for embeddings, transcription, vision/documents, and general LLM output; and gateway-compatible token usage mapping.
 - TQ-VSC-059 now selects healthy permitted providers through a privacy-aware server boundary; the adapter behavior implemented here is unchanged.
 - Actual endpoint deployment, model installation, capacity, model quality, and runtime health are external operational responsibilities and are not represented as verified by mocked adapter tests.
-- TQ-VSC-060 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-062 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-057 verification details
 
@@ -2109,7 +2182,7 @@ None. The harness is test-only and imports existing types without changing them.
 - Tests prove FAST/MAIN/REVIEW tier selection, environment-driven changes across each tier without feature-code edits, fallback defaults, invalid-ID rejection, structured schema configuration, rejection of tools on structured tasks, undeclared-tool rejection, SDK-safe controlled declarations, and explicit function allowlisting.
 - Existing route behavior is preserved because all three central defaults currently resolve to the prior model unless deployment configuration overrides them.
 - Non-Gemini/local provider adapters and provider health states are implemented by TQ-VSC-058, with privacy-aware routing implemented by TQ-VSC-059.
-- TQ-VSC-060 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-062 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-056 verification details
 

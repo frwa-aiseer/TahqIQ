@@ -182,6 +182,7 @@ TQ-VSC-021 moves eight privileged state changes to a Firebase Admin transaction 
 - `src/lib/readinessCalculator.ts` computes readiness and pipeline-stage status.
 - `src/lib/aiValidationService.ts` validates proposed AI prose/numbers and generates a ledger disclosure statement.
 - `src/lib/citationVerifier.ts` verifies manuscript citation/source consistency and explicitly prevents automatic missing-source fabrication.
+- `src/lib/citationAuditAgent.ts` provides a deterministic CitationAuditAgent-style audit over manuscript citation metadata, real project Sources, EvidenceRecords, and bibliography entries. It reports PASS/WARNING/BLOCKER findings for unresolved identifiers, verification/retraction/correction state, missing researcher-verified evidence, duplicate citations/bibliography, orphan bibliography entries, and missing bibliography entries. External identifier resolution never imports or fabricates a Source.
 - `src/lib/writingEvidence.ts` is the Writing Studio insertion policy boundary: literature requires researcher-reviewed passage/claim evidence with verified source provenance, while statistics require exact `Approved for Manuscript` state and are revalidated at insertion time.
 - `src/lib/aiValidationService.ts` now grounds empirical numbers by exact, Verified `NumericEvidence` provenance rather than value allowlists. It context-classifies bibliographic citations and labeled structural numbering and exposes validation for prose, tables, captions, and supplements.
 - Completed, hash-linked Data Lab runs deterministically create `NumericEvidence` records from stored numeric output fields through `src/lib/numericEvidence.ts`; failed or hashless runs create none.
@@ -224,6 +225,8 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 - `src/server/localModelProviders.ts` adds configurable server-endpoint abstractions for SPECTER2-compatible scientific embeddings, BGE-M3-compatible general embeddings, Whisper-compatible transcription, Qwen-VL-compatible vision/document analysis, and an OpenAI-compatible local general LLM (for example, a separately hosted gpt-oss/Qwen service). Providers report `Not Configured`, `Configured`, `Healthy`, `Unavailable`, or `Failed`; only `Healthy` adapters route. API keys remain private server configuration, response shapes are validated, and no model is represented as running in the browser.
 - `src/server/privacyTaskRouter.ts` enforces `Standard Cloud`, `Private/Hybrid`, and `Local-Only` modes before provider invocation. Every gateway task declares sensitivity, whether raw uploads are included, permitted provider IDs, and its registered preferred tier. Private/Hybrid prevents confidential or raw-upload tasks from using cloud providers; Local-Only accepts only explicitly classified local infrastructure. When no permitted healthy provider satisfies the mode, the gateway returns `Cannot Run Under Current Privacy Mode` without calling a provider.
 - Privacy mode is read from the trusted project document (`aiPrivacyMode`) ahead of the server default. Local/private endpoint location requires the server operator's explicit `TEHQIQ_LOCAL_LLM_LOCATION` classification and is never inferred from a hostname or client input. Successful and failed gateway events retain the applied privacy mode, sensitivity, and raw-upload declaration.
+- `src/server/aiBudgetGuard.ts` adds preflight per-project/per-user maximum-cost reservations, versioned provider/model pricing lookup, soft/hard USD budgets, tier-specific remaining-budget thresholds, premium-review counts, bounded provider attempts, and repeated-agent-loop limits. Prices are supplied through `TEHQIQ_AI_PRICING_CONFIG_JSON`; no transient commercial price is embedded in core logic. Trusted project `aiBudgetPolicy` overrides the server policy default.
+- Gateway events now record pricing version, estimated actual cost from provider-reported input/output tokens, exact provider-call count, premium-review classification, and soft-limit state. Hard-budget, tier-threshold, and loop failures stop before provider execution; retries cannot exceed the validated policy maximum.
 
 ## Manuscript section contracts
 
@@ -289,7 +292,7 @@ The Firestore rule tests inspect rule source and simulate helper behavior; no Fi
 
 These are source observations, not work completed under later prompts:
 
-1. Material server model calls and model selection are centralized through `AiGateway`, the configurable FAST/MAIN/REVIEW `ModelRouter`, and privacy-aware cloud/private/local selection. Budgets/retries and reconciliation of gateway events into the legacy project AI ledger remain incomplete.
+1. Material server model calls and model selection are centralized through `AiGateway`, the configurable FAST/MAIN/REVIEW `ModelRouter`, privacy-aware cloud/private/local selection, and a budget/loop guard. Reconciliation of gateway events into the legacy project AI ledger remains incomplete.
 2. Some deeply nested research entity fields are validated at their server-use boundary rather than exhaustively re-declaring the full persisted project schema; schema versioning remains a future compatibility consideration.
 3. Several implemented views are unreachable, while legacy route labels misleadingly land on other step content.
 4. Step 9 is labeled References but renders Claim Matrix rather than a dedicated reference-list view.
@@ -297,7 +300,7 @@ These are source observations, not work completed under later prompts:
 6. JATS validation language overstates the local validator's demonstrated assurance.
 7. Build externalizes Node `crypto` from browser code and emits a very large main chunk.
 8. The baseline suite is red because of a network-dependent DOI expectation and a localStorage test-environment issue.
-9. The new in-process API rate limiter is per server instance; no distributed limiter, request budget, or explicit bounded provider retry policy is present.
+9. The API rate limiter and AI budget reservation store are per server instance. Provider retries are bounded, but distributed hard-budget coordination requires a shared transactional store for horizontally scaled deployment.
 10. The repository has both npm and Bun lockfiles, creating package-manager ambiguity; the declared verification scripts were run through npm for this baseline.
 
 ## Data migration and backward compatibility
