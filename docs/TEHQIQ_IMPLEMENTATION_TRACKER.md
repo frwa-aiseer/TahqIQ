@@ -2638,6 +2638,14 @@ None. The harness is test-only and imports existing types without changing them.
 - **Verification:** `npm run lint`; golden-dataset coverage test; `git diff --check`.
 - **Acceptance:** PASS. TQ-VSC-085 and later prompts were not executed.
 
+## TQ-VSC-085 verification details
+
+- **Status:** PASS — added adversarial AgentRegistry contract assertions covering writer/source separation, results/statistics separation, retrieval/manuscript separation, reviewer no-auto-approval, editor unsupported-claim prohibition, and export gate enforcement.
+- **Files changed:** `src/tests/agentRegistryAdversarial.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; test-only coverage.
+- **Verification:** `npm run lint`; AgentRegistry contract tests; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-086 and later prompts were not executed.
+
 ## TQ-VSC-075 verification details
 
 - **Status:** PASS — added a manifest builder for submission packages that filters out empty/nonexistent candidates and records project/export IDs, timestamp, manuscript version, target-outlet version, gate results, and file metadata.
