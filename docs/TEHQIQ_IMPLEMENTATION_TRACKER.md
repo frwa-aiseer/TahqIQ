@@ -2614,6 +2614,14 @@ None. The harness is test-only and imports existing types without changing them.
 - **Verification:** `npm run lint`; deterministic RAG benchmark test; `git diff --check`.
 - **Acceptance:** PASS. TQ-VSC-082 and later prompts were not executed.
 
+## TQ-VSC-082 verification details
+
+- **Status:** PASS — expanded the scientific-integrity regression harness with deterministic checks for unapproved Results, missing sample/p-value/effect-size fallbacks, invented ethics approval, unsupported Q1 claims, object-URL persistence, and empty-ledger false “no AI” assertions. Existing DOI, provenance, demo-isolation, approval, outlet, and self-approval invariants remain covered.
+- **Files changed:** `src/tests/helpers/scientificIntegrityInvariants.ts`; `src/tests/scientificIntegrityRegression.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; test-only changes.
+- **Verification:** `npm run lint`; scientific-integrity regression tests; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-083 and later prompts were not executed.
+
 ## TQ-VSC-075 verification details
 
 - **Status:** PASS — added a manifest builder for submission packages that filters out empty/nonexistent candidates and records project/export IDs, timestamp, manuscript version, target-outlet version, gate results, and file metadata.

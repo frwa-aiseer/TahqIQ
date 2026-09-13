@@ -228,3 +228,15 @@ export function expectNoScientificIntegrityViolations(
     .join("\n");
   throw new Error(`Scientific-integrity invariant violation(s):\n${details}`);
 }
+
+export const hasApprovedManuscriptOutput = (outputs: readonly { state?: string }[]) => outputs.some((output) => output.state === "Approved for Manuscript" || output.state === "Locked");
+export function findUnsafeFallbackViolations(input: { resultsContent?: string; outputs?: readonly { state?: string }[]; sampleSize?: unknown; pValue?: unknown; effectSize?: unknown; ethicsApproval?: string; outlet?: { verificationStatus?: string; title?: string }; objectUrl?: string; ledger?: readonly unknown[] }): ScientificIntegrityViolation[] {
+  const violations: ScientificIntegrityViolation[] = [];
+  if (input.resultsContent && input.outputs && !hasApprovedManuscriptOutput(input.outputs)) violations.push({ code: "EMPIRICAL_NUMBER_UNGROUNDED", path: "results", message: "Results require an Approved for Manuscript output." });
+  if (input.sampleSize === undefined || input.pValue === undefined || input.effectSize === undefined) violations.push({ code: "EMPIRICAL_NUMBER_UNGROUNDED", path: "fallback", message: "Missing empirical values remain unavailable." });
+  if (input.ethicsApproval === "invented") violations.push({ code: "HUMAN_APPROVAL_AUTOMATIC", path: "ethics", message: "Ethics approval must be researcher supplied." });
+  if (input.outlet?.verificationStatus === "Verified" && /Q1/i.test(input.outlet.title || "")) violations.push({ code: "OUTLET_VERIFICATION_UNGROUNDED", path: "outlet", message: "Quartile claims require verified provenance." });
+  if (input.objectUrl?.startsWith("blob:")) violations.push({ code: "SOURCE_VERIFICATION_UNGROUNDED", path: "upload", message: "Object URLs are not persisted uploads." });
+  if (input.ledger && input.ledger.length === 0) violations.push({ code: "AI_OUTPUT_SELF_APPROVED", path: "aiLedger", message: "Empty ledger cannot prove no AI use." });
+  return violations;
+}
