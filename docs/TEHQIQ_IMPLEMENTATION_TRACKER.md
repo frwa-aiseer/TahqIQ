@@ -2622,6 +2622,14 @@ None. The harness is test-only and imports existing types without changing them.
 - **Verification:** `npm run lint`; scientific-integrity regression tests; `git diff --check`.
 - **Acceptance:** PASS. TQ-VSC-083 and later prompts were not executed.
 
+## TQ-VSC-083 verification details
+
+- **Status:** PASS — added adversarial regression expectations covering no-data Results, significance manipulation, unsupported sample size, invented ethics IDs, fake DOI, unverified Q1 claims, object-URL persistence, and evasion/guarantee requests. All fail closed with explicit integrity violations.
+- **Files changed:** `src/tests/adversarialResearchSafety.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; test-only changes.
+- **Verification:** `npm run lint`; adversarial safety tests; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-084 and later prompts were not executed.
+
 ## TQ-VSC-075 verification details
 
 - **Status:** PASS — added a manifest builder for submission packages that filters out empty/nonexistent candidates and records project/export IDs, timestamp, manuscript version, target-outlet version, gate results, and file metadata.
