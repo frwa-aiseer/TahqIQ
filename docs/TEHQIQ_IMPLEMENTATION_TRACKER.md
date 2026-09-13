@@ -2606,6 +2606,14 @@ None. The harness is test-only and imports existing types without changing them.
 - **Verification:** `npm run lint`; deterministic retrieval test; `git diff --check`.
 - **Acceptance:** PASS. TQ-VSC-081 and later prompts were not executed.
 
+## TQ-VSC-081 verification details
+
+- **Status:** PASS — added a repeatable fixture-based RAG benchmark producing machine-readable recall@k, precision@k, provenance-retention, and wrong-source-rate metrics with deterministic thresholds suitable for regression checks.
+- **Files changed:** `src/lib/evidenceRetrievalService.ts`; `src/tests/ragBenchmark.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; benchmark is read-only.
+- **Verification:** `npm run lint`; deterministic RAG benchmark test; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-082 and later prompts were not executed.
+
 ## TQ-VSC-075 verification details
 
 - **Status:** PASS — added a manifest builder for submission packages that filters out empty/nonexistent candidates and records project/export IDs, timestamp, manuscript version, target-outlet version, gate results, and file metadata.
