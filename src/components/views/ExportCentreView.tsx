@@ -73,14 +73,18 @@ export const ExportCentreView: React.FC<ExportCentreViewProps> = ({
   const [includeEthicsAndAi, setIncludeEthicsAndAi] = useState<boolean>(true);
   const [selectedStyle, setSelectedStyle] = useState<string>(activeCslStyle || "apa");
 
+  const verifiedReferenceStyle = outlet ? getLatestRequirement(outlet, "referenceStyle") : undefined;
+  const verifiedStyleValue = verifiedReferenceStyle?.state === "Verified" && verifiedReferenceStyle.humanConfirmed && typeof verifiedReferenceStyle.value === "string" ? verifiedReferenceStyle.value : undefined;
+
   // Sync state when project selectedTargetOutlet changes
   useEffect(() => {
     if (outlet) {
       if (outlet.lineSpacing) setLineSpacing(outlet.lineSpacing);
       if (outlet.fontFamily) setFontFamily(outlet.fontFamily);
       if (outlet.fontSizePt) setFontSizePt(outlet.fontSizePt);
+      if (verifiedStyleValue) setSelectedStyle(verifiedStyleValue.toLowerCase().includes("vancouver") ? "vancouver" : verifiedStyleValue.toLowerCase().includes("ieee") ? "ieee" : verifiedStyleValue.toLowerCase().includes("nature") ? "nature" : activeCslStyle || "apa");
     }
-  }, [outlet]);
+  }, [outlet, verifiedStyleValue, activeCslStyle]);
 
   // Calculated Compliance Rules & Gate Checks
   const calculatedRules = calculateComplianceRules(project, outlet);

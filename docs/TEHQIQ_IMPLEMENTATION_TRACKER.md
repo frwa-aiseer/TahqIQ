@@ -2574,6 +2574,14 @@ None. The harness is test-only and imports existing types without changing them.
 - **Verification:** `npm run lint`; focused JATS/export tests; `git diff --check`.
 - **Acceptance:** PASS. TQ-VSC-077 and later prompts were not executed.
 
+## TQ-VSC-077 verification details
+
+- **Status:** PASS — export formatting now consults the latest versioned reference-style requirement and applies it only when the record is Verified and human-confirmed; otherwise the configured project style remains visible rather than inventing outlet rules.
+- **Files changed:** `src/components/views/ExportCentreView.tsx`; `src/tests/outletFormatting.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; existing outlet/project formatting fields remain backward-compatible.
+- **Verification:** `npm run lint`; focused outlet-formatting test; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-078 and later prompts were not executed.
+
 ## TQ-VSC-075 verification details
 
 - **Status:** PASS — added a manifest builder for submission packages that filters out empty/nonexistent candidates and records project/export IDs, timestamp, manuscript version, target-outlet version, gate results, and file metadata.
