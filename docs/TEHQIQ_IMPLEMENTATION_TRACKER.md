@@ -2630,6 +2630,14 @@ None. The harness is test-only and imports existing types without changing them.
 - **Verification:** `npm run lint`; adversarial safety tests; `git diff --check`.
 - **Acceptance:** PASS. TQ-VSC-084 and later prompts were not executed.
 
+## TQ-VSC-084 verification details
+
+- **Status:** PASS — added a golden-dataset coverage guard ensuring every enabled deterministic analysis method is discoverable and executable for independently authored fixture tests. Existing common-comparison, regression, and specialized golden fixtures remain the expected-value source; no LLM judge or fabricated statistics are used.
+- **Files changed:** `src/tests/goldenDatasetValidation.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; test-only coverage.
+- **Verification:** `npm run lint`; golden-dataset coverage test; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-085 and later prompts were not executed.
+
 ## TQ-VSC-075 verification details
 
 - **Status:** PASS — added a manifest builder for submission packages that filters out empty/nonexistent candidates and records project/export IDs, timestamp, manuscript version, target-outlet version, gate results, and file metadata.
