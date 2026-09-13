@@ -590,7 +590,7 @@ export function generateBibTeX(project: ProjectState): string {
   return project.sources
     .map((src, idx) => {
       const citeKey = src.authors?.[0]?.split(" ")?.[0]?.toLowerCase() || `ref${idx + 1}`;
-      const year = src.year || 2026;
+      const year = src.year || "n.d.";
       const cleanTitle = (src.title || "").replace(/[{}&%$#_]/g, "\\$&");
       const cleanAuthors = (src.authors || []).join(" and ").replace(/[{}&%$#_]/g, "\\$&");
 
@@ -665,7 +665,7 @@ export function generateCslJson(project: ProjectState): string {
       title: src.title,
       author: authorsArr,
       "container-title": src.journalOrVenue,
-      issued: { "date-parts": [[src.year || 2026]] },
+      issued: src.year ? { "date-parts": [[src.year]] } : undefined,
       volume: src.volume,
       issue: src.issue,
       page: src.pages,
@@ -729,7 +729,7 @@ export function generateJatsXml(project: ProjectState): string {
         <element-citation publication-type="journal">
           <article-title>${(src.title || "").replace(/&/g, "&amp;")}</article-title>
           <source>${(src.journalOrVenue || "").replace(/&/g, "&amp;")}</source>
-          <year>${src.year || 2026}</year>
+          ${src.year ? `<year>${src.year}</year>` : ""}
         </element-citation>
       </ref>`
         )

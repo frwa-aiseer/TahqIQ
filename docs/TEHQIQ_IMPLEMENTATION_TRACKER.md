@@ -2582,6 +2582,14 @@ None. The harness is test-only and imports existing types without changing them.
 - **Verification:** `npm run lint`; focused outlet-formatting test; `git diff --check`.
 - **Acceptance:** PASS. TQ-VSC-078 and later prompts were not executed.
 
+## TQ-VSC-078 verification details
+
+- **Status:** PASS — hardened supported export formats against fabricated fallback years, preserving explicit missing metadata instead of emitting invented publication dates. Added cross-format truthfulness fixtures alongside existing DOCX/PDF/BibTeX/RIS/CSL/JATS tests.
+- **Files changed:** `src/lib/exportUtils.ts`; `src/tests/exportTruthfulness.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; export behavior is backward-compatible, with missing years now represented as `n.d.`/omitted rather than fabricated.
+- **Verification:** `npm run lint`; focused export truthfulness tests; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-079 and later prompts were not executed.
+
 ## TQ-VSC-075 verification details
 
 - **Status:** PASS — added a manifest builder for submission packages that filters out empty/nonexistent candidates and records project/export IDs, timestamp, manuscript version, target-outlet version, gate results, and file metadata.
