@@ -2590,6 +2590,14 @@ None. The harness is test-only and imports existing types without changing them.
 - **Verification:** `npm run lint`; focused export truthfulness tests; `git diff --check`.
 - **Acceptance:** PASS. TQ-VSC-079 and later prompts were not executed.
 
+## TQ-VSC-079 verification details
+
+- **Status:** PASS — added a provider-neutral embedding abstraction supporting scientific/SPECTER2-compatible, multilingual/BGE-M3-compatible, and cloud provider kinds. Embeddings retain model/version/config, generation time, chunk/document hashes, and index versions so model swaps do not orphan source locations.
+- **Files changed:** `src/lib/embeddingProvider.ts`; `src/tests/embeddingProvider.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; additive metadata model; prior provenance remains authoritative.
+- **Verification:** `npm run lint`; focused embedding-provider test; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-080 and later prompts were not executed.
+
 ## TQ-VSC-075 verification details
 
 - **Status:** PASS — added a manifest builder for submission packages that filters out empty/nonexistent candidates and records project/export IDs, timestamp, manuscript version, target-outlet version, gate results, and file metadata.
