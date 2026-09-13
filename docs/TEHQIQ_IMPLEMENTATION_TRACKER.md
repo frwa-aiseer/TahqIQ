@@ -2598,6 +2598,14 @@ None. The harness is test-only and imports existing types without changing them.
 - **Verification:** `npm run lint`; focused embedding-provider test; `git diff --check`.
 - **Acceptance:** PASS. TQ-VSC-080 and later prompts were not executed.
 
+## TQ-VSC-080 verification details
+
+- **Status:** PASS — added deterministic `EvidenceRetrievalService` behavior accepting a question/claim, ranking candidate full-text chunks by lexical relevance, returning source/evidence IDs with page/section/document provenance, and supporting project/source/date filters. Scores are explicitly relevance only.
+- **Files changed:** `src/lib/evidenceRetrievalService.ts`; `src/tests/evidenceRetrievalService.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; retrieval is read-only and preserves existing EvidenceRecord provenance.
+- **Verification:** `npm run lint`; deterministic retrieval test; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-081 and later prompts were not executed.
+
 ## TQ-VSC-075 verification details
 
 - **Status:** PASS — added a manifest builder for submission packages that filters out empty/nonexistent candidates and records project/export IDs, timestamp, manuscript version, target-outlet version, gate results, and file metadata.
