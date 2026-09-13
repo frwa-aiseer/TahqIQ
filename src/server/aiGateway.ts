@@ -49,6 +49,10 @@ export interface AiGatewayLedgerEvent {
   providerCalls: number;
   premiumReview: boolean;
   softBudgetReached: boolean;
+  /** Complete AiLedger projection metadata. */
+  feature?: string;
+  section?: string;
+  disposition?: "Proposed" | "Accepted" | "Edited & Accepted" | "Rejected";
 }
 
 export interface AiGatewayOutputArtifact<T> {
@@ -105,6 +109,8 @@ export interface AiGatewayRequest<T> {
   temperature?: number;
   privacy: AiTaskPrivacyDeclaration;
   budget: AiBudgetDeclaration;
+  feature?: string;
+  section?: string;
   validateResponse(text: string): { valid: true; value: T } | { valid: false; errors: string[] };
 }
 
@@ -157,6 +163,8 @@ export class AiGateway {
     }
     if (contract.modelTier === "Deterministic") throw new AiGatewayError("Deterministic agents cannot use a language-model provider.", "AGENT_PROVIDER_MISMATCH");
     if (!request.promptVersion.trim() || !request.responseSchemaId.trim() || !request.systemInstruction.trim() || !request.contents.trim()) throw new AiGatewayError("AI gateway request metadata is incomplete.", "INVALID_REQUEST");
+    const feature = request.feature?.trim() || request.agentId;
+    const section = request.section?.trim() || "Unspecified (researcher input required)";
     const ids = new Set<string>();
     for (const artifact of request.inputArtifacts) {
       if (!artifact.id.trim() || !contract.allowedInputArtifacts.includes(artifact.type) || ids.has(artifact.id)) throw new AiGatewayError("AI gateway input artifacts are missing, duplicated, or outside the agent contract.", "INVALID_ARTIFACTS");
@@ -228,6 +236,7 @@ export class AiGateway {
         privacyMode: route.privacyMode, sensitivity: route.sensitivity, includesRawUploads: route.includesRawUploads,
         pricingVersion: budget.pricingVersion, estimatedCostUsd: budget.estimatedCostUsd, providerCalls: budget.providerCalls,
         premiumReview: reservation.premiumReview, softBudgetReached: budget.softLimitReached,
+        feature, section, disposition: "Proposed",
       };
       await this.recordEvent(ledgerEvent, outputArtifact);
       return { outputArtifact, ledgerEvent, provider: ledgerEvent.provider, model: ledgerEvent.model, promptVersion: request.promptVersion, traceId, usage, budget };
@@ -242,6 +251,7 @@ export class AiGateway {
         privacyMode: route.privacyMode, sensitivity: route.sensitivity, includesRawUploads: route.includesRawUploads,
         pricingVersion: budget.pricingVersion, estimatedCostUsd: budget.estimatedCostUsd, providerCalls: budget.providerCalls,
         premiumReview: reservation.premiumReview, softBudgetReached: budget.softLimitReached,
+        feature, section, disposition: "Rejected",
       };
       try { await this.recordEvent(ledgerEvent); } catch { throw new AiGatewayError("AI gateway failure audit could not be recorded.", "LEDGER_WRITE_FAILED", ledgerEvent); }
       throw new AiGatewayError(gatewayError.message, gatewayError.code, ledgerEvent);

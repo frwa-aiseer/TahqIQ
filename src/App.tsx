@@ -16,6 +16,14 @@ import { ProtocolBuilderView } from "./components/views/ProtocolBuilderView";
 import { DataLabView } from "./components/views/DataLabView";
 import { WritingStudioView } from "./components/views/WritingStudioView";
 import { ExportCentreView } from "./components/views/ExportCentreView";
+import { EthicsWorkspaceView } from "./components/views/EthicsWorkspaceView";
+import { RevisionWorkspaceView } from "./components/views/RevisionWorkspaceView";
+import { JournalFinderView } from "./components/views/JournalFinderView";
+import { ReportingChecklistView } from "./components/views/ReportingChecklistView";
+import { PeerReviewView } from "./components/views/PeerReviewView";
+import { AiLedgerView } from "./components/views/AiLedgerView";
+import { ComplianceCentreView } from "./components/views/ComplianceCentreView";
+import { DashboardView } from "./components/views/DashboardView";
 import { ProjectWizardModal } from "./components/views/ProjectWizardModal";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AuthModal } from "./components/AuthModal";
@@ -306,16 +314,17 @@ function MainAppContent() {
           {/* Active Step Content Panel */}
           <div className="space-y-6">
             {activeStep === 1 && (
-              <ResearchCanvasView
+              <div className="space-y-6"><DashboardView project={project} onNavigateTab={(tab) => { const match = /step-(\d+)/.exec(tab); if (match) setActiveStep(Number(match[1])); }} /><ResearchCanvasView
                 canvas={project.canvas}
                 onUpdateCanvas={handleUpdateCanvas}
                 isDemoProject={project.isDemoProject}
                 projectId={project.id}
-              />
+              /></div>
             )}
 
             {activeStep === 2 && (
               <div className="space-y-6">
+                <JournalFinderView selectedOutlet={project.selectedTargetOutlet} onSelectOutlet={handleSelectOutlet} />
                 <SearchPlannerView
                   projectId={project.id}
                   executions={project.searchExecutions || []}
@@ -372,6 +381,8 @@ function MainAppContent() {
 
             {activeStep === 5 && (
               <div className="space-y-6">
+                <EthicsWorkspaceView ethicsInfo={project.ethicsInfo} />
+                <ReportingChecklistView guideline={project.reportingGuideline} />
                 <ProtocolBuilderView
                   project={project}
                   onUpdateProject={(updatedProject) => setProject(updatedProject)}
@@ -404,7 +415,7 @@ function MainAppContent() {
             )}
 
             {activeStep === 7 && (
-              <WritingStudioView
+              <div className="space-y-6"><WritingStudioView
                 sections={(project.sections || []).filter(
                   (s) =>
                     s.title.toLowerCase().includes("discussion") ||
@@ -419,7 +430,7 @@ function MainAppContent() {
                 onChangeCslStyle={(styleId) => setActiveCslStyle(styleId)}
                 onUpdateProject={(updatedProject) => setProject(updatedProject)}
                 onSelectOutlet={handleSelectOutlet}
-              />
+              /><RevisionWorkspaceView comments={project.reviewerComments || []} /></div>
             )}
 
             {activeStep === 8 && (
@@ -458,6 +469,10 @@ function MainAppContent() {
             )}
 
             {activeStep === 10 && (
+              <div className="space-y-6">
+              <ComplianceCentreView project={project} />
+              <PeerReviewView comments={project.reviewerComments || []} project={project} onUpdateProject={setProject} />
+              <AiLedgerView ledgerEvents={project.aiLedger || []} projectTitle={project.title} integrity={project.aiLedgerIntegrity} />
               <ExportCentreView
                 project={project}
                 activeCslStyle={activeCslStyle}
@@ -465,7 +480,7 @@ function MainAppContent() {
                 onUpdateProject={(updatedPartial) =>
                   setProject((prev) => ({ ...prev, ...updatedPartial }))
                 }
-              />
+              /></div>
             )}
           </div>
         </main>

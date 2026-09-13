@@ -11,6 +11,16 @@ export interface WorkflowStep {
   subtitle: string;
 }
 
+/** Researcher-facing six-stage map; legacy step IDs remain addressable for compatibility. */
+export const RESEARCH_STAGES = [
+  { id: 1, title: "Project & Target", stepIds: [1, 3] },
+  { id: 2, title: "Evidence", stepIds: [2, 9] },
+  { id: 3, title: "Method & Data", stepIds: [5] },
+  { id: 4, title: "Analysis", stepIds: [6] },
+  { id: 5, title: "Manuscript", stepIds: [4, 7, 8] },
+  { id: 6, title: "Review & Export", stepIds: [10] },
+] as const;
+
 export const WORKFLOW_STEPS: WorkflowStep[] = [
   { id: 1, key: "idea-title", title: "Idea & Title", shortLabel: "Idea & Title", subtitle: "Let's start with your idea" },
   { id: 2, key: "literature-gap", title: "Literature & Gap", shortLabel: "Literature & Gap", subtitle: "Find relevant literature" },
@@ -135,9 +145,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   // Calculate percentage: if readiness is available and has non-zero, combine with task completion
   const taskPercentage = Math.round((completedTasksCount / totalTasks) * 100);
   const readiness = project ? calculateProjectReadiness(project) : null;
-  const displayPercentage = readiness && readiness.overall > 0 
-    ? Math.max(taskPercentage, readiness.overall)
-    : taskPercentage;
+  const displayPercentage = readiness ? Math.round((taskPercentage + readiness.overall) / 2) : taskPercentage;
 
   const getProgressLabel = (pct: number) => {
     if (pct >= 90) return "Ready for Export";
@@ -356,4 +364,3 @@ export const Navigation: React.FC<NavigationProps> = ({
     </aside>
   );
 };
-

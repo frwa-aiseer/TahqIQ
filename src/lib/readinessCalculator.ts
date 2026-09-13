@@ -1,5 +1,11 @@
 import { ProjectState, PipelineStage, StageStatus } from "../types";
 import { isEvidenceBackedChecklistItem } from "./reportingGuidelineRegistry";
+import { evaluateExportGateChecks } from "./complianceEngine";
+
+export function calculateSubmissionReadiness(project: ProjectState): { ready: boolean; blockers: string[] } {
+  const blockers = evaluateExportGateChecks(project, "Submission-Ready").filter((check) => check.status === "Blocker").map((check) => check.message);
+  return { ready: blockers.length === 0, blockers };
+}
 
 export function calculateProjectReadiness(project: ProjectState): {
   overall: number;

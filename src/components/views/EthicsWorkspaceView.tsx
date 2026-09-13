@@ -23,19 +23,19 @@ export const EthicsWorkspaceView: React.FC<EthicsWorkspaceViewProps> = ({ ethics
       </div>
 
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4 text-xs">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-[#F8F5EC] p-3.5 rounded-lg border border-slate-200">
             <span className="text-slate-500 font-semibold block">Committee Approval Reference</span>
-            <p className="font-mono font-bold text-[#0B5D4B] mt-1">{ethicsInfo.approvalNumber}</p>
+            <p className="font-mono font-bold text-[#0B5D4B] mt-1">{ethicsInfo.approvalNumber || "Missing — researcher input required"}</p>
           </div>
           <div className="bg-[#F8F5EC] p-3.5 rounded-lg border border-slate-200">
             <span className="text-slate-500 font-semibold block">Trial Registration ID</span>
-            <p className="font-mono font-bold text-[#102A43] mt-1">{ethicsInfo.trialRegistrationNumber}</p>
+            <p className="font-mono font-bold text-[#102A43] mt-1">{ethicsInfo.trialRegistrationNumber || "Not applicable / not available"}</p>
           </div>
           <div className="bg-[#F8F5EC] p-3.5 rounded-lg border border-slate-200">
             <span className="text-slate-500 font-semibold block">Informed Consent Status</span>
             <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded mt-1 inline-block">
-              Confirmed & Logged
+              {ethicsInfo.consentObtained ? "Confirmed & Logged" : "Missing — researcher input required"}
             </span>
           </div>
         </div>

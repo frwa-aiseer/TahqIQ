@@ -13,6 +13,7 @@ export interface MetadataProviderResult {
 export interface CandidateSearchOptions { query?: string; author?: string; year?: number; limit?: number }
 export interface PubMedLookupOptions { apiKey?: string; email?: string; tool?: string }
 export interface DoiLookupOptions { pubMed?: PubMedLookupOptions }
+export interface IntegrityMetadataResult { status: "Clear" | "Retracted" | "Corrected" | "Expression of Concern" | "Updated" | "Unverified" | "Unavailable"; provider: string; retrievedAt: string; relatedIds: string[]; message?: string }
 
 const P = {
   crossref: { id: "crossref" as const, name: "Crossref Official Registry" },
@@ -74,6 +75,36 @@ export async function fetchCrossrefMetadata(input: string): Promise<MetadataProv
     return { success: true, providerId: provider.id, providerName: provider.name, providerRecordId: resolvedDoi, identifiers: { doi: resolvedDoi }, retrievedAt, rawUrl, ...fields,
       disclaimer: CrossrefDisclaimer.MESSAGE, fieldProvenance: provenance(fields, provider, retrievedAt, rawUrl) };
   } catch (error: any) { return failure(provider, retrievedAt, "network_error", `Network failure connecting to Crossref: ${error?.message || error}`, rawUrl); }
+}
+
+/** Queries Crossref relation/update metadata without treating absence as retraction clearance. */
+export async function fetchCrossrefIntegrityMetadata(input: string, fetchImpl: typeof fetch = fetch): Promise<IntegrityMetadataResult> {
+  const doi = normalizeDoi(input), provider = P.crossref, retrievedAt = new Date().toISOString();
+  if (!doi) return { status: "Unverified", provider: provider.name, retrievedAt, relatedIds: [], message: "Identifier is not a valid DOI." };
+  const rawUrl = `https://api.crossref.org/works/${encodeURIComponent(doi)}`;
+  try {
+    const response = await fetchImpl(rawUrl, { headers: { "User-Agent": "TehqIQ/1.0 (mailto:support@tehqiq.app)" } });
+    if (!response.ok) return { status: response.status === 404 ? "Unverified" : "Unavailable", provider: provider.name, retrievedAt, relatedIds: [], message: `Crossref integrity metadata unavailable (HTTP ${response.status}).` };
+    const item = (await response.json())?.message;
+    if (!item || typeof item !== "object") return { status: "Unverified", provider: provider.name, retrievedAt, relatedIds: [], message: "Crossref returned no integrity metadata." };
+    const relatedIds: string[] = [];
+    const labels: string[] = [];
+    const updates = Array.isArray((item as any)["update-to"]) ? (item as any)["update-to"] : [];
+    for (const update of updates) {
+      const relation = String(update?.type || "").toLowerCase();
+      const id = normalizeDoi(update?.DOI || update?.doi || ""); if (id) relatedIds.push(id);
+      if (relation.includes("retract")) labels.push("Retracted"); else if (relation.includes("correct")) labels.push("Corrected"); else if (relation.includes("concern")) labels.push("Expression of Concern"); else if (relation.includes("update")) labels.push("Updated");
+    }
+    const relationObject = (item as any).relation && typeof (item as any).relation === "object" ? (item as any).relation : {};
+    for (const [relation, ids] of Object.entries(relationObject)) {
+      const values = Array.isArray(ids) ? ids : [ids];
+      values.forEach((id) => { const normalized = normalizeDoi(String(id)); if (normalized) relatedIds.push(normalized); });
+      const lower = relation.toLowerCase();
+      if (lower.includes("retract")) labels.push("Retracted"); else if (lower.includes("correct")) labels.push("Corrected"); else if (lower.includes("concern")) labels.push("Expression of Concern"); else if (lower.includes("update")) labels.push("Updated");
+    }
+    const status = labels.includes("Retracted") ? "Retracted" : labels.includes("Corrected") ? "Corrected" : labels.includes("Expression of Concern") ? "Expression of Concern" : labels.includes("Updated") ? "Updated" : "Clear";
+    return { status, provider: provider.name, retrievedAt, relatedIds: [...new Set(relatedIds)], message: status === "Clear" ? "No Crossref retraction, correction, expression-of-concern, or update relation was returned; this is not proof of universal clearance." : `Crossref reported ${status.toLowerCase()} metadata.` };
+  } catch (error) { return { status: "Unavailable", provider: provider.name, retrievedAt, relatedIds: [], message: `Crossref integrity metadata request failed: ${error instanceof Error ? error.message : "network error"}.` }; }
 }
 
 export async function fetchOpenAlexMetadata(input: string): Promise<MetadataProviderResult> {

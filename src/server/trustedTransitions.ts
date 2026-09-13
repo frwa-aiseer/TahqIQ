@@ -147,7 +147,7 @@ export function applyTrustedTransition(
     fromState = author.finalApproval ? "Signed Off" : "Pending";
     if (author.finalApproval) throw new Error("Author sign-off is already locked.");
     toState = "Signed Off";
-    updated.authors = project.authors.map((item) => item.id === author.id ? { ...item, finalApproval: true, approvalTimestamp: timestamp } : item);
+    updated.authors = project.authors.map((item) => item.id === author.id ? { ...item, finalApproval: true, approvalTimestamp: timestamp, approvalActorUid: actor.uid, approvalRationale: request.rationale } : item);
   } else {
     entityType = "Submission";
     if (request.entityId !== project.id) throw new Error("Submission entity must be the project.");

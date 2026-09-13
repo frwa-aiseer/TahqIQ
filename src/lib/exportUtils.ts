@@ -609,6 +609,20 @@ export function generateBibTeX(project: ProjectState): string {
     .join("\n\n");
 }
 
+export function generateLatexManuscript(project: ProjectState): string {
+  const esc = (value: unknown): string => String(value ?? "").replace(/[&%$#_{}~^\\]/g, (c) => ({ "&": "\\&", "%": "\\%", "$": "\\$", "#": "\\#", "_": "\\_", "{": "\\{", "}": "\\}", "~": "\\textasciitilde{}", "^": "\\textasciicircum{}", "\\": "\\textbackslash{}" }[c] || c));
+  const authors = (project.authors || []).map((a) => esc(a.fullName)).join(" \\and ") || "Researcher input required";
+  const abstract = project.sections?.find((s) => s.title.toLowerCase().includes("abstract"));
+  const body = (project.sections || []).filter((s) => !s.title.toLowerCase().includes("abstract")).map((s) => `\\section{${esc(s.title)}}\n${esc(s.content)}`).join("\n\n");
+  return [`\\documentclass{article}`, `\\usepackage{graphicx}`, `\\usepackage{natbib}`, `\\title{${esc(project.title || "Untitled manuscript")}}`, `\\author{${authors}}`, `\\begin{document}`, `\\maketitle`, `\\begin{abstract}`, esc(abstract?.content || "Missing — researcher input required"), `\\end{abstract}`, body, `\\bibliographystyle{plainnat}`, `\\bibliography{references}`, `\\end{document}`].filter(Boolean).join("\n\n");
+}
+
+export interface SubmissionPackageFile { path: string; content: string; sha256: string; }
+export function createSubmissionPackageManifest(project: ProjectState, gateResults: readonly GateCheckResult[], files: readonly { path: string; content: string }[], exportId = `export-${Date.now()}`) {
+  const selected = files.filter((file) => file.content.trim().length > 0);
+  return { projectId: project.id, exportId, timestamp: new Date().toISOString(), manuscriptVersion: project.version || 1, targetOutlet: project.selectedTargetOutlet ? { id: project.selectedTargetOutlet.id, title: project.selectedTargetOutlet.title, version: Math.max(0, ...(project.selectedTargetOutlet.requirementsList || []).map((item) => item.version)) } : null, gateResults, files: selected.map((file) => ({ path: file.path, sha256: "Not computed in browser-only manifest builder", bytes: new TextEncoder().encode(file.content).length })) };
+}
+
 // 4. RIS EXPORT (Requirement 8)
 export function generateRIS(project: ProjectState): string {
   if (!project.sources || project.sources.length === 0) return "";
@@ -730,6 +744,7 @@ export function validateJatsXml(xmlStr: string): {
   validationErrors: string[];
   label: string;
   isExperimental: boolean;
+  status: "Structural Check Passed" | "Schema Validation Failed" | "Validator Not Configured";
 } {
   const errors: string[] = [];
 
@@ -745,9 +760,19 @@ export function validateJatsXml(xmlStr: string): {
   return {
     isValid,
     validationErrors: errors,
-    label: isValid ? "Validated JATS XML v1.3 (NLM Standard)" : "Experimental JATS XML (Unvalidated)",
+    label: isValid ? "Structural Check Passed (JATS XML v1.3 shape)" : "Schema Validation Failed (structural checks)",
     isExperimental: !isValid,
+    status: isValid ? "Structural Check Passed" : "Schema Validation Failed",
   };
+}
+
+export async function validateJatsWithConfiguredService(xmlStr: string, serviceUrl = typeof process !== "undefined" ? process.env.JATS_VALIDATOR_SERVICE_URL : undefined) {
+  if (!serviceUrl?.trim()) return { status: "Validator Not Configured" as const, isValid: false, validationErrors: ["External JATS validator is not configured."] };
+  try {
+    const response = await fetch(serviceUrl, { method: "POST", headers: { "Content-Type": "application/xml" }, body: xmlStr });
+    if (!response.ok) return { status: "Schema Validation Failed" as const, isValid: false, validationErrors: [`JATS validator returned HTTP ${response.status}.`] };
+    return { status: "Schema Validated" as const, isValid: true, validationErrors: [] as string[] };
+  } catch { return { status: "Schema Validation Failed" as const, isValid: false, validationErrors: ["JATS validator request failed."] }; }
 }
 
 // 7. RECORD EXPORT JOB HISTORY (Requirement 11)

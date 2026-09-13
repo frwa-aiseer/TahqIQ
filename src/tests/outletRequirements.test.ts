@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyProject } from "../data/demoProject";
 import { BASELINE_JOURNALS } from "../data/baselineOutlets";
-import { calculateComplianceRules } from "../lib/complianceEngine";
+import { calculateComplianceRules, runJournalComplianceAgent } from "../lib/complianceEngine";
 import {
   OUTLET_REQUIREMENT_FIELDS,
   createRequirementVersion,
@@ -112,5 +112,11 @@ describe("versioned outlet requirement provenance", () => {
       retrievalDate: requirement.retrievedAt,
       humanConfirmed: true,
     });
+  });
+
+  it("runs the JournalComplianceAgent boundary from actual project data", () => {
+    const requirement = verifiedRequirement({ value: 1 });
+    const project = { ...createEmptyProject(), selectedTargetOutlet: outletWith([requirement]) };
+    expect(runJournalComplianceAgent(project).find((rule) => rule.id === "rule-word-limit")).toMatchObject({ actualValue: "0 words", sourceRecordId: requirement.id, retrievalDate: requirement.retrievedAt });
   });
 });

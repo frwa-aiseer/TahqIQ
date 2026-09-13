@@ -66,6 +66,7 @@ describe("trusted sensitive transitions", () => {
     project.authors = [{ id: "author-1", fullName: "Researcher", publicationName: "Researcher", email: actor.email, department: "", institution: "", city: "", country: "", isCorresponding: true, order: 1, creditRoles: [], conflictDeclaration: "", finalApproval: false }];
     project = applyTrustedTransition(project, request("ETHICS_APPROVED", "ethics"), actor).project;
     project = applyTrustedTransition(project, request("AUTHOR_SIGNED_OFF", "author-1", 1), actor).project;
+    expect(project.authors[0]).toMatchObject({ finalApproval: true, approvalActorUid: actor.uid, approvalRationale: expect.any(String) });
     project.sections = project.sections.map((section) => ({ ...section, state: "Locked", status: "Approved" }));
     project = seal(project, 2);
     const ready = applyTrustedTransition(project, request("SUBMISSION_READY", project.id, 2), actor).project;

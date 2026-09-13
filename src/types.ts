@@ -200,6 +200,8 @@ export interface Author {
   conflictDeclaration: string;
   finalApproval: boolean;
   approvalTimestamp?: string;
+  approvalActorUid?: string;
+  approvalRationale?: string;
   isDemo?: boolean;
   isSynthetic?: boolean;
 }
@@ -474,6 +476,14 @@ export interface LiteratureScreeningRecord {
 }
 
 export type VerificationState = "Unverified" | "Verified" | "Conflict" | "Retracted" | "Corrected";
+export type SourceIntegrityVerificationStatus = "Clear" | "Retracted" | "Corrected" | "Expression of Concern" | "Updated" | "Unverified" | "Unavailable";
+export interface SourceIntegrityVerification {
+  status: SourceIntegrityVerificationStatus;
+  provider: string;
+  retrievedAt: string;
+  relatedIds: string[];
+  message?: string;
+}
 
 export type SourceState =
   | "Imported"
@@ -704,6 +714,7 @@ export interface SourceRecord {
   verificationDate?: string;
   retractionWarning?: boolean;
   correctionNotice?: string;
+  integrityVerification?: SourceIntegrityVerification;
   relevanceScore: number; // 1 to 10
   tags: string[];
   researcherNotes?: string;
@@ -1766,6 +1777,9 @@ export interface ProjectState {
     approvalDate?: string;
     consentObtained: boolean;
     trialRegistrationNumber?: string;
+    protocolId?: string;
+    consentWaiver?: string;
+    privacyConsiderations?: string;
     notes?: string;
     approvalState?: "Not Required" | "Pending" | "Approved" | "Rejected";
   };

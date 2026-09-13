@@ -277,7 +277,7 @@ export const ExportCentreView: React.FC<ExportCentreViewProps> = ({
 
     setExportNotice({
       type: validation.isValid ? "success" : "warning",
-      message: `${validation.label} exported. ${validation.isValid ? "100% NLM DTD compliant." : "Labeled as experimental/unvalidated per submission rules."}`,
+      message: `${validation.label} exported. No external NLM DTD/schema validation was performed.`,
     });
   };
 

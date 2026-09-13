@@ -99,7 +99,7 @@ describe('Export Validation Tests', () => {
       const validation = validateJatsXml(xml);
       expect(validation.isValid).toBe(true);
       expect(validation.validationErrors).toHaveLength(0);
-      expect(validation.label).toContain('Validated JATS XML v1.3');
+      expect(validation.label).toContain('Structural Check Passed');
     });
 
     it('detects missing tags in malformed XML', () => {

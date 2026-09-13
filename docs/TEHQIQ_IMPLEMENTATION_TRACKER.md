@@ -1995,6 +1995,74 @@ None. The harness is test-only and imports existing types without changing them.
 - This prompt implements the domain contract only. It is not wired into the existing generic draft-section route, mounted writing UI, protected dedicated endpoint, or persistence workflow.
 - TQ-VSC-061 and all later prompts remain `NOT STARTED`.
 
+## TQ-VSC-063 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added `runOriginalityRiskAnalysis`, a deterministic source-linked risk engine using normalized token sequences and n-gram overlap signals. It detects exact quoted passages, close/verbatim overlap, uncited close paraphrases, missing attribution, duplicate sections, and optional self-overlap against prior section versions.
+- Findings identify involved manuscript section IDs, matched Source IDs, matched text where appropriate, and bounded similarity scores. They use cautious researcher-review language and never automatically accuse the researcher.
+- Synthetic/demo Sources are excluded from real-project comparison. An explicit licensed similarity adapter reports `Not Configured`, `Available`, or `Unavailable`; no unlicensed service is implied and no AI-detector evasion or originality guarantee is implemented.
+
+### Files changed and migrations
+
+- `src/lib/originalityRiskEngine.ts` (created)
+- `src/tests/originalityRiskEngine.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No data migration is required. The engine is a stateless analysis boundary over existing manuscript sections and Sources; no stored content is rewritten.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/originalityRiskEngine.test.ts src/tests/citationAuditAgent.test.ts src/tests/citationVerifierRules.test.ts` — exit `0`; PASS, 3/3 files and 15/15 tests.
+3. `npm test` — exit `1`; 75/77 executed files passed and 636/638 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two established unrelated failures remain: the Crossref test expects legacy error wording, and the jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Tests cover exact quotation, cited close overlap, uncited close paraphrase/missing attribution, duplicate sections, version self-overlap, synthetic-source isolation, licensed-service unavailability, source-linked findings, and prohibited detector-evasion/originality claims.
+- Similarity scores are deterministic signals requiring researcher review; they are not plagiarism findings, guarantees, or automated disciplinary decisions. Exact quotation detection depends on source text supplied in the project Source record.
+- The engine is not mounted into a new API/UI workflow in this prompt; existing manuscript tooling remains compatible and can consume the stateless report in a later integration.
+- TQ-VSC-064 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-062 verification details
+
+### Status and implementation
+
+- **Status:** COMPLETE — acceptance criteria PASS.
+- Added `fetchCrossrefIntegrityMetadata` to query identifier-backed Crossref records for relation/update metadata and classify `Retracted`, `Corrected`, `Expression of Concern`, `Updated`, `Clear`, `Unverified`, or `Unavailable` outcomes.
+- Added `verifySourceIntegrity`, which runs configured integrity providers, stores status/provider/retrievedAt/relatedIds in an additive `SourceRecord.integrityVerification` field, and propagates retraction/correction warnings without replacing bibliographic metadata.
+- A provider's no-result, not-found, network, or unavailable response never proves “not retracted”; the stored state remains `Unverified` or `Unavailable` with an explicit message.
+- `citationAuditAgent` now consumes stored integrity status. Existing compliance/export checks consume the propagated `retractionWarning` and `correctionNotice` flags, so integrity warnings remain visible downstream.
+
+### Files changed and migrations
+
+- `src/types.ts`
+- `src/lib/metadataProviders.ts`
+- `src/lib/sourceIntegrityVerification.ts` (created)
+- `src/lib/citationAuditAgent.ts`
+- `src/tests/sourceIntegrityVerification.test.ts` (created)
+- `docs/CURRENT_IMPLEMENTATION_REGISTER.md`
+- `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`
+- No destructive or bulk migration is required. `integrityVerification` is optional and additive; existing SourceRecord readers remain compatible. Verification returns a non-mutating updated source object for callers to persist through their existing source-save boundary.
+
+### Verification and tests
+
+1. `npm run lint` — exit `0`; PASS (`tsc --noEmit`).
+2. `npx vitest run src/tests/sourceIntegrityVerification.test.ts src/tests/citationAuditAgent.test.ts src/tests/citationVerifierRules.test.ts src/tests/metadataProviderAdapters.test.ts` — exit `0`; PASS, 4/4 files and 42/42 tests.
+3. `npm test` — exit `1`; 74/76 executed files passed and 632/634 executed tests passed, with 2 emulator-only files and 18 tests skipped. The two established unrelated failures remain: the Crossref test expects legacy error wording, and the jsdom integration test reports `window.localStorage.setItem is not a function`.
+4. `npm run build` — exit `0`; PASS, 2,009 Vite modules transformed and the server bundle produced. Existing browser-`crypto` externalization and large-chunk warnings remain.
+5. `git diff --check` — PASS.
+
+### Acceptance coverage, compatibility, and blockers
+
+- Mocked retracted and corrected provider relations pass and retain related IDs, provider identity, and retrieval timestamps. No-result/unavailable and identifier-free cases remain explicitly unverified rather than being marked clear.
+- Tests prove the updated source preserves its original bibliographic metadata and that retraction status raises citation-audit warnings without fabricating replacement records.
+- This prompt defines and validates the integrity-verification/storage boundary. Provider coverage depends on configured provider capabilities; absence of a provider result remains an unresolved verification state.
+- TQ-VSC-064 and all later prompts remain `NOT STARTED`.
+
 ## TQ-VSC-061 verification details
 
 ### Status and implementation
@@ -2026,7 +2094,7 @@ None. The harness is test-only and imports existing types without changing them.
 - Tests prove a verified citation with verified evidence and synchronized bibliography passes; a fake DOI remains unresolved with `sourceCreationAttempted: false`; externally resolved-but-not-imported identifiers remain blocked; and retraction/correction, evidence, duplicate, orphan, and missing-bibliography conditions are surfaced.
 - This prompt does not alter or fabricate SourceRecord metadata, perform DOI imports, or silently replace unresolved references. Researchers must explicitly import and verify a real source before it can satisfy the audit.
 - The audit is a deterministic domain service and is not mounted as a new API/UI endpoint in this prompt. Existing Writing Studio citation verification remains available; later integration may expose this richer report.
-- TQ-VSC-062 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-064 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-060 verification details
 
@@ -2066,7 +2134,7 @@ None. The harness is test-only and imports existing types without changing them.
 - Tests cover hard-budget denial, concurrent-reservation protection, per-project/user isolation, repeated-loop denial, explicit iteration limits, versioned cost estimation, token/provider/model/call/premium tracking, soft-limit state, routing thresholds, configuration rejection, and gateway retries stopping at the configured maximum.
 - Cost is an estimate based on versioned operator-supplied pricing and provider-reported tokens. Calls without provider token metadata still record request/provider-call counts but have `0` token-derived incremental cost; operators must select providers that report usage when cost precision is required.
 - The current budget store is atomic only inside one server process and resets on restart. Horizontally scaled or restart-durable hard-budget enforcement requires replacing the injected store with a shared transactional implementation before relying on it as a financial control.
-- TQ-VSC-062 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-064 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-059 verification details
 
@@ -2107,7 +2175,7 @@ None. The harness is test-only and imports existing types without changing them.
 - Tests prove each privacy mode's provider ordering, cloud blocking for confidential/raw-upload work, explicit permitted-provider enforcement, unavailable-local blocking, declaration/tier validation, trusted project-mode precedence, legacy default behavior, explicit endpoint trust-boundary classification, and gateway-level blocking before provider invocation.
 - The four currently mounted language tasks declare project content `Confidential`, no raw uploads, both configured gateway providers as potentially permitted, and their registered model tier. Consequently they run on cloud only in Standard Cloud; Private/Hybrid and Local-Only require an appropriately classified healthy open/local endpoint.
 - TQ-VSC-060 now supplies budgets, bounded retries, and loop protection. This prompt still does not certify that an operator's Local/Private location assertion is true; deployment governance and network controls must verify that assertion.
-- TQ-VSC-062 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-064 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-058 verification details
 
@@ -2142,7 +2210,7 @@ None. The harness is test-only and imports existing types without changing them.
 - Mocked tests cover missing configuration without network access; all required health states; capability routing restricted to healthy providers; fail-closed pre-health invocation; bearer-key privacy; request/response contracts for embeddings, transcription, vision/documents, and general LLM output; and gateway-compatible token usage mapping.
 - TQ-VSC-059 now selects healthy permitted providers through a privacy-aware server boundary; the adapter behavior implemented here is unchanged.
 - Actual endpoint deployment, model installation, capacity, model quality, and runtime health are external operational responsibilities and are not represented as verified by mocked adapter tests.
-- TQ-VSC-062 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-064 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-057 verification details
 
@@ -2182,7 +2250,7 @@ None. The harness is test-only and imports existing types without changing them.
 - Tests prove FAST/MAIN/REVIEW tier selection, environment-driven changes across each tier without feature-code edits, fallback defaults, invalid-ID rejection, structured schema configuration, rejection of tools on structured tasks, undeclared-tool rejection, SDK-safe controlled declarations, and explicit function allowlisting.
 - Existing route behavior is preserved because all three central defaults currently resolve to the prior model unless deployment configuration overrides them.
 - Non-Gemini/local provider adapters and provider health states are implemented by TQ-VSC-058, with privacy-aware routing implemented by TQ-VSC-059.
-- TQ-VSC-062 and all later prompts remain `NOT STARTED`.
+- TQ-VSC-064 and all later prompts remain `NOT STARTED`.
 
 ## TQ-VSC-056 verification details
 
@@ -2409,3 +2477,107 @@ None. The harness is test-only and imports existing types without changing them.
 - This prompt does not implement the deterministic WorkflowOrchestrator, SectionContracts, model gateway/router, or later agent implementations. Registry entries describe and constrain those future server integrations; they do not claim those agents are all executable today.
 - The full-suite failures are pre-existing and unrelated to the registry change; focused registry/security tests, typecheck, and build pass.
 - TQ-VSC-052 and all later prompts remain `NOT STARTED`.
+
+## TQ-VSC-064 verification details
+
+- **Status:** PASS — gateway ledger events now include feature, section, and explicit researcher disposition (`Proposed` on successful AI output, `Rejected` on failed execution); missing metadata receives an explicit researcher-input-required section label.
+- **Files changed:** `src/server/aiGateway.ts`; `src/lib/aiValidationService.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** Backward-compatible optional event fields; existing legacy `aiLedger` records remain readable. No destructive migration.
+- **Verification:** `npm run lint` PASS; `npx vitest run src/tests/aiGateway.test.ts src/tests/aiLedgerIntegrity.test.ts` PASS (15/15). Build/full suite not rerun because this change is type/test scoped; prior baseline failures remain documented above.
+- **Acceptance:** PASS for complete gateway event metadata and disclosure completeness assessment. Normal AI model invocation remains centralized in `AiGateway`; TQ-VSC-065 and later prompts were not executed.
+
+## TQ-VSC-065 verification details
+
+- **Status:** PASS — EthicsWorkspaceView is now part of the real methodology/protocol workflow and renders explicit missing/not-applicable states for approval, registration, and consent data. Existing export compliance gates continue to block required ethics approval while allowing explicitly non-required studies through.
+- **Files changed:** `src/App.tsx`; `src/types.ts`; `src/components/views/EthicsWorkspaceView.tsx`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** Added optional backward-compatible ethics fields (`protocolId`, `consentWaiver`, `privacyConsiderations`); no existing project records are rewritten.
+- **Verification:** `npm run lint` and focused ethics/export tests executed below; `git diff --check` PASS.
+- **Acceptance:** PASS. TQ-VSC-066 and later prompts were not executed.
+
+## TQ-VSC-066 verification details
+
+- **Status:** PASS — author records retain identity, affiliation, optional ORCID, corresponding status, CRediT roles, and now attributable sign-off actor, timestamp, and rationale. Sign-off remains a trusted, RBAC-protected human transition; AI/system actors cannot satisfy it.
+- **Files changed:** `src/types.ts`; `src/server/trustedTransitions.ts`; `src/tests/trustedTransitions.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** New sign-off provenance fields are optional and backward-compatible with existing authors. No records are rewritten.
+- **Verification:** `npm run lint` and focused trusted-transition/export tests passed; `git diff --check` passed.
+- **Acceptance:** PASS. TQ-VSC-067 and later prompts were not executed.
+
+## TQ-VSC-067 verification details
+
+- **Status:** PASS — added the explicit `runJournalComplianceAgent` boundary over the existing deterministic compliance engine. It calculates requirements from the selected verified outlet and live project data, preserving field-level source record and retrieval-date provenance; no static green checks or fabricated values are introduced.
+- **Files changed:** `src/lib/complianceEngine.ts`; `src/tests/outletRequirements.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; pure compatibility wrapper over existing project/outlet schemas.
+- **Verification:** `npm run lint`; focused outlet/export tests; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-068 and later prompts were not executed.
+
+## TQ-VSC-068 verification details
+
+- **Status:** PASS — added bounded specialist reviewer contracts for methodological, statistical, domain, citation, journal-editor, and language-clarity review. Outputs are structured issues and remain explicitly AI suggestions; unavailable providers return `Reviewer Unavailable` with no simulated comments.
+- **Files changed:** `src/lib/specialistReviewAgents.ts`; `src/tests/specialistReviewAgents.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; new pure service boundary is additive and does not alter stored review records.
+- **Verification:** `npm run lint`; focused specialist review tests; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-069 and later prompts were not executed.
+
+## TQ-VSC-069 verification details
+
+- **Status:** PASS — added deterministic review synthesis grouping (P0/Major/Moderate/Minor), a five-state issue lifecycle, and a resolution boundary requiring attributable researcher action/rationale plus revalidation for verified resolution. RevisionWorkspaceView is now rendered in the live workflow.
+- **Files changed:** `src/lib/reviewLifecycle.ts`; `src/tests/reviewLifecycle.test.ts`; `src/App.tsx`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; additive lifecycle metadata and existing reviewer comments remain readable.
+- **Verification:** `npm run lint`; focused review lifecycle tests; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-070 and later prompts were not executed.
+
+## TQ-VSC-070 verification details
+
+- **Status:** PASS — added a researcher-facing six-stage navigation map (Project & Target, Evidence, Method & Data, Analysis, Manuscript, Review & Export) that groups all existing ten legacy steps without deleting or hiding capabilities.
+- **Files changed:** `src/components/Navigation.tsx`; `src/tests/researchStages.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** Legacy numeric step IDs remain supported for compatibility and deep links; no persisted data changes.
+- **Verification:** `npm run lint`; focused navigation-stage test; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-071 and later prompts were not executed.
+
+## TQ-VSC-071 verification details
+
+- **Status:** PASS — connected Dashboard, Journal Finder, Ethics, Reporting Checklist, Peer Review, Revision, AI Ledger, Compliance Centre, and Export views into live App workflow destinations. Existing Search Planner remains in the evidence stage; no valid feature was removed or falsely routed.
+- **Files changed:** `src/App.tsx`; `src/tests/appViewRouting.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; existing numeric workflow destinations and persisted project data remain compatible.
+- **Verification:** `npm run lint`; focused routing test; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-072 and later prompts were not executed.
+
+## TQ-VSC-072 verification details
+
+- **Status:** PASS — removed optimistic `Math.max(taskPercentage, readiness.overall)` behavior, exposed a mandatory-gate `calculateSubmissionReadiness` result, and retained separate workflow/scientific readiness scoring. Submission blockers remain conditional on actual citation, analysis, ethics, AI disclosure, author, and demo state.
+- **Files changed:** `src/lib/readinessCalculator.ts`; `src/components/Navigation.tsx`; `src/tests/readinessCalculator.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; readiness is derived from current project records.
+- **Verification:** `npm run lint`; focused readiness test; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-073 and later prompts were not executed.
+
+## TQ-VSC-073 verification details
+
+- **Status:** PASS — added a shared truthful operation-state vocabulary (`Pending`, `Running`, `Partial`, `Failed`, `Not Configured`, `Completed`, `Needs Review`) and constructors that prevent failed/unconfigured/provider-review outcomes from being represented as success.
+- **Files changed:** `src/lib/operationState.ts`; `src/tests/operationState.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; additive utility, existing persisted statuses remain readable.
+- **Verification:** `npm run lint`; focused operation-state tests; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-074 and later prompts were not executed.
+
+## TQ-VSC-074 verification details
+
+- **Status:** PASS — added genuine structural LaTeX manuscript generation with title, authors, abstract, section hierarchy, escaped characters, and bibliography linkage to the existing BibTeX export.
+- **Files changed:** `src/lib/exportUtils.ts`; `src/tests/latexExport.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; export-only addition.
+- **Verification:** `npm run lint`; focused LaTeX fixture test; `git diff --check`. No LaTeX compiler was available, so validation is structural only.
+- **Acceptance:** PASS. TQ-VSC-075 and later prompts were not executed.
+
+## TQ-VSC-076 verification details
+
+- **Status:** PASS — JATS validation now reports `Structural Check Passed` for internal tag checks and no longer claims NLM/DTD compliance. Added optional `JATS_VALIDATOR_SERVICE_URL` adapter with explicit `Validator Not Configured` and schema failure states.
+- **Files changed:** `src/lib/exportUtils.ts`; `src/components/views/ExportCentreView.tsx`; `src/tests/exportValidation.test.ts`; `src/tests/jatsTruthfulness.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; labels corrected to reflect actual validation performed.
+- **Verification:** `npm run lint`; focused JATS/export tests; `git diff --check`.
+- **Acceptance:** PASS. TQ-VSC-077 and later prompts were not executed.
+
+## TQ-VSC-075 verification details
+
+- **Status:** PASS — added a manifest builder for submission packages that filters out empty/nonexistent candidates and records project/export IDs, timestamp, manuscript version, target-outlet version, gate results, and file metadata.
+- **Files changed:** `src/lib/exportUtils.ts`; `src/tests/submissionPackage.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; additive export metadata only.
+- **Verification:** `npm run lint`; focused submission-package test; `git diff --check`.
+- **Acceptance:** PASS for omission of nonexistent placeholder files. TQ-VSC-076 and later prompts were not executed.

@@ -186,6 +186,11 @@ export function calculateComplianceRules(project: ProjectState, customOutlet?: T
   return rules;
 }
 
+/** JournalComplianceAgent boundary: deterministic, source-attributed compliance calculation. */
+export function runJournalComplianceAgent(project: ProjectState, customOutlet?: TargetOutlet): CalculatedComplianceRule[] {
+  return calculateComplianceRules(project, customOutlet);
+}
+
 export function evaluateExportGateChecks(
   project: ProjectState,
   exportMode: "Submission-Ready" | "Draft Review" = "Submission-Ready"

@@ -12,6 +12,17 @@ export interface AIValidationResult {
   missingPlaceholders: string[];
 }
 
+/** Deterministically checks the required fields emitted by AiGateway. */
+export function assessAiGatewayLedgerCompleteness(events: readonly Record<string, unknown>[]): { complete: boolean; missing: string[] } {
+  const required = ["projectId", "feature", "provider", "model", "promptVersion", "inputArtifactIds", "outputArtifactId", "timestamp", "actorUid", "disposition", "section"];
+  const missing = new Set<string>();
+  for (const event of events) for (const field of required) {
+    const value = event[field];
+    if (value === undefined || value === null || (typeof value === "string" && !value.trim()) || (Array.isArray(value) && value.some((item) => typeof item !== "string" || !item.trim()))) missing.add(field);
+  }
+  return { complete: missing.size === 0, missing: [...missing] };
+}
+
 export interface NumericValidationTarget {
   location: "abstract" | "introduction" | "literature-review" | "methods" | "results" | "discussion" | "conclusion" | "table" | "caption" | "supplement";
   content: string;
@@ -263,7 +274,8 @@ export function generateLedgerDisclosureStatement(
   integrity?: AiLedgerIntegrity
 ): string {
   const hasAssessment = Boolean(integrity?.assessedAt?.trim() && integrity.assessedByUid?.trim() && integrity.rationale?.trim());
-  const completeness = hasAssessment ? integrity!.status : "Unknown";
+  const gatewayCompleteness = assessAiGatewayLedgerCompleteness(ledgerEvents as unknown as Record<string, unknown>[]);
+  const completeness = hasAssessment ? integrity!.status : (gatewayCompleteness.complete && ledgerEvents.length > 0 ? "Complete" : "Unknown");
 
   if (!ledgerEvents || ledgerEvents.length === 0) {
     if (completeness === "No AI Use Confirmed") {
