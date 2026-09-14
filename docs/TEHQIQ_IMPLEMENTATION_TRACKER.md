@@ -2653,3 +2653,19 @@ None. The harness is test-only and imports existing types without changing them.
 - **Migration:** None; additive export metadata only.
 - **Verification:** `npm run lint`; focused submission-package test; `git diff --check`.
 - **Acceptance:** PASS for omission of nonexistent placeholder files. TQ-VSC-076 and later prompts were not executed.
+
+## TQ-VSC-086 verification details
+
+- **Status:** PASS — added a focused authentication/RBAC/security regression suite covering verified-token authorization, Viewer least privilege, self-role elevation resistance, rate limiting, trusted-audit/transition forgery rejection, project/profile/file isolation, locked-artifact protection, and per-project AI budget enforcement.
+- **Files changed:** `src/tests/authRbacSecuritySuite.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; test-only coverage with no persisted schema changes.
+- **Verification:** `npm run lint` (pass); focused security, auth/RBAC, Firestore/Storage rules, trusted audit/transition, and AI budget tests (46 passed, 18 emulator tests skipped without emulator hosts); `npm run build` (pass); `npm test` (669 passed, 2 pre-existing failures in `phase3.test.ts` network-dependent DOI lookup and `integration.test.ts` localStorage mock); `npm run test:firestore-rules` blocked because Java is unavailable; `git diff --check` (pass).
+- **Acceptance:** PASS — least-privilege expectations are covered. TQ-VSC-087 and later prompts were not executed.
+
+## TQ-VSC-087 verification details
+
+- **Status:** PASS — added a deterministic generic empirical end-to-end fixture that dispatches every governed workflow gate from intake through literature, evidence, research design, methodology, analysis, results, writing, review, compliance, and export; executes a real registered statistical method with QC and researcher approval; validates citations; runs mocked specialist review; and generates DOCX, BibTeX, LaTeX, and a submission manifest.
+- **Files changed:** `src/tests/genericEmpiricalWorkflow.e2e.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; test-only fixture coverage. The project fixture is explicitly non-demo/non-synthetic and no synthetic fallback records are introduced.
+- **Verification:** `npx vitest run src/tests/genericEmpiricalWorkflow.e2e.test.ts` (1 passed); `npm run lint` (pass); `npm run build` (pass); `npm test` (670 passed, 2 pre-existing failures in localStorage mocking and a network/provider-dependent DOI assertion); `git diff --check` (pass).
+- **Acceptance:** PASS — full generic empirical E2E fixture passes. TQ-VSC-088 and later prompts were not executed.
