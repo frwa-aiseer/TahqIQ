@@ -137,7 +137,7 @@ export async function generateGenuineDocxBlob(project: ProjectState, config: Doc
                     new TextRun({ text: `Citation Format: `, bold: true, size: fontSize - 4, font }),
                     new TextRun({ text: `${styleId.toUpperCase()} | `, size: fontSize - 4, font }),
                     new TextRun({ text: `Ethics ID: `, bold: true, size: fontSize - 4, font }),
-                    new TextRun({ text: `${project.ethicsInfo?.approvalNumber || "Declared NISS-REC-2026"}`, size: fontSize - 4, font }),
+                    new TextRun({ text: `${project.ethicsInfo?.approvalNumber || "Not configured — researcher input required"}`, size: fontSize - 4, font }),
                   ],
                 }),
               ],
@@ -438,7 +438,7 @@ export function downloadPdfPackage(
     doc.setFontSize(9);
     doc.setTextColor(80, 80, 80);
     const outletTitle = project.selectedTargetOutlet?.title || "Target Outlet";
-    doc.text(`Target Outlet: ${outletTitle} | Format: ${styleId.toUpperCase()} | Ethics ID: ${project.ethicsInfo?.approvalNumber || "Declared"}`, marginX, y);
+    doc.text(`Target Outlet: ${outletTitle} | Format: ${styleId.toUpperCase()} | Ethics ID: ${project.ethicsInfo?.approvalNumber || "Not configured — researcher input required"}`, marginX, y);
     y += 8;
     doc.setDrawColor(200, 200, 200);
     doc.line(marginX, y, marginX + contentWidth, y);
@@ -581,6 +581,7 @@ export function downloadPdfPackage(
   // Save PDF
   const safeTitle = (project.title || "Manuscript").substring(0, 25).replace(/[^a-zA-Z0-9]/g, "_");
   doc.save(`${safeTitle}_TehqIQ.pdf`);
+  return doc.output("blob");
 }
 
 // 3. BIBTEX EXPORT (Requirement 8)
@@ -589,7 +590,7 @@ export function generateBibTeX(project: ProjectState): string {
 
   return project.sources
     .map((src, idx) => {
-      const citeKey = src.authors?.[0]?.split(" ")?.[0]?.toLowerCase() || `ref${idx + 1}`;
+      const citeKey = (src.authors?.[0]?.split(" ")?.[0]?.toLowerCase() || `ref${idx + 1}`).replace(/[^a-z0-9]+/g, "") || `ref${idx + 1}`;
       const year = src.year || "n.d.";
       const cleanTitle = (src.title || "").replace(/[{}&%$#_]/g, "\\$&");
       const cleanAuthors = (src.authors || []).join(" and ").replace(/[{}&%$#_]/g, "\\$&");
@@ -597,7 +598,7 @@ export function generateBibTeX(project: ProjectState): string {
       return `@article{${citeKey}${year},
   author = {${cleanAuthors}},
   title = {${cleanTitle}},
-  journal = {${src.journalOrVenue || "Scholarly Outlet"}},
+  journal = {${src.journalOrVenue || "Not available"}},
   year = {${year}},
   volume = {${src.volume || ""}},
   number = {${src.issue || ""}},
@@ -613,7 +614,15 @@ export function generateLatexManuscript(project: ProjectState): string {
   const esc = (value: unknown): string => String(value ?? "").replace(/[&%$#_{}~^\\]/g, (c) => ({ "&": "\\&", "%": "\\%", "$": "\\$", "#": "\\#", "_": "\\_", "{": "\\{", "}": "\\}", "~": "\\textasciitilde{}", "^": "\\textasciicircum{}", "\\": "\\textbackslash{}" }[c] || c));
   const authors = (project.authors || []).map((a) => esc(a.fullName)).join(" \\and ") || "Researcher input required";
   const abstract = project.sections?.find((s) => s.title.toLowerCase().includes("abstract"));
-  const body = (project.sections || []).filter((s) => !s.title.toLowerCase().includes("abstract")).map((s) => `\\section{${esc(s.title)}}\n${esc(s.content)}`).join("\n\n");
+  const citeKey = (source: ProjectState["sources"][number], index: number) => `${(source.authors?.[0]?.split(" ")?.[0]?.toLowerCase() || `ref${index + 1}`).replace(/[^a-z0-9]+/g, "") || `ref${index + 1}`}${source.year || "nd"}`;
+  const body = (project.sections || []).filter((s) => !s.title.toLowerCase().includes("abstract")).map((s) => {
+    const citations = (s.citationIds || []).map((id) => {
+      const index = (project.sources || []).findIndex((source) => source.id === id);
+      return index >= 0 ? citeKey(project.sources[index], index) : undefined;
+    }).filter((key): key is string => Boolean(key));
+    const citationCommand = citations.length ? `\n\\cite{${[...new Set(citations)].join(",")}}` : "";
+    return `\\section{${esc(s.title)}}\n${esc(s.content)}${citationCommand}`;
+  }).join("\n\n");
   return [`\\documentclass{article}`, `\\usepackage{graphicx}`, `\\usepackage{natbib}`, `\\title{${esc(project.title || "Untitled manuscript")}}`, `\\author{${authors}}`, `\\begin{document}`, `\\maketitle`, `\\begin{abstract}`, esc(abstract?.content || "Missing — researcher input required"), `\\end{abstract}`, body, `\\bibliographystyle{plainnat}`, `\\bibliography{references}`, `\\end{document}`].filter(Boolean).join("\n\n");
 }
 

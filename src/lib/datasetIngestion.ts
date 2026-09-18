@@ -472,6 +472,10 @@ export async function updateDatasetVariableDictionary(
   updatedVariables: DatasetVariable[],
   changeNote: string
 ): Promise<DatasetRecord> {
+  if (dataset.state === "Locked") {
+    throw new Error(`Dataset '${dataset.id}' is locked and immutable. Upload a replacement dataset to create a new version.`);
+  }
+
   const newVersionNum = (dataset.version || 1) + 1;
   const nowIso = new Date().toISOString();
 
@@ -562,4 +566,3 @@ export function parseCsvTextToDataset(filename: string, csvContent: string): Dat
     rawPreview: rawRows,
   };
 }
-

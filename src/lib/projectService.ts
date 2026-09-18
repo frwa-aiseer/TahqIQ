@@ -1,5 +1,5 @@
 import { getFirebaseServices } from "./firebase";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where, addDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where, addDoc, runTransaction } from "firebase/firestore";
 import { ProjectState, ProjectRole, ProjectMember, ProjectVersionSnapshot } from "../types";
 import { createEmptyProject, isDemoRecord } from "../data/demoProject";
 import { hydrateProjectResearchArtifacts } from "./researchArtifacts";
@@ -11,6 +11,75 @@ export interface ProjectSaveResult {
   version: number;
   updatedAt: string;
   error?: string;
+  conflict?: boolean;
+  status?: "Saved" | "Conflict" | "Failed";
+  remoteProject?: ProjectState;
+}
+
+export class ProjectVersionConflictError extends Error {
+  readonly code = "PROJECT_VERSION_CONFLICT" as const;
+
+  constructor(
+    message: string,
+    readonly expectedVersion: number,
+    readonly actualVersion: number,
+    readonly remoteProject?: ProjectState
+  ) {
+    super(message);
+    this.name = "ProjectVersionConflictError";
+  }
+}
+
+type LockableProjectCollection = "datasets" | "analysisOutputs" | "sections";
+
+/**
+ * Returns identifiers for locked records that a candidate save attempts to
+ * remove or rewrite. These records are immutable after trusted approval.
+ */
+export function findImmutableProjectConflicts(
+  current: ProjectState,
+  candidate: ProjectState
+): string[] {
+  const conflicts: string[] = [];
+  const collections: LockableProjectCollection[] = ["datasets", "analysisOutputs", "sections"];
+
+  for (const collectionName of collections) {
+    const currentRecords = (current[collectionName] || []) as unknown as Array<Record<string, unknown>>;
+    const candidateRecords = (candidate[collectionName] || []) as unknown as Array<Record<string, unknown>>;
+    const candidateById = new Map(candidateRecords.map((record) => [String(record.id), record]));
+
+    for (const currentRecord of currentRecords) {
+      const isLocked = currentRecord.state === "Locked" || currentRecord.locked === true;
+      if (!isLocked) continue;
+
+      const id = String(currentRecord.id || "unknown");
+      const candidateRecord = candidateById.get(id);
+      if (!candidateRecord || JSON.stringify(candidateRecord) !== JSON.stringify(currentRecord)) {
+        conflicts.push(`${collectionName}:${id}`);
+      }
+    }
+  }
+
+  return conflicts;
+}
+
+function buildVersionSnapshot(
+  project: ProjectState,
+  version: number,
+  uid: string,
+  email: string,
+  summary: string
+): ProjectVersionSnapshot {
+  return {
+    id: `ver-${version}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    version,
+    timestamp: new Date().toISOString(),
+    createdByUid: uid,
+    createdByEmail: email,
+    summary,
+    titleSnapshot: project.title,
+    sectionCountSnapshot: project.sections?.length || 0,
+  };
 }
 
 export async function getUserProjects(uid: string): Promise<ProjectState[]> {
@@ -98,41 +167,76 @@ export async function createProjectInFirestore(
 export async function saveProjectToFirestore(
   project: ProjectState,
   currentUserUid: string,
-  currentUserEmail: string
+  currentUserEmail: string,
+  expectedVersion: number = project.version || 1
 ): Promise<ProjectSaveResult> {
   if (project.isDemoProject) {
     return {
       success: true,
       version: project.version || 1,
       updatedAt: new Date().toISOString(),
+      status: "Saved",
     };
   }
 
   try {
-    const now = new Date().toISOString();
-    const newVersion = (project.version || 1) + 1;
+    const docRef = doc(firestore(), "projects", project.id);
+    const result = await runTransaction(firestore(), async (transaction) => {
+      const snapshot = await transaction.get(docRef);
+      if (!snapshot.exists()) throw new Error("Project not found.");
 
-    const updatedProject = hydrateProjectResearchArtifacts({
-      ...project,
-      version: newVersion,
-      updatedAt: now,
+      const remoteProject = hydrateProjectResearchArtifacts(snapshot.data() as ProjectState);
+      const actualVersion = remoteProject.version || 1;
+      if (actualVersion !== expectedVersion) {
+        throw new ProjectVersionConflictError(
+          `Project version conflict: expected v${expectedVersion}, but the stored project is v${actualVersion}. Reload before saving.`,
+          expectedVersion,
+          actualVersion,
+          remoteProject
+        );
+      }
+
+      const immutableConflicts = findImmutableProjectConflicts(remoteProject, project);
+      if (immutableConflicts.length > 0) {
+        throw new ProjectVersionConflictError(
+          `Immutable approved artifact conflict: ${immutableConflicts.join(", ")}. The newer approved record was not overwritten.`,
+          expectedVersion,
+          actualVersion,
+          remoteProject
+        );
+      }
+
+      const now = new Date().toISOString();
+      const newVersion = actualVersion + 1;
+      const updatedProject = hydrateProjectResearchArtifacts({ ...project, version: newVersion, updatedAt: now });
+      const versionSnapshot = buildVersionSnapshot(updatedProject, newVersion, currentUserUid, currentUserEmail, "Autosave manuscript/project revision");
+      const versionRef = doc(collection(firestore(), "projects", project.id, "versions"), versionSnapshot.id);
+
+      transaction.set(docRef, updatedProject, { merge: true });
+      transaction.set(versionRef, versionSnapshot);
+      return { updatedProject, versionSnapshot };
     });
 
-    const docRef = doc(firestore(), "projects", project.id);
-    await setDoc(docRef, updatedProject, { merge: true });
-
-    return {
-      success: true,
-      version: newVersion,
-      updatedAt: now,
-    };
+    return { success: true, version: result.updatedProject.version || expectedVersion + 1, updatedAt: result.updatedProject.updatedAt, status: "Saved" };
   } catch (err: any) {
+    if (err instanceof ProjectVersionConflictError) {
+      return {
+        success: false,
+        version: err.actualVersion,
+        updatedAt: err.remoteProject?.updatedAt || project.updatedAt,
+        error: err.message,
+        conflict: true,
+        status: "Conflict",
+        remoteProject: err.remoteProject,
+      };
+    }
     console.error("Firestore save error:", err);
     return {
       success: false,
       version: project.version || 1,
       updatedAt: project.updatedAt,
       error: err.message || "Failed to save project to cloud storage.",
+      status: "Failed",
     };
   }
 }
@@ -220,16 +324,7 @@ export async function createVersionSnapshot(
 ): Promise<void> {
   try {
     const versionsRef = collection(firestore(), "projects", projectId, "versions");
-    const snapshot: ProjectVersionSnapshot = {
-      id: `ver-${project.version || 1}-${Date.now()}`,
-      version: project.version || 1,
-      timestamp: new Date().toISOString(),
-      createdByUid: uid,
-      createdByEmail: email,
-      summary,
-      titleSnapshot: project.title,
-      sectionCountSnapshot: project.sections?.length || 0,
-    };
+    const snapshot = buildVersionSnapshot(project, project.version || 1, uid, email, summary);
     await addDoc(versionsRef, snapshot);
   } catch (err) {
     console.warn("Version snapshot notice:", err);

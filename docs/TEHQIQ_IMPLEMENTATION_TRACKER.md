@@ -2669,3 +2669,46 @@ None. The harness is test-only and imports existing types without changing them.
 - **Migration:** None; test-only fixture coverage. The project fixture is explicitly non-demo/non-synthetic and no synthetic fallback records are introduced.
 - **Verification:** `npx vitest run src/tests/genericEmpiricalWorkflow.e2e.test.ts` (1 passed); `npm run lint` (pass); `npm run build` (pass); `npm test` (670 passed, 2 pre-existing failures in localStorage mocking and a network/provider-dependent DOI assertion); `git diff --check` (pass).
 - **Acceptance:** PASS — full generic empirical E2E fixture passes. TQ-VSC-088 and later prompts were not executed.
+
+## TQ-VSC-088 verification details
+
+- **Status:** PASS — added a governed qualitative E2E fixture covering classification, researcher-reviewed transcript upload, researcher and AI code versions, mandatory AI-code disposition, exact evidence quotations, researcher-approved themes and Findings, literature-grounded Discussion citation audit, specialist review proposal, compliance checks, and DOCX/BibTeX/LaTeX submission packaging.
+- **Files changed:** `src/tests/qualitativeWorkflow.e2e.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; test-only coverage. The fixture explicitly marks literature records as non-demo/non-synthetic and does not introduce statistical results, p-values, or auto-approved AI themes.
+- **Verification:** `npx vitest run src/tests/qualitativeWorkflow.e2e.test.ts` (1 passed); `npm run lint` (pass); `npm run build` (pass); `npm test` (671 passed, 2 pre-existing failures in localStorage mocking and a provider-dependent DOI assertion); `git diff --check` (pass).
+- **Acceptance:** PASS — qualitative E2E passes. TQ-VSC-089 and later prompts were not executed.
+
+## TQ-VSC-089 verification details
+
+- **Status:** PASS — added a deterministic review-project E2E fixture covering a researcher-approved question/search design, multiple provider fixtures, provider retrieval and provenance, deterministic DOI deduplication, screening and inclusion decisions, full-text evidence extraction/review, contradiction comparison, literature synthesis/review, scoped research-gap proposal, manuscript Discussion citation audit, reporting-checklist assessment, compliance, and DOCX/BibTeX/LaTeX export packaging.
+- **Files changed:** `src/tests/literatureReviewWorkflow.e2e.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; test-only coverage. The project contains no datasets or empirical analysis outputs, and provider fixtures are explicitly non-demo/non-synthetic records with no synthetic fallback creation.
+- **Verification:** `npx vitest run src/tests/literatureReviewWorkflow.e2e.test.ts` (1 passed); `npm run lint` (pass); `npm run build` (pass); `npm test` (672 passed, 2 pre-existing failures in localStorage mocking and a provider-dependent DOI assertion); `git diff --check` (pass).
+- **Acceptance:** PASS — review-project E2E passes. TQ-VSC-090 and later prompts were not executed.
+
+## TQ-VSC-090 verification details
+
+- **Status:** PASS — added machine-tested export validation for DOCX OpenXML sections, returned PDF artifacts and section completeness, BibTeX required fields/escaping, RIS records, CSL JSON structure, LaTeX structure/escaping/citation commands, truthful JATS validation states, submission manifest file filtering, and all Submission-Ready blocker gates (citation, unapproved Results analysis, missing ethics, missing author sign-off, and demo contamination). Corrected fabricated ethics/outlet fallback labels and aligned LaTeX citation keys with BibTeX keys.
+- **Files changed:** `src/lib/exportUtils.ts`; `src/tests/exportSecurityValidation.test.ts`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; export-only backward-compatible changes. `downloadPdfPackage` now returns the generated PDF Blob in addition to preserving its browser download behavior.
+- **Blockers/Risks:** No TQ-VSC-090 regression blockers. The repository-wide suite still has the two pre-existing failures recorded below; the browser-only package manifest intentionally labels artifact hashes as not computed rather than fabricating digests.
+- **Verification:** `npx vitest run src/tests/exportSecurityValidation.test.ts src/tests/exportValidation.test.ts src/tests/submissionPackage.test.ts src/tests/jatsTruthfulness.test.ts` (4 files, 21 tests passed); `npm run lint` (pass); `npm run build` (pass, existing crypto/chunk-size warnings); `npm test` (98 files passed, 2 skipped; 682 tests passed, 2 failed, 18 skipped — pre-existing localStorage mock and provider-dependent DOI assertion); `git diff --check` (pass).
+- **Acceptance:** PASS — advertised export behavior is machine-tested. TQ-VSC-091 and later prompts were not executed.
+
+## TQ-VSC-091 verification details
+
+- **Status:** PASS — added optimistic Firestore transaction/version checks for concurrent clients, immutable approved-artifact protection, atomic manuscript version snapshots, truthful autosave states for Saving/Saved/Offline/Conflict/Failed, offline reconnect retry handling, and dataset replacement/version guards.
+- **Files changed:** `src/lib/projectService.ts`; `src/hooks/useAutosave.ts`; `src/lib/datasetIngestion.ts`; `src/tests/projectConcurrency.integration.test.ts`; `src/tests/autosaveStates.test.tsx`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; the optional save-result fields and `expectedVersion` parameter are backward-compatible. Existing project records remain readable. Locked dataset edits now require a replacement record; unlocked dataset metadata continues versioning and history.
+- **Blockers/Risks:** No TQ-VSC-091 regression blockers. The concurrency integration uses deterministic Firestore transaction mocks rather than requiring an emulator. The repository-wide suite retains two pre-existing failures: the integration test's incomplete localStorage mock and the provider-dependent DOI error-string assertion.
+- **Verification:** `npx vitest run src/tests/projectConcurrency.integration.test.ts src/tests/autosaveStates.test.tsx src/tests/trustedTransitions.test.ts src/tests/lifecycle.test.ts src/tests/dataIntegrityRegression.test.ts src/tests/storagePersistence.test.ts` (6 files, 40 tests passed); `npm run lint` (pass); `npm run build` (pass, existing crypto/chunk-size warnings); `npm test` (100 files passed, 2 failed, 2 skipped; 692 tests passed, 2 failed, 18 skipped — pre-existing failures); `git diff --check` (pass).
+- **Acceptance:** PASS — conflict/version integration tests pass. TQ-VSC-092 and later prompts were not executed.
+
+## TQ-VSC-092 verification details
+
+- **Status:** PASS — added deterministic performance/failure regression coverage for 2,000-chunk retrieval, maximum-size evidence extraction, bounded provider retries, expensive review-tier budget blocking, parser/storage/analysis failures, and machine-readable failure outcomes. No fabricated research values or successful artifacts are introduced by the fixtures.
+- **Files changed:** `src/tests/performanceFailureSafety.test.ts`; `docs/TQ-VSC-092_PERFORMANCE_FAILURE_REPORT.json`; `docs/TEHQIQ_IMPLEMENTATION_TRACKER.md`.
+- **Migration:** None; test-only coverage and a documentation JSON report. Existing schemas and runtime behavior remain backward-compatible.
+- **Blockers/Risks:** No TQ-VSC-092 regression blockers. The repository-wide suite retains two pre-existing failures: the integration test's incomplete localStorage mock and the provider-dependent DOI error-string assertion. The report intentionally does not persist fabricated benchmark durations.
+- **Verification:** `npx vitest run src/tests/performanceFailureSafety.test.ts src/tests/aiGateway.test.ts src/tests/aiBudgetGuard.test.ts src/tests/localModelProviders.test.ts src/tests/documentIngestionRouter.test.ts src/tests/richDocumentParser.test.ts src/tests/storagePersistence.test.ts src/tests/ragBenchmark.test.ts src/tests/evidenceExtractionAgent.test.ts src/tests/regressionAnalysisMethods.test.ts` (10 files, 86 tests passed); `npm run lint` (script executes `tsc --noEmit`, pass); `npm run build` (pass, existing crypto/chunk-size warnings); `npm test` (101 files passed, 2 failed, 2 skipped; 698 tests passed, 2 failed, 18 skipped — pre-existing failures); `git diff --check` (pass).
+- **Acceptance:** PASS — failure behavior remains safe and truthful. TQ-VSC-093 and later prompts were not executed.

@@ -1,0 +1,58 @@
+{
+  "promptId": "TQ-VSC-092",
+  "phase": "Phase 20 — Testing",
+  "status": "PASS",
+  "scope": "Deterministic regression coverage for bounded performance, provider/model/parser/storage failures, analysis failures, AI budgets, and retry behavior.",
+  "fixturePolicy": {
+    "data": "Synthetic test fixtures only; no fixture is persisted as a research result.",
+    "scientificClaims": "None; analysis failure assertions check explicit failure states and empty result arrays."
+  },
+  "scenarios": [
+    {
+      "id": "large-source-library",
+      "component": "evidenceRetrievalService",
+      "input": { "chunks": 2000, "resultLimit": 7, "benchmarkCases": 1 },
+      "assertions": ["result count is bounded by k", "document/source/version provenance is retained", "workload completes within the test safety budget"],
+      "expectedStatus": "safe"
+    },
+    {
+      "id": "many-chunk-agent-input",
+      "component": "evidenceExtractionAgent",
+      "input": { "chunks": 500, "proposalCalls": 1, "overLimitChunks": 501 },
+      "assertions": ["maximum accepted chunk count is enforced", "duplicate extraction calls are not introduced", "output remains Needs Researcher Review"],
+      "expectedStatus": "safe"
+    },
+    {
+      "id": "bounded-provider-retry",
+      "component": "aiGateway",
+      "input": { "providerFailures": "permanent", "maxProviderCalls": 3 },
+      "assertions": ["exactly three provider calls are attempted", "failure ledger is written", "outputArtifactId remains null", "provider error is not reported as success"],
+      "expectedStatus": "safe"
+    },
+    {
+      "id": "expensive-model-budget-threshold",
+      "component": "aiGateway/aiBudgetGuard",
+      "input": { "tier": "REVIEW", "minimumRemainingUsd": 21, "hardLimitUsd": 20 },
+      "assertions": ["review route is blocked before provider use", "provider call count remains zero", "budget threshold is explicit"],
+      "expectedStatus": "safe"
+    },
+    {
+      "id": "parser-storage-analysis-failures",
+      "component": "documentIngestionRouter/storageService/statsEngine",
+      "input": { "parser": "throws", "storage": "upload rejects", "analysis": "singular model" },
+      "assertions": ["parser status is Failed with diagnostic", "storage remains Local / Unpersisted with no metadata record", "analysis status is Failed with no p-values/effect sizes"],
+      "expectedStatus": "safe"
+    }
+  ],
+  "retryPolicy": {
+    "providerCallsPerRequest": "bounded by validated maxProviderCallsPerRequest (1–4)",
+    "agentLoopIterations": "bounded by validated maxAgentLoopIterations (1–20)",
+    "unboundedLoopsObserved": false,
+    "duplicateCallsObserved": false
+  },
+  "verification": {
+    "focusedTest": "src/tests/performanceFailureSafety.test.ts",
+    "runtimeMeasurements": "The test records a bounded retrieval timing check; no fabricated benchmark duration is persisted in this report."
+  },
+  "blockers": []
+}
