@@ -304,6 +304,13 @@ export async function generateGenuineDocxBlob(project: ProjectState, config: Doc
 
   // Ethics & AI Disclosure
   if (config.includeEthicsAndAiDisclosure !== false) {
+    const ethicsDisclosure = project.ethicsInfo?.approvalRequired === false
+      ? "Researcher-declared not required — independent verification is not available."
+      : project.ethicsInfo?.approvalNumber
+        ? project.ethicsInfo.approvalState === "Approved"
+          ? `Researcher-supplied protocol reference ${project.ethicsInfo.approvalNumber}; trusted approval recorded in project state.`
+          : `Researcher-supplied protocol reference ${project.ethicsInfo.approvalNumber}; trusted approval is pending.`
+        : "Missing — researcher input required.";
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_2,
@@ -314,11 +321,7 @@ export async function generateGenuineDocxBlob(project: ProjectState, config: Doc
         spacing: { after: 120 },
         children: [
           new TextRun({
-            text: `Ethics Approval: ${
-              project.ethicsInfo?.approvalNumber
-                ? `Protocol #${project.ethicsInfo.approvalNumber} approved by ${project.ethicsInfo.committeeName || "Institutional Review Board"}.`
-                : "No human subjects approval required."
-            }`,
+            text: `Ethics Approval: ${ethicsDisclosure}`,
             size: fontSize - 2,
             font,
           }),

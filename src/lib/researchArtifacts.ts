@@ -163,8 +163,8 @@ function planArtifact(project: ProjectState, plan: AnalysisPlan): ResearchArtifa
     createdAt: plan.approvalTimestamp,
     updatedAt: plan.approvalTimestamp,
     sourceArtifactIds: [plan.researchQuestionId, plan.hypothesisId],
-    verificationState: plan.status === "Approved" || plan.status === "Executed" ? "Verified" : "Needs Review",
-    approvalState: plan.status === "Approved" || plan.status === "Executed" ? "Approved" : "Not Approved",
+    verificationState: plan.status === "Approved" ? "Verified" : "Needs Review",
+    approvalState: plan.status === "Approved" ? "Approved" : "Not Approved",
     locked: plan.state === "Locked",
   });
 }

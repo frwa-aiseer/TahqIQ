@@ -23,8 +23,8 @@ export const AiProposalModal: React.FC<AiProposalModalProps> = ({
   featureUsed,
   manuscriptSection,
   proposedContent,
-  model = "gemini-3.6-flash",
-  promptVersion = "v2.4-phase6",
+  model,
+  promptVersion,
   groundingStatus,
   onAccept,
   onEditAndAccept,
@@ -58,7 +58,7 @@ export const AiProposalModal: React.FC<AiProposalModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-stone-500 mt-0.5">
-                Feature: <strong className="text-stone-800">{featureUsed}</strong> | Model: <strong className="text-[#053B2E] font-medium">{model}</strong> | Prompt: <strong className="text-stone-700">{promptVersion}</strong>
+                Feature: <strong className="text-stone-800">{featureUsed}</strong> | Model: <strong className="text-[#053B2E] font-medium">{model || "Not available"}</strong> | Prompt: <strong className="text-stone-700">{promptVersion || "Not available"}</strong>
               </p>
             </div>
           </div>

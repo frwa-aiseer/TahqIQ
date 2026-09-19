@@ -14,7 +14,7 @@ import { performStateTransition, DATASET_TRANSITIONS } from "../../lib/stateMach
 import { parseAndProfileDataset, updateDatasetVariableDictionary } from "../../lib/datasetIngestion";
 import { executeRegisteredAnalysisMethod, generateAnalysisFiguresAndTables } from "../../lib/statsEngine";
 import { createNumericEvidenceFromAnalysis } from "../../lib/numericEvidence";
-import { hasAttributableManuscriptApproval, transitionAnalysisOutput } from "../../lib/analysisLifecycle";
+import { hasAttributableManuscriptApproval, isResearcherApprovedAnalysisPlan, transitionAnalysisOutput } from "../../lib/analysisLifecycle";
 import { ApprovalModal } from "../ApprovalModal";
 import { useAuth } from "../../context/AuthContext";
 import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
@@ -460,7 +460,7 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
   };
 
   const isDatasetApproved = activeDataset && (activeDataset.state === "Approved for Analysis" || activeDataset.state === "Locked");
-  const isPlanApproved = activePlan && (activePlan.status === "Approved" || activePlan.state === "Approved" || activePlan.state === "Executed");
+  const isPlanApproved = activePlan && isResearcherApprovedAnalysisPlan(activePlan);
 
   return (
     <div className="space-y-6">

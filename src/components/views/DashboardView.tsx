@@ -42,11 +42,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const verifiedSourcesCount = (project.sources || []).filter(
     (s) => s.state === "Full Text Reviewed" || s.state === "Full Text Available" || s.verificationState === "Verified"
   ).length;
+  const doiResolvedCount = (project.sources || []).filter((s) => Boolean(s.doi?.trim())).length;
   const totalClaims = (project.claims || []).length;
   const verifiedClaims = (project.claims || []).filter(
     (c) => c.state === "Verified" || c.verificationStatus === "Verified"
   ).length;
   const totalWords = (project.sections || []).reduce((acc, s) => acc + (s.currentWordCount || 0), 0);
+  const briefStatus = project.canvas?.broadTopic?.trim() && project.canvas?.scientificProblem?.trim()
+    ? "Drafted"
+    : "Researcher input required";
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -80,7 +84,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {project.title}
               </h1>
               <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed max-w-3xl">
-                Ready for peer-review submission. Track progress, synthesize evidence, and edit manuscript sections with real-time CSL citations.
+                Research workspace overview. Track evidence, approvals, and manuscript progress with attributable project records.
               </p>
             </div>
 
@@ -94,7 +98,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {readiness.overall}%
                 </span>
                 <span className="text-[10px] text-emerald-400/90 font-medium">
-                  Verified Evidence
+                  Evidence-based estimate
                 </span>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
@@ -232,7 +236,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="text-2xl font-bold font-mono text-white mt-1">
             {verifiedSourcesCount} <span className="text-xs text-zinc-500 font-normal">/ {(project.sources || []).length}</span>
           </div>
-          <p className="text-[10px] text-emerald-400 font-medium mt-1">100% DOI Resolved</p>
+            <p className="text-[10px] text-zinc-400 font-medium mt-1">
+              {doiResolvedCount > 0 ? `${doiResolvedCount} DOI record(s) present` : "DOI status not available"}
+            </p>
         </div>
 
         <div
@@ -278,10 +284,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
             <h3 className="font-bold text-sm text-white flex items-center space-x-2">
               <BookOpen className="w-4 h-4 text-indigo-400" />
-              <span>Confirmed Research Brief</span>
+              <span>Research Brief</span>
             </h3>
-            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-semibold">
-              Confirmed
+            <span className="text-[10px] text-zinc-300 bg-zinc-800 border border-zinc-700 px-2.5 py-0.5 rounded-full font-semibold">
+              {briefStatus}
             </span>
           </div>
 

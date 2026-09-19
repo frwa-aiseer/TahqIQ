@@ -1,9 +1,14 @@
-import type { AnalysisOutput, AnalysisState } from "../types";
+import type { AnalysisOutput, AnalysisPlan, AnalysisState } from "../types";
 import { performStateTransition } from "./stateMachines";
 
 export interface ResearcherActor {
   uid: string;
   email: string;
+}
+
+/** `Completed` records execution history; it is never an approval signal. */
+export function isResearcherApprovedAnalysisPlan(plan: Pick<AnalysisPlan, "status" | "state">): boolean {
+  return plan.status === "Approved" || plan.state === "Approved";
 }
 
 export function hasAttributableManuscriptApproval(output: AnalysisOutput): boolean {

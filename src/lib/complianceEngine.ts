@@ -3,6 +3,13 @@ import { hasAttributableManuscriptApproval } from "./analysisLifecycle";
 import { isOutletVerified } from "../data/baselineOutlets";
 import { getVerifiedRequirement } from "./outletRequirements";
 
+const hasAttributableAuthorApproval = (author: ProjectState["authors"][number]): boolean => Boolean(
+  author.finalApproval &&
+  author.approvalActorUid?.trim() &&
+  author.approvalTimestamp?.trim() &&
+  author.approvalRationale?.trim()
+);
+
 export function calculateComplianceRules(project: ProjectState, customOutlet?: TargetOutlet): CalculatedComplianceRule[] {
   const outlet = customOutlet || project.selectedTargetOutlet;
   if (!outlet) return [];
@@ -129,13 +136,17 @@ export function calculateComplianceRules(project: ProjectState, customOutlet?: T
   });
 
   // Rule 5: Ethics & Mandatory Declaration
-  const hasEthicsApproval = !project.ethicsInfo?.approvalRequired || Boolean(project.ethicsInfo?.approvalNumber);
+  const hasEthicsApproval = !project.ethicsInfo?.approvalRequired || Boolean(project.ethicsInfo?.approvalState === "Approved" && project.ethicsInfo?.approvalNumber);
   rules.push({
     id: "rule-ethics",
     category: "Ethics & AI",
     requirementName: "Mandatory Ethics Approval & Declaration",
     requiredValue: project.ethicsInfo?.approvalRequired ? "Ethics Protocol ID Required" : "Exempt / Statement Provided",
-    actualValue: project.ethicsInfo?.approvalNumber ? `Approved (${project.ethicsInfo.approvalNumber})` : project.ethicsInfo?.approvalRequired ? "Missing Approval ID" : "Exempt",
+    actualValue: project.ethicsInfo?.approvalNumber
+      ? project.ethicsInfo.approvalState === "Approved"
+        ? `Approved (${project.ethicsInfo.approvalNumber})`
+        : `Researcher-supplied ID (${project.ethicsInfo.approvalNumber}) — trusted approval pending`
+      : project.ethicsInfo?.approvalRequired ? "Missing Approval ID" : "Exempt",
     status: hasEthicsApproval ? "Pass" : "Fail",
     actionRequired: hasEthicsApproval ? undefined : "Provide valid Institutional Review Board (IRB) / Ethics Committee approval ID.",
   });
@@ -170,7 +181,7 @@ export function calculateComplianceRules(project: ProjectState, customOutlet?: T
 
   // Rule 7: Author Sign-off Confirmation
   const totalAuthors = project.authors?.length || 0;
-  const approvedAuthors = (project.authors || []).filter((a) => a.finalApproval).length;
+  const approvedAuthors = (project.authors || []).filter(hasAttributableAuthorApproval).length;
   const allAuthorsApproved = totalAuthors > 0 && approvedAuthors === totalAuthors;
 
   rules.push({
@@ -210,7 +221,7 @@ export function evaluateExportGateChecks(
     name: "Unresolved / Unverified Source Verification",
     status: citationPass ? "Pass" : "Blocker",
     message: citationPass
-      ? `All ${project.sources?.length || 0} sources in library are verified with stable bibliographic metadata.`
+      ? `No source records are currently marked unverified, unresolved, or retracted (${project.sources?.length || 0} total).`
       : `Detected ${unverifiedSources.length} unresolved, unverified, or retracted reference(s) in source library.`,
     affectedItemIds: unverifiedIds,
     resolutionPath: "Verify metadata, replace unverified sources, or resolve retraction warnings in Source Library.",
@@ -231,7 +242,7 @@ export function evaluateExportGateChecks(
     name: "Evidence Grounding & Result Verification",
     status: resultsPass ? "Pass" : "Blocker",
     message: resultsPass
-      ? "All empirical claims and Results section findings are linked to verified data or literature."
+      ? "No unverified empirical claims or unapproved Results section findings were detected in the current project records."
       : resultsUnlinked
       ? "Results section exists but no approved empirical analysis outputs exist in project records."
       : `Detected ${unverifiedClaims.length} unlinked or unverified empirical claim(s) in Claim Matrix.`,
@@ -243,7 +254,7 @@ export function evaluateExportGateChecks(
   const ethicsRequired = Boolean(project.ethicsInfo?.approvalRequired);
   const missingEthicsNumber = ethicsRequired && !project.ethicsInfo?.approvalNumber;
   const missingConsent = ethicsRequired && !project.ethicsInfo?.consentObtained;
-  const ethicsPass = !ethicsRequired || (!missingEthicsNumber && !missingConsent);
+  const ethicsPass = !ethicsRequired || (project.ethicsInfo?.approvalState === "Approved" && !missingEthicsNumber && !missingConsent);
 
   gateChecks.push({
     checkId: "gate-ethics-mandate",
@@ -252,10 +263,12 @@ export function evaluateExportGateChecks(
     status: ethicsPass ? "Pass" : "Blocker",
     message: ethicsPass
       ? ethicsRequired
-        ? `Ethics protocol approved (${project.ethicsInfo.approvalNumber}) and participant consent confirmed.`
+        ? `Ethics protocol approval and participant consent are recorded in the trusted project state (${project.ethicsInfo.approvalNumber}).`
         : "Study designated as exempt / no human participants."
       : missingEthicsNumber
       ? "Ethics approval is required for this study type, but no protocol number was provided."
+      : project.ethicsInfo?.approvalState !== "Approved"
+      ? "Ethics approval has not been recorded through a trusted transition."
       : "Informed participant consent has not been confirmed.",
     resolutionPath: "Enter IRB/Ethics Approval Number and confirm participant consent in Ethics Workspace.",
   });
@@ -296,7 +309,7 @@ export function evaluateExportGateChecks(
 
   // Check 5: Author Sign-off Approval
   const totalAuthors = project.authors?.length || 0;
-  const approvedAuthors = (project.authors || []).filter((a) => a.finalApproval).length;
+  const approvedAuthors = (project.authors || []).filter(hasAttributableAuthorApproval).length;
   const authorPass = totalAuthors > 0 && approvedAuthors === totalAuthors;
 
   gateChecks.push({
@@ -305,9 +318,9 @@ export function evaluateExportGateChecks(
     name: "Complete Co-Author Final Sign-Off (100%)",
     status: authorPass ? "Pass" : "Blocker",
     message: authorPass
-      ? `All ${totalAuthors} author(s) have confirmed final manuscript approval.`
+      ? `All ${totalAuthors} author(s) have attributable, timestamped final sign-off records.`
       : `Only ${approvedAuthors} of ${totalAuthors} co-author(s) have signed off on final submission.`,
-    affectedItemIds: (project.authors || []).filter((a) => !a.finalApproval).map((a) => a.id),
+    affectedItemIds: (project.authors || []).filter((a) => !hasAttributableAuthorApproval(a)).map((a) => a.id),
     resolutionPath: "Obtain digital sign-off from all listed co-authors in Project Members & Authors setting.",
   });
 
@@ -326,7 +339,7 @@ export function evaluateExportGateChecks(
     name: "Demonstration Data & Synthetic Content Guard",
     status: demoPass ? "Pass" : "Blocker",
     message: demoPass
-      ? "Project contains 100% genuine researcher-entered evidence and datasets."
+      ? "No demo or synthetic records were detected in the current project artifacts."
       : isDemoProj
       ? "This is a prototype demo project environment. Real journal exports are blocked."
       : `Export contains ${demoSources.length + demoDatasets.length + demoClaims.length} prototype/synthetic demo record(s).`,

@@ -6,6 +6,7 @@ import type {
   TrustedStateTransitionRecord,
   TrustedTransitionIntegrity,
 } from "../types";
+import { isResearcherApprovedAnalysisPlan } from "../lib/analysisLifecycle";
 
 export interface TrustedTransitionRequest {
   transitionType: SensitiveTransitionType;
@@ -46,10 +47,52 @@ export function privilegedStateSnapshot(project: ProjectState): Record<string, u
     sources: (project.sources || []).map(({ id, state, verificationState, verificationDate }) => ({ id, verified: state === "Metadata Verified" || verificationState === "Verified", verificationDate: verificationState === "Verified" ? verificationDate : undefined })),
     claims: (project.claims || []).map(({ id, state, verificationStatus, isResearcherApproved }) => ({ id, verified: state === "Verified" || verificationStatus === "Verified", isResearcherApproved: state === "Verified" ? isResearcherApproved : undefined })),
     datasets: (project.datasets || []).map(({ id, state, fileHash, version, filename }) => ({ id, privilegedState: state === "Approved for Analysis" || state === "Locked" ? state : "Not Approved", lockedContent: state === "Locked" ? { fileHash, version, filename } : undefined })),
-    analysisOutputs: (project.analysisOutputs || []).map(({ id, state, researcherApproval }) => ({ id, privilegedState: state === "Approved for Manuscript" || state === "Locked" ? state : "Not Approved", researcherApproval: state === "Approved for Manuscript" || state === "Locked" ? researcherApproval : undefined })),
+    analysisOutputs: (project.analysisOutputs || []).map((output) => ({
+      id: output.id,
+      privilegedState: output.state === "Approved for Manuscript" || output.state === "Locked" ? output.state : "Not Approved",
+      execution: {
+        analysisPlanId: output.analysisPlanId,
+        executionTimestamp: output.executionTimestamp,
+        softwareEnvironment: output.softwareEnvironment,
+        randomSeed: output.randomSeed,
+        summaryText: output.summaryText,
+        numericResults: output.numericResults,
+        figuresCreated: output.figuresCreated,
+        tablesCreated: output.tablesCreated,
+        pValues: output.pValues,
+        effectSizes: output.effectSizes,
+        assumptionChecks: output.assumptionChecks,
+        isReproduced: output.isReproduced,
+        reproducibilityHash: output.reproducibilityHash,
+        isDemo: output.isDemo,
+        isSynthetic: output.isSynthetic,
+        datasetHash: output.datasetHash,
+        planId: output.planId,
+        code: output.code,
+        packageVersions: output.packageVersions,
+        parameters: output.parameters,
+        logs: output.logs,
+        warnings: output.warnings,
+        executionStatus: output.executionStatus,
+        isResearcherSupplied: output.isResearcherSupplied,
+        reproductionStatus: output.reproductionStatus,
+        pairingReport: output.pairingReport,
+        trustedServerCreated: output.trustedServerCreated,
+      },
+      researcherApproval: output.state === "Approved for Manuscript" || output.state === "Locked" ? output.researcherApproval : undefined,
+    })),
     sections: (project.sections || []).map(({ id, state, title, content, version, citationIds }) => ({ id, locked: state === "Locked", lockedContent: state === "Locked" ? { title, content, version, citationIds } : undefined })),
-    ethicsApprovalState: project.ethicsInfo.approvalState || "Pending",
-    authors: (project.authors || []).map(({ id, finalApproval, approvalTimestamp }) => ({ id, finalApproval, approvalTimestamp: finalApproval ? approvalTimestamp : undefined })),
+    ethics: {
+      approvalRequired: project.ethicsInfo.approvalRequired,
+      approvalState: project.ethicsInfo.approvalState || "Pending",
+      committeeName: project.ethicsInfo.committeeName,
+      approvalNumber: project.ethicsInfo.approvalNumber,
+      approvalDate: project.ethicsInfo.approvalDate,
+      consentObtained: project.ethicsInfo.consentObtained,
+      consentWaiver: project.ethicsInfo.consentWaiver,
+      trialRegistrationNumber: project.ethicsInfo.trialRegistrationNumber,
+    },
+    authors: (project.authors || []).map(({ id, email, finalApproval, approvalTimestamp, approvalActorUid, approvalRationale }) => ({ id, email, finalApproval, approvalTimestamp: finalApproval ? approvalTimestamp : undefined, approvalActorUid: finalApproval ? approvalActorUid : undefined, approvalRationale: finalApproval ? approvalRationale : undefined })),
     submissionState: project.submissionState || "Draft",
   };
 }
@@ -79,6 +122,18 @@ export function applyTrustedTransition(
   timestamp = new Date().toISOString(),
   transitionId = `transition-${randomUUID()}`
 ): { project: ProjectState; record: TrustedStateTransitionRecord } {
+  // A legacy project may begin without a trusted digest, but it must not be
+  // allowed to bootstrap trusted history around client-forged approvals.
+  if (!project.trustedTransitionIntegrity && (
+    project.sources.some((source) => source.state === "Metadata Verified" || source.verificationState === "Verified") ||
+    project.claims.some((claim) => claim.state === "Verified" || claim.verificationStatus === "Verified") ||
+    project.authors.some((author) => author.finalApproval) ||
+    project.analysisOutputs.some((output) => output.state && output.state !== "Draft Plan") ||
+    project.datasets.some((dataset) => dataset.state === "Approved for Analysis" || dataset.state === "Locked") ||
+    project.ethicsInfo.approvalState === "Approved"
+  )) {
+    throw new Error("Privileged project approvals require trusted transition history before further changes.");
+  }
   const integrityCheck = validateTrustedTransitionIntegrity(project);
   if (!integrityCheck.valid) throw new Error(integrityCheck.reason);
   const revision = project.trustedTransitionIntegrity?.revision || 0;
@@ -93,7 +148,7 @@ export function applyTrustedTransition(
     entityType = "Source";
     const source = project.sources.find((item) => item.id === request.entityId);
     if (!source) throw new Error("Source does not exist.");
-    if (!source.provenance?.provider?.trim() || !source.provenance.retrievedAt?.trim()) throw new Error("Source verification requires provider and retrieval provenance.");
+    if (!source.provenance?.provider?.trim() || !source.provenance.retrievedAt?.trim() || source.provenance.trustedServerRetrieved !== true) throw new Error("Source verification requires trusted server/provider retrieval provenance.");
     if (source.state === "Retracted") throw new Error("A retracted source cannot be verified.");
     fromState = source.state || source.verificationState;
     toState = "Metadata Verified";
@@ -118,7 +173,11 @@ export function applyTrustedTransition(
     entityType = "Analysis";
     const output = project.analysisOutputs.find((item) => item.id === request.entityId);
     if (!output) throw new Error("Analysis output does not exist.");
-    if (output.state !== "Researcher Reviewed" || !output.datasetHash || !(output.planId || output.analysisPlanId)) throw new Error("Analysis approval requires Researcher Reviewed state, dataset hash, and plan ID.");
+    const dataset = project.datasets.find((item) => item.fileHash === output.datasetHash && (item.state === "Approved for Analysis" || item.state === "Locked"));
+    const plan = project.analysisPlans.find((item) => item.id === (output.planId || output.analysisPlanId));
+    if (output.state !== "Researcher Reviewed" || output.executionStatus !== "Completed" || output.isResearcherSupplied === true || output.trustedServerCreated !== true || !output.datasetHash || !(output.planId || output.analysisPlanId) || !dataset || !plan || !isResearcherApprovedAnalysisPlan(plan)) {
+      throw new Error("Analysis approval requires a completed server execution against an approved dataset and researcher-approved plan.");
+    }
     fromState = output.state;
     toState = "Approved for Manuscript";
     updated.analysisOutputs = project.analysisOutputs.map((item) => item.id === output.id ? { ...item, state: "Approved for Manuscript", researcherApproval: { actor: { uid: actor.uid, email: actor.email }, timestamp, rationale: request.rationale, outputId: output.id, datasetHash: output.datasetHash!, planId: output.planId || output.analysisPlanId } } : item);
@@ -151,9 +210,10 @@ export function applyTrustedTransition(
   } else {
     entityType = "Submission";
     if (request.entityId !== project.id) throw new Error("Submission entity must be the project.");
+    if (!project.trustedTransitionIntegrity?.trustedServerCreated) throw new Error("Submission Ready requires trusted transition history.");
     if (project.isDemoProject) throw new Error("Demo/synthetic projects cannot become Submission Ready.");
     if (project.sections.some((section) => section.state !== "Locked")) throw new Error("Every manuscript section must be locked.");
-    if (project.authors.length === 0 || project.authors.some((author) => !author.finalApproval)) throw new Error("Every author must sign off.");
+    if (project.authors.length === 0 || project.authors.some((author) => !author.finalApproval || !author.approvalActorUid?.trim() || !author.approvalTimestamp?.trim() || !author.approvalRationale?.trim())) throw new Error("Every author must have a trusted, attributable sign-off.");
     if (project.ethicsInfo.approvalRequired && project.ethicsInfo.approvalState !== "Approved") throw new Error("Required ethics approval is missing.");
     if (project.analysisOutputs.some((output) => output.state !== "Approved for Manuscript" && output.state !== "Locked")) throw new Error("Every analysis output must be approved for manuscript use.");
     fromState = project.submissionState || "Draft";

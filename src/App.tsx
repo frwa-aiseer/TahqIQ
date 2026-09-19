@@ -205,7 +205,6 @@ function MainAppContent() {
       metadataProvider: source.provider,
       providerRecordId: source.providerRecordId,
       provenance: { providerId: source.providerId, provider: source.provider, retrievedAt: source.retrievedAt, fieldProvenance: source.fieldProvenance },
-      relevanceScore: 5,
       tags: [`Search Execution ${execution.searchId}`, source.provider],
     }));
     setProject((prev) => {

@@ -26,8 +26,8 @@ describe("trusted sensitive transitions", () => {
   });
 
   it("verifies sources only with recorded provider provenance", () => {
-    const project = baseProject();
-    project.sources = [{ id: "source-1", title: "Source", authors: [], year: 2025, journalOrVenue: "Journal", documentType: "Article", peerReviewStatus: "Unknown", verificationState: "Unverified", provenance: { provider: "Crossref", retrievedAt: "2026-01-01" }, relevanceScore: 8, tags: [] }];
+    let project = baseProject();
+    project.sources = [{ id: "source-1", title: "Source", authors: [], year: 2025, journalOrVenue: "Journal", documentType: "Article", peerReviewStatus: "Unknown", verificationState: "Unverified", provenance: { provider: "Crossref", retrievedAt: "2026-01-01", trustedServerRetrieved: true }, relevanceScore: 8, tags: [] }];
     const result = applyTrustedTransition(project, request("SOURCE_VERIFIED", "source-1"), actor, "2026-01-02", "transition-source");
     expect(result.project.sources[0]).toMatchObject({ state: "Metadata Verified", verificationState: "Verified" });
     expect(result.record).toMatchObject({ trustedServerCreated: true, immutable: true, beforeHash: expect.any(String), afterHash: expect.any(String) });
@@ -52,10 +52,15 @@ describe("trusted sensitive transitions", () => {
   });
 
   it("creates attributable analysis approval and locks only approved manuscript sections", () => {
-    const project = baseProject();
-    project.analysisOutputs = [{ id: "output-1", analysisPlanId: "plan-1", planId: "plan-1", datasetHash: "dataset-hash", executionTimestamp: "2026-01-01", softwareEnvironment: "R", summaryText: "", numericResults: {}, pValues: [], effectSizes: [], assumptionChecks: [], isReproduced: true, reproducibilityHash: "hash", state: "Researcher Reviewed" }];
+    let project = baseProject();
+    project.datasets = [{ id: "dataset-1", filename: "data.csv", fileHash: "dataset-hash", uploadDate: "2026-01-01", recordCount: 1, variableCount: 1, variables: [], missingnessPercent: 0, isAnonymizedConfirmed: true, state: "Approved for Analysis" }];
+    project.analysisPlans = [{ id: "plan-1", title: "Approved plan", researchQuestionId: "question-1", outcomeVariable: "score", predictorVariables: ["group"], statisticalMethod: "independent-t", assumptions: [], effectSizeMeasure: "Cohen's d", significanceThreshold: 0.05, missingDataStrategy: "Complete cases", status: "Approved", state: "Approved", isPreregistered: false }];
+    project.analysisOutputs = [{ id: "output-1", analysisPlanId: "plan-1", planId: "plan-1", datasetHash: "dataset-hash", executionTimestamp: "2026-01-01", softwareEnvironment: "TehqIQ Execution Engine", summaryText: "", numericResults: {}, pValues: [], effectSizes: [], assumptionChecks: [], isReproduced: true, reproducibilityHash: "hash", executionStatus: "Completed", trustedServerCreated: true, state: "Researcher Reviewed" }];
+    project = seal(project, 0);
     const analysis = applyTrustedTransition(project, request("ANALYSIS_APPROVED_FOR_MANUSCRIPT", "output-1"), actor).project;
     expect(analysis.analysisOutputs[0]).toMatchObject({ state: "Approved for Manuscript", researcherApproval: { actor: { uid: actor.uid }, datasetHash: "dataset-hash", planId: "plan-1" } });
+    const forged = { ...analysis, analysisOutputs: analysis.analysisOutputs.map((output) => ({ ...output, numericResults: { forged: 1 } })) };
+    expect(validateTrustedTransitionIntegrity(forged).valid).toBe(false);
     const sectionProject = baseProject(); sectionProject.sections = [{ ...sectionProject.sections[0], state: "Approved", status: "Approved" }];
     expect(applyTrustedTransition(sectionProject, request("MANUSCRIPT_LOCKED", sectionProject.sections[0].id), actor).project.sections[0].state).toBe("Locked");
   });
@@ -75,7 +80,7 @@ describe("trusted sensitive transitions", () => {
 
   it("detects direct privileged mutation and rejects stale revisions", () => {
     const project = baseProject();
-    project.sources = [{ id: "source-1", title: "Source", authors: [], year: 2025, journalOrVenue: "Journal", documentType: "Article", peerReviewStatus: "Unknown", verificationState: "Unverified", provenance: { provider: "Crossref", retrievedAt: "2026-01-01" }, relevanceScore: 8, tags: [] }];
+    project.sources = [{ id: "source-1", title: "Source", authors: [], year: 2025, journalOrVenue: "Journal", documentType: "Article", peerReviewStatus: "Unknown", verificationState: "Unverified", provenance: { provider: "Crossref", retrievedAt: "2026-01-01", trustedServerRetrieved: true }, relevanceScore: 8, tags: [] }];
     const trusted = applyTrustedTransition(project, request("SOURCE_VERIFIED", "source-1"), actor).project;
     const forged = { ...trusted, sources: trusted.sources.map((source) => ({ ...source, state: "Unresolved" as const, verificationState: "Unverified" as const })) };
     expect(validateTrustedTransitionIntegrity(forged)).toMatchObject({ valid: false, reason: expect.stringMatching(/digest mismatch/i) });
@@ -88,5 +93,19 @@ describe("trusted sensitive transitions", () => {
     const locked = applyTrustedTransition(project, request("MANUSCRIPT_LOCKED", project.sections[0].id), actor).project;
     const forged = { ...locked, sections: locked.sections.map((section) => ({ ...section, content: "Client rewrite after lock" })) };
     expect(validateTrustedTransitionIntegrity(forged).valid).toBe(false);
+  });
+
+  it("binds trusted digests to approval attribution and ethics identifiers", () => {
+    let authorProject = baseProject();
+    authorProject.authors = [{ id: "author-1", fullName: "Researcher", publicationName: "Researcher", email: actor.email, department: "", institution: "", city: "", country: "", isCorresponding: true, order: 1, creditRoles: [], conflictDeclaration: "", finalApproval: false }];
+    const signed = applyTrustedTransition(authorProject, request("AUTHOR_SIGNED_OFF", "author-1"), actor).project;
+    const forgedAuthor = { ...signed, authors: signed.authors.map((item) => ({ ...item, approvalRationale: "Client-forged rationale" })) };
+    expect(validateTrustedTransitionIntegrity(forgedAuthor).valid).toBe(false);
+
+    let ethicsProject = baseProject();
+    ethicsProject.ethicsInfo = { approvalRequired: true, committeeName: "Researcher supplied committee", approvalNumber: "IRB-1", consentObtained: true, approvalState: "Pending" };
+    const approved = applyTrustedTransition(ethicsProject, request("ETHICS_APPROVED", "ethics"), actor).project;
+    const forgedEthics = { ...approved, ethicsInfo: { ...approved.ethicsInfo, approvalNumber: "IRB-client-forged" } };
+    expect(validateTrustedTransitionIntegrity(forgedEthics).valid).toBe(false);
   });
 });

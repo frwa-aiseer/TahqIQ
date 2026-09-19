@@ -58,8 +58,9 @@ export function parseBibTeX(bibtexString: string): SourceRecord[] {
     const authors = authorsRaw
       ? authorsRaw.split(/\s+and\s+/i).map((a) => a.trim()).filter(Boolean)
       : ["Unknown Author"];
-    const year = fields.year ? parseInt(fields.year, 10) : new Date().getFullYear();
-    const journal = fields.journal || fields.booktitle || fields.publisher || "BibTeX Import Venue";
+    const parsedYear = fields.year ? parseInt(fields.year, 10) : undefined;
+    const year = parsedYear !== undefined && Number.isFinite(parsedYear) ? parsedYear : undefined;
+    const journal = fields.journal || fields.booktitle || fields.publisher || "Not available — researcher input required";
     const doi = fields.doi ? fields.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "") : undefined;
     const volume = fields.volume;
     const issue = fields.number || fields.issue;
@@ -85,7 +86,7 @@ export function parseBibTeX(bibtexString: string): SourceRecord[] {
       id: sourceId,
       title,
       authors,
-      year: isNaN(year) ? new Date().getFullYear() : year,
+      year,
       journalOrVenue: journal,
       volume,
       issue,
@@ -94,10 +95,11 @@ export function parseBibTeX(bibtexString: string): SourceRecord[] {
       publisher,
       abstract,
       documentType: docTypeMap[entryType] || "Journal Article",
-      peerReviewStatus: entryType === "article" ? "Peer-reviewed" : "Unknown",
-      verificationState: doi ? "Verified" : "Unverified",
+      // Imported identifiers and entry types are researcher-supplied metadata;
+      // they do not establish peer review or independent registry verification.
+      peerReviewStatus: "Unknown",
+      verificationState: "Unverified",
       state: "Imported",
-      relevanceScore: 7,
       tags: ["bibtex-import", citeKey],
       provenance: prov,
       metadataProvider: "BibTeX Import Parser",
@@ -123,7 +125,7 @@ export function parseRIS(risString: string): SourceRecord[] {
     let docType = "Journal Article";
     let title = "";
     let authors: string[] = [];
-    let year = new Date().getFullYear();
+    let year: number | undefined;
     let journal = "";
     let volume = "";
     let issue = "";
@@ -203,7 +205,7 @@ export function parseRIS(risString: string): SourceRecord[] {
         title: title || "Untitled RIS Reference",
         authors: authors.length > 0 ? authors : ["Unknown Author"],
         year,
-        journalOrVenue: journal || "RIS Import Venue",
+        journalOrVenue: journal || "Not available — researcher input required",
         volume,
         issue,
         pages,
@@ -212,9 +214,8 @@ export function parseRIS(risString: string): SourceRecord[] {
         abstract,
         documentType: docType,
         peerReviewStatus: "Unknown",
-        verificationState: doi ? "Verified" : "Unverified",
+        verificationState: "Unverified",
         state: "Imported",
-        relevanceScore: 7,
         tags: ["ris-import"],
         provenance: prov,
         metadataProvider: "RIS Import Parser",
@@ -250,8 +251,8 @@ export function parseCSLJSON(cslData: string | any[] | Record<string, any>): Sou
       a.literal || `${a.family || ""}, ${a.given || ""}`.trim() || "Unknown Author"
     );
     const yearPart = item.issued?.["date-parts"]?.[0]?.[0];
-    const year = typeof yearPart === "number" ? yearPart : new Date().getFullYear();
-    const journal = item["container-title"] || item.publisher || "CSL JSON Venue";
+    const year = typeof yearPart === "number" ? yearPart : undefined;
+    const journal = item["container-title"] || item.publisher || "Not available — researcher input required";
     const doi = item.DOI ? item.DOI.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "") : undefined;
     const volume = item.volume ? String(item.volume) : undefined;
     const issue = item.issue ? String(item.issue) : undefined;
@@ -279,10 +280,9 @@ export function parseCSLJSON(cslData: string | any[] | Record<string, any>): Sou
       publisher,
       abstract,
       documentType: item.type === "article-journal" ? "Journal Article" : "Reference",
-      peerReviewStatus: item.type === "article-journal" ? "Peer-reviewed" : "Unknown",
-      verificationState: doi ? "Verified" : "Unverified",
+      peerReviewStatus: "Unknown",
+      verificationState: "Unverified",
       state: "Imported",
-      relevanceScore: 7,
       tags: ["csl-import"],
       provenance: prov,
       metadataProvider: "CSL JSON Import Parser",
@@ -299,7 +299,8 @@ export const parseRISString = parseRIS;
  */
 export function parseReferenceTextToSource(refText: string): SourceRecord {
   const yearMatch = refText.match(/\b(19\d\d|20\d\d)\b/);
-  const year = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+  if (!yearMatch) throw new Error("Reference publication year is missing — researcher input required.");
+  const year = parseInt(yearMatch[1], 10);
 
   const doiMatch = refText.match(/10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+/);
   const doi = doiMatch ? doiMatch[0].replace(/\.$/, '') : undefined;
@@ -318,16 +319,13 @@ export function parseReferenceTextToSource(refText: string): SourceRecord {
     title,
     authors: authors.length > 0 ? authors : ['Unknown Author'],
     year,
-    journalOrVenue: 'Unformatted Reference Ingestion',
+    journalOrVenue: 'Not available — researcher input required',
     doi,
     documentType: 'Journal Article',
     peerReviewStatus: 'Unknown',
-    verificationState: doi ? 'Verified' : 'Unverified',
+    verificationState: 'Unverified',
     state: 'Imported',
-    relevanceScore: 5,
     tags: ['text-import'],
     stateHistory: [],
   };
 }
-
-

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { ReviewerComment, ProjectState, AiLedgerEvent } from "../../types";
 import { Users, CheckCircle2, AlertTriangle, Sparkles, X, Check, ShieldAlert, Sliders } from "lucide-react";
 import { authenticatedProjectFetch } from "../../lib/authenticatedFetch";
+import { useAuth } from "../../context/AuthContext";
 
 interface PeerReviewViewProps {
   comments: ReviewerComment[];
@@ -24,6 +25,7 @@ export const PeerReviewView: React.FC<PeerReviewViewProps> = ({
   project,
   onUpdateProject,
 }) => {
+  const { user } = useAuth();
   const [comments, setComments] = useState<ReviewerComment[]>(initialComments || []);
   const [isRunning, setIsRunning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -112,10 +114,12 @@ export const PeerReviewView: React.FC<PeerReviewViewProps> = ({
             agentRole: cm.agentRole || role,
             severity: cm.severity || "Recommendation",
             manuscriptSection: cm.manuscriptSection || "Introduction",
-            commentText: cm.commentText || "Manuscript prose adheres to structural guidelines.",
-            suggestedAction: cm.suggestedAction || "Revise text accordingly.",
+            commentText: cm.commentText || "Reviewer comment unavailable — researcher review required.",
+            suggestedAction: cm.suggestedAction || "Researcher review required.",
             status: "AI Suggested" as any,
             timestamp: new Date().toISOString(),
+            aiModel: typeof data.aiGateway?.model === "string" ? data.aiGateway.model : undefined,
+            aiPromptVersion: typeof data.aiGateway?.promptVersion === "string" ? data.aiGateway.promptVersion : undefined,
           });
         });
       } catch (err: any) {
@@ -159,11 +163,11 @@ export const PeerReviewView: React.FC<PeerReviewViewProps> = ({
       const newEvent: AiLedgerEvent = {
         id: `ledger-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         timestamp: new Date().toISOString(),
-        userEmail: "researcher@local",
+        userEmail: user?.email || "Not available",
         featureUsed: "Multi-Agent Peer Review",
         manuscriptSection: cm.manuscriptSection,
-        model: "gemini-3.6-flash",
-        promptVersion: "v2.4-phase6",
+        model: cm.aiModel || "Not available — server attribution was not attached",
+        promptVersion: cm.aiPromptVersion || "Not available — server attribution was not attached",
         inputSourcesUsed: (project.sources || []).map((s) => s.id),
         generatedSummary: `Peer review comment from ${cm.agentRole}: "${cm.commentText}"`,
         userDecision: decision,
@@ -177,7 +181,7 @@ export const PeerReviewView: React.FC<PeerReviewViewProps> = ({
         aiLedgerIntegrity: {
           status: "Incomplete",
           assessedAt: new Date().toISOString(),
-          assessedByUid: "tehqiq-system",
+          assessedByUid: user?.uid || "Not available",
           rationale: "The server AiGateway records generation events; reconciliation with this legacy project decision ledger remains incomplete.",
           knownBypassPaths: [],
         },

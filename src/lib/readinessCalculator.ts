@@ -1,6 +1,7 @@
 import { ProjectState, PipelineStage, StageStatus } from "../types";
 import { isEvidenceBackedChecklistItem } from "./reportingGuidelineRegistry";
 import { evaluateExportGateChecks } from "./complianceEngine";
+import { isResearcherApprovedAnalysisPlan } from "./analysisLifecycle";
 
 export function calculateSubmissionReadiness(project: ProjectState): { ready: boolean; blockers: string[] } {
   const blockers = evaluateExportGateChecks(project, "Submission-Ready").filter((check) => check.status === "Blocker").map((check) => check.message);
@@ -65,21 +66,24 @@ export function calculateProjectReadiness(project: ProjectState): {
   let methodScore = 0;
   if (hasQuestions) methodScore += 25;
   if ((project.searchStrategies || []).length > 0) methodScore += 25;
-  if (project.ethicsInfo?.approvalNumber || project.ethicsInfo?.consentObtained) methodScore += 25;
+  const ethicsRecordComplete = project.ethicsInfo?.approvalRequired
+    ? project.ethicsInfo.approvalState === "Approved" && Boolean(project.ethicsInfo.approvalNumber) && project.ethicsInfo.consentObtained
+    : project.ethicsInfo?.approvalRequired === false;
+  if (ethicsRecordComplete) methodScore += 25;
   if ((project.reportingGuideline?.checklistItems || []).some(isEvidenceBackedChecklistItem)) methodScore += 25;
   const methodCompleteness = Math.min(100, methodScore);
 
   // 5. Data Quality
   const totalDatasets = project.datasets.length;
   const approvedDatasets = project.datasets.filter(
-    (d) => d.state === "Approved for Analysis" || d.state === "Locked" || d.isAnonymizedConfirmed
+    (d) => d.state === "Approved for Analysis" || d.state === "Locked"
   ).length;
   const dataQuality = totalDatasets > 0 ? Math.round((approvedDatasets / totalDatasets) * 100) : 0;
 
   // 6. Reproducibility
   const totalPlans = project.analysisPlans.length;
   const approvedPlans = project.analysisPlans.filter(
-    (a) => a.state === "Approved for Manuscript" || (a.state as any) === "Researcher Approved" || a.state === "Completed" || a.status === "Approved" || a.status === "Executed"
+    (a) => isResearcherApprovedAnalysisPlan(a)
   ).length;
   const reproducibility = totalPlans > 0 ? Math.round((approvedPlans / totalPlans) * 100) : 0;
 
@@ -89,14 +93,16 @@ export function calculateProjectReadiness(project: ProjectState): {
   const citationAccuracy = totalSections > 0 ? Math.round((sectionsWithCitations / totalSections) * 100) : 0;
 
   // 8. Compliance
-  let complianceScore = 0;
-  if (project.selectedTargetOutlet) complianceScore += 50;
-  if (project.complianceReport?.overallStatus === "Pass") complianceScore += 50;
-  const compliance = complianceScore;
+  const complianceGates = evaluateExportGateChecks(project, "Submission-Ready");
+  const compliance = complianceGates.length > 0
+    ? Math.round((complianceGates.filter((gate) => gate.status === "Pass").length / complianceGates.length) * 100)
+    : 0;
 
   // 9. Integrity Review
   let integrityScore = 0;
-  const authorFinalApprovals = project.authors.filter((a) => a.finalApproval).length;
+  const authorFinalApprovals = project.authors.filter(
+    (a) => a.finalApproval && a.approvalActorUid?.trim() && a.approvalTimestamp?.trim() && a.approvalRationale?.trim()
+  ).length;
   if (project.authors.length > 0 && authorFinalApprovals === project.authors.length) integrityScore += 50;
   if (project.termsAccepted) integrityScore += 50;
   const integrityReview = Math.min(100, integrityScore);

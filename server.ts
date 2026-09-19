@@ -553,7 +553,7 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
         issue: lookup.issue,
         pages: lookup.pages,
         publisher: lookup.publisher,
-        verificationState: "Verified",
+        verificationState: "Unverified",
         metadataProvider: lookup.providerName,
         metadataProviderId: lookup.providerId,
         providerRecordId: lookup.providerRecordId,
@@ -565,6 +565,7 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
           providerId: lookup.providerId,
           provider: lookup.providerName,
           retrievedAt: lookup.retrievedAt,
+          trustedServerRetrieved: true,
           fieldProvenance: lookup.fieldProvenance,
           disclaimer: lookup.disclaimer,
         },
@@ -632,7 +633,11 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
           if (!responseValidation.valid) {
             console.error("External analysis response validation failed:", responseValidation.errors);
           } else {
-            return res.json(responseValidation.value);
+            const externalOutput = responseValidation.value.output as Record<string, unknown>;
+            return res.json({
+              ...responseValidation.value,
+              output: { ...externalOutput, trustedServerCreated: true },
+            });
           }
         } catch (serviceErr: any) {
           console.error("Cloud Run Analysis Service Error:", serviceErr);
@@ -668,7 +673,7 @@ Intervention, exposure, and comparator are optional and must remain "Researcher 
       res.json({
         status: "completed",
         executionStatus: "Completed",
-        output,
+        output: { ...output, trustedServerCreated: true },
         figures,
         tables,
         datasetHash: output.datasetHash,

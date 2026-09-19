@@ -46,6 +46,28 @@ interface ManuscriptPreviewPaneProps {
   hasBlockers?: boolean;
 }
 
+export function buildTruthfulEthicsDisclosure(ethicsInfo: ProjectState["ethicsInfo"] | undefined): {
+  approval: string;
+  consent: string;
+} {
+  if (!ethicsInfo) {
+    return {
+      approval: "Missing — researcher input required.",
+      consent: "Not confirmed — researcher input required.",
+    };
+  }
+
+  const approval = ethicsInfo.approvalRequired === false
+    ? "Researcher-declared not required — independent verification not available."
+    : ethicsInfo.approvalNumber?.trim()
+      ? `Researcher-supplied approval reference: ${ethicsInfo.approvalNumber.trim()}. Independent verification is not available in this preview.`
+      : "Missing — researcher input required.";
+  const consent = ethicsInfo.consentObtained
+    ? "Researcher recorded consent confirmation."
+    : "Not confirmed — researcher input required.";
+  return { approval, consent };
+}
+
 export const ManuscriptPreviewPane: React.FC<ManuscriptPreviewPaneProps> = ({
   project,
   selectedStyle,
@@ -72,6 +94,10 @@ export const ManuscriptPreviewPane: React.FC<ManuscriptPreviewPaneProps> = ({
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
   const outlet = project.selectedTargetOutlet;
+  const ethicsDisclosure = buildTruthfulEthicsDisclosure(project.ethicsInfo);
+  const aiDisclosure = project.aiLedger?.length
+    ? `${project.aiLedger.length} AI ledger event(s) recorded; ledger status: ${project.aiLedgerIntegrity?.status || "Unverified"}.`
+    : "AI-use history not available — researcher input required.";
   const currentStyleObj = useMemo(() => {
     return CSL_STYLES.find((s) => s.id === selectedStyle) || CSL_STYLES[0];
   }, [selectedStyle]);
@@ -567,7 +593,7 @@ export const ManuscriptPreviewPane: React.FC<ManuscriptPreviewPaneProps> = ({
                   </span>
                   <span>•</span>
                   <span>
-                    <strong className="text-stone-800">Ethics Approval:</strong> {project.ethicsInfo?.approvalNumber || "Declared / Exemption Active"}
+                    <strong className="text-stone-800">Ethics Approval:</strong> {ethicsDisclosure.approval}
                   </span>
                 </div>
 
@@ -700,14 +726,15 @@ export const ManuscriptPreviewPane: React.FC<ManuscriptPreviewPaneProps> = ({
                   <div className="bg-stone-50 p-3 rounded-lg border border-stone-200 space-y-1">
                     <strong className="text-stone-800 block">Ethics & Institutional Approval:</strong>
                     <p className="text-stone-600">
-                      Approval Ref: {project.ethicsInfo?.approvalNumber || "Declared Exempt NISS-REC-2026"} (Institutional Review Board verified). Informed consent was obtained from all participating subjects prior to protocol initiation.
+                      <span className="block">Approval: {ethicsDisclosure.approval}</span>
+                      <span className="block">Consent: {ethicsDisclosure.consent}</span>
                     </p>
                   </div>
 
                   <div className="bg-stone-50 p-3 rounded-lg border border-stone-200 space-y-1">
                     <strong className="text-stone-800 block">AI & Computational Tool Usage:</strong>
                     <p className="text-stone-600">
-                      Generative AI tools were utilized strictly for structural summarization, literature indexing, and citation normalization per ICMJE & WAME guidelines under full human researcher review and verification.
+                      {aiDisclosure} AI output remains a proposal until an attributable researcher decision is recorded.
                     </p>
                   </div>
                 </div>

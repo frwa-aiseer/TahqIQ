@@ -1,6 +1,7 @@
 import type { AnalysisOutput, AnalysisPlan, DatasetRecord } from "../types";
 import type { AnalysisMethodDefinition, AnalysisMethodRegistry } from "./analysisMethodRegistry";
 import { normalCdf, studentTTwoTailedPValue } from "./statsEngine";
+import { isResearcherApprovedAnalysisPlan } from "./analysisLifecycle";
 
 export interface RegressionAnalysisInput {
   dataset: DatasetRecord;
@@ -88,7 +89,7 @@ function validateAndExtract(input: RegressionAnalysisInput, binary: boolean): Re
   const { dataset, plan } = input;
   if (!dataset || !plan) return "Dataset and analysis plan are required.";
   if (dataset.state !== "Approved for Analysis" && dataset.state !== "Locked") return "Dataset requires approval for analysis.";
-  if (plan.status !== "Approved" && plan.state !== "Approved" && plan.state !== "Completed") return "Analysis plan requires researcher approval.";
+  if (!isResearcherApprovedAnalysisPlan(plan)) return "Analysis plan requires researcher approval.";
   const rows = dataset.rawPreview ?? [];
   if (!rows.length) return "Dataset contains no raw records.";
   const outcome = input.outcomeVariable ?? plan.outcomeVariable;

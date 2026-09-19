@@ -96,8 +96,11 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
           pmcid: data.pmcid,
           providerRecordId: data.providerRecordId,
           documentType: "Journal Article",
-          peerReviewStatus: "Peer-reviewed",
-          verificationState: "Verified",
+          peerReviewStatus: "Unknown",
+          // Registry resolution verifies bibliographic metadata only; source
+          // verification and peer-review disposition require a separate
+          // researcher-reviewed trusted transition.
+          verificationState: "Unverified",
           state: "Imported",
           provenance: data.provenance || {
             provider: data.metadataProvider || "Crossref Official Registry",
@@ -105,30 +108,16 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
             fieldProvenance: data.fieldProvenance,
             disclaimer: CrossrefDisclaimer.MESSAGE,
           },
-          stateHistory: [
-            {
-              id: `tr-${Date.now()}`,
-              entityType: "Source",
-              entityId: sourceId,
-              fromState: "Imported",
-              toState: "Imported",
-              actorUid: user?.uid || "system",
-              actorEmail: user?.email || "system@tehqiq.edu",
-              timestamp: new Date().toISOString(),
-              reason: "DOI Metadata Verified via Authoritative Registry",
-              evidenceRecordIds: [`doi:${data.doi}`],
-            },
-          ],
+          stateHistory: [],
           metadataProvider: data.metadataProvider || "Crossref Official Registry",
           verificationDate: data.verificationDate,
-          relevanceScore: 9,
           tags: ["DOI Import"],
           researcherNotes: "Imported with authoritative registry metadata."
         };
 
         onAddSource(newSource);
         setDoiInput("");
-        setNotice(`Successfully imported & verified DOI: ${data.doi} (${data.metadataProvider})`);
+        setNotice(`Successfully resolved DOI metadata: ${data.doi} (${data.metadataProvider}). Source verification remains pending.`);
       } else {
         setNotice("DOI lookup failed or was not found in Crossref / authoritative registries.");
       }
@@ -183,7 +172,9 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
       publisher: cand.publisher,
       documentType: "Journal Article",
       peerReviewStatus: "Unknown",
-      verificationState: cand.doi ? "Verified" : "Unverified",
+      // Candidate search returns registry metadata only; it does not establish
+      // source verification, peer-review status, or claim support.
+      verificationState: "Unverified",
       state: "Imported",
       metadataProvider: cand.providerName,
       provenance: {
@@ -191,7 +182,6 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
         retrievedAt: new Date().toISOString(),
         fieldProvenance: cand.fieldProvenance,
       },
-      relevanceScore: 8,
       tags: ["Candidate Search Import"],
       stateHistory: [],
     };
@@ -510,7 +500,7 @@ export const SourceLibraryView: React.FC<SourceLibraryViewProps> = ({
             </h3>
 
             <p className="text-xs text-slate-600">
-              Search Crossref / OpenAlex registries for candidates. Selected candidates will be imported as verified sources.
+              Search Crossref / OpenAlex registries for candidates. Selected candidates are imported as unverified records for researcher review.
             </p>
 
             <form onSubmit={handleSearchCandidates} className="flex items-center space-x-2">

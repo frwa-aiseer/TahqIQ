@@ -260,13 +260,17 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
     targetSection: ManuscriptSection | null;
     proposedContent: string;
     groundingStatus: AIValidationResult;
+    model?: string;
+    promptVersion?: string;
   }>({
     isOpen: false,
     title: "",
     featureUsed: "",
-    targetSection: null,
-    proposedContent: "",
-    groundingStatus: {
+      targetSection: null,
+      proposedContent: "",
+      model: undefined,
+      promptVersion: undefined,
+      groundingStatus: {
       valid: true,
       groundedCitations: [],
       ungroundedCitations: [],
@@ -285,11 +289,11 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
     const newEvent: AiLedgerEvent = {
       id: `ledger-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       timestamp: new Date().toISOString(),
-      userEmail: user?.email || "researcher@local",
+      userEmail: user?.email || "Not available",
       featureUsed: "Evidence-First Section Drafting",
       manuscriptSection: secTitle,
-      model: "gemini-3.6-flash",
-      promptVersion: "v2.4-phase6",
+      model: aiProposalState.model || "Not available — server attribution was not attached",
+      promptVersion: aiProposalState.promptVersion || "Not available — server attribution was not attached",
       inputSourcesUsed: sources.map((s) => s.id),
       generatedSummary: summary,
       userDecision: decision,
@@ -303,7 +307,7 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
       aiLedgerIntegrity: {
         status: "Incomplete",
         assessedAt: new Date().toISOString(),
-        assessedByUid: user?.uid || "tehqiq-system",
+        assessedByUid: user?.uid || "Not available",
         rationale: "The server AiGateway records generation events; reconciliation with this legacy project decision ledger remains incomplete.",
         knownBypassPaths: [],
       },
@@ -343,6 +347,8 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
     }
 
     let generatedText = "";
+    let generatedModel: string | undefined;
+    let generatedPromptVersion: string | undefined;
     try {
       const res = await authenticatedProjectFetch("/api/gemini/draft-section", project.id, {
         method: "POST",
@@ -367,6 +373,11 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
       }
 
       generatedText = data.draft?.content || "";
+      if (!generatedText.trim()) {
+        throw new Error("AI drafting returned no content. No fallback prose was generated.");
+      }
+      generatedModel = typeof data.model === "string" ? data.model : undefined;
+      generatedPromptVersion = typeof data.promptVersion === "string" ? data.promptVersion : undefined;
     } catch (err: any) {
       alert(`AI Drafting Service Unavailable: ${err?.message || "Could not reach drafting server."}. Local substitution of synthetic content is disabled to protect scientific integrity.`);
       setIsExpanding(false);
@@ -385,6 +396,8 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
       targetSection: targetSec,
       proposedContent: generatedText,
       groundingStatus: grounding,
+      model: generatedModel,
+      promptVersion: generatedPromptVersion,
     });
   };
 
@@ -1107,7 +1120,11 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
                 ) : (
                   <div className="bg-emerald-950/20 border border-emerald-500/30 p-3 rounded-2xl text-[11px] text-emerald-300 flex items-center space-x-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>All in-text citations are verified in the Source Library!</span>
+                    <span>
+                      {verificationReport.totalCitationsFound > 0
+                        ? "All in-text citations match verified Source Library records."
+                        : "No in-text citations found — researcher input required."}
+                    </span>
                   </div>
                 )}
 
@@ -1827,6 +1844,8 @@ export const WritingStudioView: React.FC<WritingStudioViewProps> = ({
         featureUsed={aiProposalState.featureUsed}
         manuscriptSection={aiProposalState.targetSection?.title}
         proposedContent={aiProposalState.proposedContent}
+        model={aiProposalState.model}
+        promptVersion={aiProposalState.promptVersion}
         groundingStatus={aiProposalState.groundingStatus}
         onAccept={handleAcceptProposal}
         onEditAndAccept={handleEditAndAcceptProposal}

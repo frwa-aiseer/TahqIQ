@@ -590,6 +590,8 @@ export interface ProvenanceMetadata {
   providerId?: string;
   provider: string;
   retrievedAt: string;
+  /** Set only by a trusted server/provider boundary; never client-authored. */
+  trustedServerRetrieved?: true;
   fieldProvenance?: Record<string, FieldProvenance>;
   disclaimer?: string;
 }
@@ -680,7 +682,7 @@ export interface SourceRecord {
   canonicalSourceId?: string;
   title: string;
   authors: string[];
-  year: number;
+  year?: number;
   fullDate?: string;
   journalOrVenue: string;
   publisher?: string;
@@ -715,7 +717,7 @@ export interface SourceRecord {
   retractionWarning?: boolean;
   correctionNotice?: string;
   integrityVerification?: SourceIntegrityVerification;
-  relevanceScore: number; // 1 to 10
+  relevanceScore?: number; // researcher-assigned relevance only; missing remains unscored
   tags: string[];
   researcherNotes?: string;
   extractedPassages?: ExtractedPassage[];
@@ -1260,6 +1262,8 @@ export interface AnalysisOutput {
   warnings?: string[];
   executionStatus?: "Completed" | "Failed" | "Queued" | "Running" | "Blocked";
   isResearcherSupplied?: boolean; // Label for imported SPSS/R/Jamovi/Prism logs
+  /** Set only on output returned by the authenticated server execution boundary. */
+  trustedServerCreated?: true;
   reproductionStatus?: "Independently Reproduced" | "Not Independently Reproduced";
   pairingReport?: {
     totalParticipants: number;
@@ -1649,6 +1653,9 @@ export interface ReviewerComment {
   actionTaken?: "Accept" | "Reject with explanation" | "Partially accept" | "Pending";
   status: "Open" | "Resolved";
   timestamp: string;
+  /** Server-returned attribution when the comment came from AiGateway. */
+  aiModel?: string;
+  aiPromptVersion?: string;
   isDemo?: boolean;
   isSynthetic?: boolean;
 }

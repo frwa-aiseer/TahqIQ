@@ -9,6 +9,7 @@ import { AnalysisMethodRegistry } from "./analysisMethodRegistry";
 import { registerCommonComparisonMethods } from "./commonComparisonMethods";
 import { registerRegressionSurvivalDiagnosticMethods } from "./regressionAnalysisMethods";
 import { registerSpecializedAnalysisMethods } from "./specializedAnalysisMethods";
+import { isResearcherApprovedAnalysisPlan } from "./analysisLifecycle";
 
 // ==========================================
 // High-Precision Statistical Distribution Helpers
@@ -341,7 +342,7 @@ function executePairedCrossoverMethod(
   // 1. Strict State Machine Governance & Approval Requirements
   // Execution MUST require an approved dataset and an approved plan.
   const isDatasetApproved = dataset.state === "Approved for Analysis" || dataset.state === "Locked";
-  const isPlanApproved = plan.status === "Approved" || plan.state === "Approved" || plan.state === "Completed";
+  const isPlanApproved = isResearcherApprovedAnalysisPlan(plan);
 
   if (!isDatasetApproved || !isPlanApproved) {
     const unapprovedReasons: string[] = [];
@@ -512,24 +513,24 @@ function executePairedCrossoverMethod(
       }
     });
   } else {
-    // Fallback: extract first two numerical columns if available
-    const numericCols = dataset.variables.filter((v) => v.type === "Numeric").map((v) => v.name);
-    if (numericCols.length >= 2) {
-      const colA = numericCols[0];
-      const colB = numericCols[1];
-      rawRows.forEach((row, idx) => {
-        const subId = String(row["id"] || row["participant"] || `S-${idx + 1}`);
-        const vA = Number(row[colA]);
-        const vB = Number(row[colB]);
-        if (!isNaN(vA) && !isNaN(vB)) {
-          condA_vals.push(vA);
-          condB_vals.push(vB);
-          pairSubjectIds.push(subId);
-        } else {
-          droppedSubjects.push(subId);
-        }
-      });
-    }
+    return {
+      id: `an-run-failed-${Date.now()}`,
+      analysisPlanId: plan.id,
+      planId: plan.id,
+      datasetHash: dataset.fileHash,
+      executionTimestamp: timestamp,
+      softwareEnvironment: "TehqIQ Execution Engine v2.3",
+      summaryText: "Execution Failed: Explicit paired outcome variables and a condition variable are required; no implicit numeric-column fallback is used.",
+      numericResults: { status: "Failed", error: "Explicit analysis variables are required." },
+      pValues: [],
+      effectSizes: [],
+      assumptionChecks: [],
+      isReproduced: false,
+      reproducibilityHash: "failed-missing-analysis-variables",
+      executionStatus: "Failed",
+      logs: [`Execution attempted at ${timestamp}`, "Explicit paired analysis variables were not supplied."],
+      warnings: ["Analysis did not guess variables from column order."],
+    };
   }
 
   // Ensure sufficient valid pairs

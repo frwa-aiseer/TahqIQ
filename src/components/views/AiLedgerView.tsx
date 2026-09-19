@@ -77,7 +77,7 @@ export const AiLedgerView: React.FC<AiLedgerViewProps> = ({ ledgerEvents, projec
             <Database className="w-4 h-4 text-indigo-400" />
             <span>Immutable Action Log ({ledgerEvents.length} Events)</span>
           </h3>
-          <span className="text-[11px] text-zinc-400 font-mono">Prompt Version: v2.4-phase6</span>
+          <span className="text-[11px] text-zinc-400 font-mono">Prompt Version: server-attributed per event</span>
         </div>
 
         {ledgerEvents.length === 0 ? (
@@ -111,7 +111,7 @@ export const AiLedgerView: React.FC<AiLedgerViewProps> = ({ ledgerEvents, projec
                     </td>
                     <td className="p-3.5 font-mono text-amber-400 text-[11px]">
                       <div>{ev.model}</div>
-                      <span className="text-zinc-500 text-[10px]">{ev.promptVersion || "v2.4-phase6"}</span>
+                      <span className="text-zinc-500 text-[10px]">{ev.promptVersion || "Not available"}</span>
                     </td>
                     <td className="p-3.5 font-mono text-zinc-400 text-[10px]">
                       {(ev.inputSourcesUsed || []).slice(0, 2).join(", ") || "None"}

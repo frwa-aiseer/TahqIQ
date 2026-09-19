@@ -1,6 +1,7 @@
 import type { AnalysisOutput, AnalysisPlan, DatasetRecord } from "../types";
 import type { AnalysisMethodDefinition, AnalysisMethodRegistry } from "./analysisMethodRegistry";
 import { normalCdf, studentTTwoTailedPValue } from "./statsEngine";
+import { isResearcherApprovedAnalysisPlan } from "./analysisLifecycle";
 
 export interface SpecializedAnalysisInput {
   dataset: DatasetRecord;
@@ -65,7 +66,7 @@ function failure(input: SpecializedAnalysisInput, method: string, reason: string
 function baseValidation(input: SpecializedAnalysisInput): string | undefined {
   if (!input.dataset || !input.plan) return "Dataset and analysis plan are required.";
   if (input.dataset.state !== "Approved for Analysis" && input.dataset.state !== "Locked") return "Dataset requires approval for analysis.";
-  if (input.plan.status !== "Approved" && input.plan.state !== "Approved" && input.plan.state !== "Completed") return "Analysis plan requires researcher approval.";
+  if (!isResearcherApprovedAnalysisPlan(input.plan)) return "Analysis plan requires researcher approval.";
   if (!input.dataset.rawPreview?.length) return "Dataset contains no raw records.";
 }
 

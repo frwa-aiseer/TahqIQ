@@ -222,7 +222,7 @@ export const ExportCentreView: React.FC<ExportCentreViewProps> = ({
       ethicsAndAiDisclosure: false,
       supplementarySelections: false,
     });
-    setExportNotice({ type: "success", message: `BibTeX file exported with ${project.sources?.length || 0} verified references.` });
+    setExportNotice({ type: "success", message: `BibTeX file exported with ${project.sources?.length || 0} supplied references.` });
   };
 
   const handleExportRis = () => {
@@ -240,7 +240,7 @@ export const ExportCentreView: React.FC<ExportCentreViewProps> = ({
       ethicsAndAiDisclosure: false,
       supplementarySelections: false,
     });
-    setExportNotice({ type: "success", message: `RIS file exported with ${project.sources?.length || 0} verified references.` });
+    setExportNotice({ type: "success", message: `RIS file exported with ${project.sources?.length || 0} supplied references.` });
   };
 
   const handleExportCslJson = () => {
@@ -258,7 +258,7 @@ export const ExportCentreView: React.FC<ExportCentreViewProps> = ({
       ethicsAndAiDisclosure: false,
       supplementarySelections: false,
     });
-    setExportNotice({ type: "success", message: `CSL JSON schema file exported with ${project.sources?.length || 0} verified references.` });
+    setExportNotice({ type: "success", message: `CSL JSON schema file exported with ${project.sources?.length || 0} supplied references.` });
   };
 
   const handleExportJats = () => {
@@ -557,7 +557,7 @@ export const ExportCentreView: React.FC<ExportCentreViewProps> = ({
               onChange={(e) => setLineSpacing(parseFloat(e.target.value) as 1.0 | 1.5 | 2.0)}
               className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-semibold text-[#102A43] focus:outline-none focus:border-[#0B5D4B]"
             >
-              <option value={2.0}>2.0 (Double Spaced - Q1 Standard)</option>
+                    <option value={2.0}>2.0 (Double Spaced - Journal preset)</option>
               <option value={1.5}>1.5 Line Spacing</option>
               <option value={1.0}>1.0 Single Spacing</option>
             </select>
