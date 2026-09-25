@@ -200,7 +200,7 @@ Client-side guards and Firestore rules are not substitutes for authentication an
 - `DataLabView` calls `/api/analysis/execute` for server execution.
 - `ANALYSIS_SERVICE_URL` optionally routes execution to an external `/execute` service; failures fall back to the native engine.
 - The native endpoint is specialized to paired/crossover analysis rather than a general analysis registry.
-- `src/lib/q1ManuscriptEngine.ts` remains only as a demo-fixture generator. TQ-VSC-002 added a fail-closed `isDemoProject === true` guard to both generation entry points, tags generated sections as demo/synthetic, and removed all production component imports. Deterministic tone-only formatting now lives in `src/lib/manuscriptTone.ts`.
+- The obsolete `q1ManuscriptEngine` demo generator and its one-off patch utilities were removed in TQ-VSC-096 after repository search confirmed no production callers. Deterministic tone-only formatting remains in `src/lib/manuscriptTone.ts`, and the mounted Writing Studio imports that safe formatter directly. The explicit `createDemoProject` fixture remains for prototype UI coverage and is still marked demo/synthetic.
 
 ## Methodology workspace
 
@@ -298,7 +298,7 @@ These are source observations, not work completed under later prompts:
 2. Some deeply nested research entity fields are validated at their server-use boundary rather than exhaustively re-declaring the full persisted project schema; schema versioning remains a future compatibility consideration.
 3. Several implemented views are unreachable, while legacy route labels misleadingly land on other step content.
 4. Step 9 is labeled References but renders Claim Matrix rather than a dedicated reference-list view.
-5. `q1ManuscriptEngine.ts` still contains synthetic demonstration prose, but TQ-VSC-002 restricts it to explicit demo projects. TQ-VSC-004 removed abstract/unreviewed literature insertion and non-final statistical insertion from Writing Studio; other writing-generation paths remain separately governed.
+5. TQ-VSC-096 removed the obsolete q1 manuscript generator after confirming that no production route imported it; demo-project UI data remains explicitly isolated and marked synthetic. TQ-VSC-004 removed abstract/unreviewed literature insertion and non-final statistical insertion from Writing Studio; other writing-generation paths remain separately governed.
 6. JATS validation language overstates the local validator's demonstrated assurance.
 7. Build externalizes Node `crypto` from browser code and emits a very large main chunk.
 8. The baseline suite is red because of a network-dependent DOI expectation and a localStorage test-environment issue.

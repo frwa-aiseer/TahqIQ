@@ -57,6 +57,18 @@ describe('Statistical Input-Sensitivity & Edge Case Tests', () => {
   });
 
   describe('2. Missing Data, Non-Numeric Strings & NaNs Filtering', () => {
+    it('fails closed when outcome variables are omitted instead of selecting numeric columns by order', () => {
+      const ds = parseCsvTextToDataset('implicit-columns.csv', 'id,pre,post\n1,10,12\n2,11,13\n');
+      ds.isAnonymizedConfirmed = true;
+      ds.state = 'Approved for Analysis';
+
+      const result = executePairedCrossoverAnalysis(ds);
+
+      expect(result.executionStatus).toBe('Failed');
+      expect(result.summaryText).toContain('Explicit paired outcome variables are required');
+      expect(result.warnings?.join(' ')).toContain('did not guess outcome variables');
+    });
+
     it('filters missing values, empty strings, and NaNs, reporting missing count accurately', () => {
       const dirtyCsv = `id,pre,post\n1,10.0,20.0\n2,12.0,N/A\n3,15.0,25.0\n4,,30.0\n5,invalid,40.0\n6,18.0,28.0`;
       const dirtyDs = parseCsvTextToDataset('dirty.csv', dirtyCsv);

@@ -400,12 +400,33 @@ function executePairedCrossoverMethod(
   // Identify dataset variable names available
   const availableVars = new Set(Object.keys(rawRows[0] || {}));
 
+  if (!outcomeVar || !outcomeVar.trim()) {
+    return {
+      id: `an-run-failed-${Date.now()}`,
+      analysisPlanId: plan.id,
+      planId: plan.id,
+      datasetHash: dataset.fileHash,
+      executionTimestamp: timestamp,
+      softwareEnvironment: "TehqIQ Execution Engine v2.3",
+      summaryText: "Execution Failed: Explicit paired outcome variables are required; the engine will not infer variables from column order.",
+      numericResults: { status: "Failed", error: "Explicit outcome variables are required." },
+      pValues: [],
+      effectSizes: [],
+      assumptionChecks: [],
+      isReproduced: false,
+      reproducibilityHash: "failed-missing-outcome-variable",
+      executionStatus: "Failed",
+      logs: [`Execution attempted at ${timestamp}`, "Explicit paired outcome variables were not supplied."],
+      warnings: ["Analysis did not guess outcome variables from numeric column order."],
+    };
+  }
+
   // Resolve variable names for Wide vs Long format
   let condA_vals: number[] = [];
   let condB_vals: number[] = [];
   let pairSubjectIds: string[] = [];
 
-  // Verify missing variable explicitly before attempting wide fallback
+  // Verify missing variables explicitly before attempting a declared wide format.
   if (outcomeVar && !outcomeVar.includes(",") && !availableVars.has(outcomeVar)) {
     return {
       id: `an-run-failed-${Date.now()}`,
@@ -456,13 +477,6 @@ function executePairedCrossoverMethod(
         logs: [`Execution attempted at ${timestamp}`, `Missing variable '${missingVar}'`],
         warnings: [`Required variable '${missingVar}' was not found in dataset columns.`],
       };
-    }
-  } else {
-    // Look for implicit wide columns if outcomeVar isn't provided or is empty
-    const numCols = dataset.variables.filter((v) => v.type === "Numeric").map((v) => v.name);
-    if (!outcomeVar && numCols.length >= 2) {
-      wideVarA = numCols[0];
-      wideVarB = numCols[1];
     }
   }
 

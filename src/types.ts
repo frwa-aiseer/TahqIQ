@@ -284,12 +284,12 @@ export interface ResearchQuestionItem {
   question: string;
   type: "Primary" | "Secondary" | "Sub-question";
   finerScore: {
-    feasible: number;
-    interesting: number;
-    novel: number;
-    ethical: number;
-    relevant: number;
-    totalScore: number;
+    feasible: number | null;
+    interesting: number | null;
+    novel: number | null;
+    ethical: number | null;
+    relevant: number | null;
+    totalScore: number | null;
   };
   hypotheses: Hypothesis[];
   isApproved: boolean;

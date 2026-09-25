@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateAiGeneratedProse, generateLedgerDisclosureStatement } from "../lib/aiValidationService";
-import { expandSectionToQ1Length } from "../lib/q1ManuscriptEngine";
-import { ProjectState, ManuscriptSection } from "../types";
+import { ProjectState } from "../types";
 
 describe("Phase 6 Acceptance Tests: Structured, Reviewable & Evidence-Grounded AI Workflows", () => {
   const mockProjectWithoutData = {
@@ -126,31 +125,8 @@ describe("Phase 6 Acceptance Tests: Structured, Reviewable & Evidence-Grounded A
     expect(result2.error).toContain("Ungrounded numerical findings detected");
   });
 
-  // Test 3: AI output cannot self-approve
-  it("Test 3: AI output cannot self-approve", () => {
-    const section: ManuscriptSection = {
-      id: "sec-intro",
-      title: "Introduction",
-      content: "",
-      order: 1,
-      currentWordCount: 0,
-      targetWordLimit: 1200,
-      status: "Drafting",
-      state: "Empty",
-      citationIds: [],
-      version: 1,
-      lastEditedBy: "system",
-      lastEditedTimestamp: new Date().toISOString(),
-    };
-
-    // The legacy generator is demo-only and cannot create or approve real-project content.
-    expect(() => expandSectionToQ1Length(section, mockProjectWithoutData, 1200)).toThrow(/demo-only/i);
-    expect(section.status).toBe("Drafting");
-    expect(section.state).toBe("Empty");
-  });
-
-  // Test 4: Accepted and rejected proposals are logged to ledger
-  it("Test 4: Accepted and rejected proposals are logged to ledger", () => {
+  // Test 3: Accepted and rejected proposals are logged to ledger
+  it("Test 3: Accepted and rejected proposals are logged to ledger", () => {
     const ledgerEvents = [
       {
         id: "ev-1",
@@ -187,8 +163,8 @@ describe("Phase 6 Acceptance Tests: Structured, Reviewable & Evidence-Grounded A
     expect(ledgerEvents[0].promptVersion).toBe("v2.4-phase6");
   });
 
-  // Test 5: Disclosure matches the ledger
-  it("Test 5: Disclosure matches the ledger", () => {
+  // Test 4: Disclosure matches the ledger
+  it("Test 4: Disclosure matches the ledger", () => {
     const ledgerEvents = [
       {
         id: "ev-1",
@@ -227,8 +203,8 @@ describe("Phase 6 Acceptance Tests: Structured, Reviewable & Evidence-Grounded A
     expect(disclosure).toContain("Introduction, Methods");
   });
 
-  // Test 6: Results cannot be drafted from no data
-  it("Test 6: Results cannot be drafted from no data", () => {
+  // Test 5: Results cannot be drafted from no data
+  it("Test 5: Results cannot be drafted from no data", () => {
     const result = validateAiGeneratedProse("Some results text...", "Results", mockProjectWithoutData);
 
     expect(result.valid).toBe(false);

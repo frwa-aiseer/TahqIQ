@@ -461,6 +461,11 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
 
   const isDatasetApproved = activeDataset && (activeDataset.state === "Approved for Analysis" || activeDataset.state === "Locked");
   const isPlanApproved = activePlan && isResearcherApprovedAnalysisPlan(activePlan);
+  const analysisReadinessLabel = isDatasetApproved && isPlanApproved
+    ? "Ready for researcher-approved analysis"
+    : datasets.length === 0 || plans.length === 0
+      ? "Waiting for dataset and approved plan"
+      : "Approval gate active";
 
   return (
     <div className="space-y-6">
@@ -481,12 +486,18 @@ export const DataLabView: React.FC<DataLabViewProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
-          <span className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Analysis Engine Ready</span>
+          <span className={`${isDatasetApproved && isPlanApproved ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-amber-50 border-amber-200 text-amber-900"} border px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5`}>
+            {isDatasetApproved && isPlanApproved ? <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" /> : <Lock className="w-4 h-4 text-amber-600 shrink-0" />}
+            <span>{analysisReadinessLabel}</span>
           </span>
         </div>
       </div>
+
+      {project?.projectType?.toLowerCase().includes("qualitative") && (
+        <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs p-3.5 rounded-xl">
+          <strong>Qualitative project:</strong> this Data Lab is for numeric datasets only. Transcript/corpus upload and qualitative coding are Not Configured in this screen; do not upload qualitative material here as a numeric dataset.
+        </div>
+      )}
 
       {parsedMessage && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-3 rounded-xl flex items-center justify-between">

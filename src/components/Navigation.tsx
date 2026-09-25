@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Check, CheckCircle2, Circle, ChevronDown, ChevronUp, TrendingUp, ListTodo, Sparkles } from "lucide-react";
 import { ProjectState } from "../types";
-import { calculateProjectReadiness } from "../lib/readinessCalculator";
+import { calculateProjectReadiness, calculateSubmissionReadiness } from "../lib/readinessCalculator";
 
 export interface WorkflowStep {
   id: number;
@@ -26,12 +26,12 @@ export const WORKFLOW_STEPS: WorkflowStep[] = [
   { id: 2, key: "literature-gap", title: "Literature & Gap", shortLabel: "Literature & Gap", subtitle: "Find relevant literature" },
   { id: 3, key: "questions-hypotheses", title: "Questions & Hypotheses", shortLabel: "Questions & Hypotheses", subtitle: "Formulate research questions" },
   { id: 4, key: "introduction-review", title: "Introduction & Review", shortLabel: "Introduction & Review", subtitle: "Draft introduction & literature review" },
-  { id: 5, key: "methodology", title: "Methodology", shortLabel: "Methodology", subtitle: "Add Data & Generate Insights" },
-  { id: 6, key: "results", title: "Results", shortLabel: "Results", subtitle: "Empirical findings & data tables" },
+  { id: 5, key: "methodology", title: "Methods & Protocol", shortLabel: "Methods & Protocol", subtitle: "Define method, ethics, and analysis plan" },
+  { id: 6, key: "results", title: "Data & Results", shortLabel: "Data & Results", subtitle: "Upload data, run approved analysis, and review outputs" },
   { id: 7, key: "discussion-conclusion", title: "Discussion & Conclusion", shortLabel: "Discussion & Conclusion", subtitle: "Synthesize conclusions & findings" },
   { id: 8, key: "future-work", title: "Future Work", shortLabel: "Future Work", subtitle: "Outline study limitations & future directions" },
   { id: 9, key: "references", title: "References", shortLabel: "References", subtitle: "Verified citations & reference list" },
-  { id: 10, key: "preview-export", title: "Preview & Export", shortLabel: "Preview & Export", subtitle: "Review complete manuscript & export" },
+  { id: 10, key: "preview-export", title: "Review & Export", shortLabel: "Review & Export", subtitle: "Review warnings, disclosures, and export files" },
 ];
 
 interface NavigationProps {
@@ -72,7 +72,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       (project.sources.some((s) => s.state === "Full Text Reviewed" || s.state === "Full Text Available" || s.verificationState === "Verified" || (s.title && s.title.length > 5)))
     );
 
-    const hasQuestions = Boolean((project.researchQuestions || []).length > 0);
+    const hasQuestions = Boolean((project.researchQuestions || []).some((question) => question.question.trim().length > 0));
 
     const hasIntroOrReview = Boolean(
       (project.sections || []).some(
@@ -147,8 +147,10 @@ export const Navigation: React.FC<NavigationProps> = ({
   const readiness = project ? calculateProjectReadiness(project) : null;
   const displayPercentage = readiness ? Math.round((taskPercentage + readiness.overall) / 2) : taskPercentage;
 
-  const getProgressLabel = (pct: number) => {
-    if (pct >= 90) return "Ready for Export";
+  const submissionReady = project ? calculateSubmissionReadiness(project).ready : false;
+
+  const getProgressLabel = (pct: number, isSubmissionReady: boolean) => {
+    if (pct >= 90) return isSubmissionReady ? "Ready for Export" : "Review Submission Blockers";
     if (pct >= 70) return "Advanced Stage";
     if (pct >= 40) return "In Active Progress";
     if (pct > 0) return "Drafting Started";
@@ -192,7 +194,7 @@ export const Navigation: React.FC<NavigationProps> = ({
           <div className="flex items-center justify-between text-[11px] text-stone-500 pt-0.5">
             <span className="font-medium">{completedTasksCount} of {totalTasks} tasks finished</span>
             <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded">
-              {getProgressLabel(displayPercentage)}
+              {getProgressLabel(displayPercentage, submissionReady)}
             </span>
           </div>
 

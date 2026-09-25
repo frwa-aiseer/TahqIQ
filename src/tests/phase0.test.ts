@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { createEmptyProject, createDemoProject, canAddRecordToProject } from "../data/demoProject";
 import { executePairedCrossoverAnalysis } from "../lib/statsEngine";
 import { createMissingSourceRecord } from "../lib/citationVerifier";
-import { expandSectionToQ1Length } from "../lib/q1ManuscriptEngine";
-import { ManuscriptSection } from "../types";
 
 describe('Phase 0 Verification Tests', () => {
   it('1. Real projects contain no demo records', () => {
@@ -57,25 +55,5 @@ describe('Phase 0 Verification Tests', () => {
 
   it('5. Creating synthetic sources from surname/year throws disabled or prohibition error', () => {
     expect(() => createMissingSourceRecord("Smith", 2024)).toThrow(/prohibited/i);
-  });
-
-  it('6. Demo manuscript engine rejects real projects without generating substitute Results', () => {
-    const realProject = createEmptyProject();
-    const sectionToExpand: ManuscriptSection = {
-      id: "sec-3",
-      title: "3. Results",
-      content: "",
-      order: 3,
-      currentWordCount: 0,
-      citationIds: [],
-      status: "Drafting",
-      version: 1,
-      lastEditedBy: "Researcher",
-      lastEditedTimestamp: new Date().toISOString()
-    };
-
-    expect(() => expandSectionToQ1Length(sectionToExpand, realProject)).toThrow(/demo-only/i);
-    expect(sectionToExpand.content).toBe("");
-    expect(sectionToExpand.content).not.toContain("Boyer et al.");
   });
 });
